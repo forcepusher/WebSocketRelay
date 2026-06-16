@@ -1,12 +1,10 @@
 using UnityEngine;
-using System.IO;
-using BananaParty.WebSocketRelay;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
     public class Network : MonoBehaviour
     {
-        [SerializeField] private string serverAddress = "ws://127.0.0.1:23144";
+        private readonly string _serverAddress = "ws://127.0.0.1:23144";
         private Server _server;
         private Socket _socket;
 
@@ -19,29 +17,28 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void StopServer()
         {
-            _server?.Stop();
+            _server.Stop();
             _server = null;
             Debug.Log("Relay server stopped.");
         }
 
-        public void StartClient()
+        public void Connect()
         {
-            _socket = new Socket(serverAddress);
+            _socket = new Socket(_serverAddress);
             _socket.Connect();
-            Debug.Log($"Connected to relay server at {serverAddress}");
+            Debug.Log($"Connected to relay server at {_serverAddress}");
         }
 
-        public void StopClient()
+        public void Disconnect()
         {
-            _socket?.Dispose();
-            _socket = null;
+            _socket.Disconnect();
             Debug.Log("Disconnected from relay server.");
         }
 
         private void OnDestroy()
         {
-            _server?.Stop();
-            _socket?.Dispose();
+            _server.Stop();
+            _socket.Dispose();
         }
     }
 }
