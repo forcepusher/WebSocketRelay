@@ -1,5 +1,12 @@
 {
   "dependencies": {
+    "com.bananaparty.unislop": {
+      "version": "https://github.com/forcepusher/com.bananaparty.unislop.git#2.1.0",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "3f8a7ddffc502d2534ea6c4b5c86c114db014e9a"
+    },
     "com.bananaparty.websocketrelay": {
       "version": "file:com.bananaparty.websocketrelay",
       "depth": 0,

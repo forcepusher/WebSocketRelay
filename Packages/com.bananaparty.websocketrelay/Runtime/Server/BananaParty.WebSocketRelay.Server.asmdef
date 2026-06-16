@@ -1,0 +1,14 @@
+{
+    "name": "BananaParty.WebSocketRelay.Server",
+    "rootNamespace": "BananaParty.WebSocketRelay",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.IO;
 using BananaParty.WebSocketRelay;
 
 namespace BananaParty.WebSocketRelay.Samples
@@ -10,7 +11,10 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void StartServer()
         {
-
+            string serverPath = Path.Combine(Application.dataPath, "..", "Packages", "com.bananaparty.websocketrelay", "Server");
+            var server = new Server(serverPath);
+            server.Start();
+            Debug.Log("Relay server started.");
         }
 
         public void StartClient()
