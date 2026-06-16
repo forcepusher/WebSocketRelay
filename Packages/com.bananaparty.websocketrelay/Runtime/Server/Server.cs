@@ -11,18 +11,17 @@ namespace BananaParty.WebSocketRelay
         private Process _process;
         private readonly string _basePath;
 
-        public Server(string basePath)
+        public Server()
         {
-            if (string.IsNullOrEmpty(basePath)) throw new ArgumentException("Base path cannot be null or empty", nameof(basePath));
-            _basePath = basePath;
         }
 
         public void Start()
         {
             if (_process != null && !_process.HasExited) return;
 
+            string basePath = GetServerBasePath();
             string scriptName = GetScriptName();
-            string fullPath = Path.Combine(_basePath, scriptName);
+            string fullPath = Path.Combine(basePath, scriptName);
 
             if (!File.Exists(fullPath))
             {
@@ -44,6 +43,12 @@ namespace BananaParty.WebSocketRelay
             }
 
             _process = Process.Start(startInfo);
+        }
+
+        private string GetServerBasePath()
+        {
+            // This works in the Unity Editor.
+            return Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages", "com.bananaparty.websocketrelay", "Runtime", "Server"));
         }
 
         public void Stop()

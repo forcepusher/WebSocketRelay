@@ -11,8 +11,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void StartServer()
         {
-            string serverPath = Path.Combine(Application.dataPath, "..", "Packages", "com.bananaparty.websocketrelay", "Server");
-            var server = new Server(serverPath);
+            var server = new Server();
             server.Start();
             Debug.Log("Relay server started.");
         }
