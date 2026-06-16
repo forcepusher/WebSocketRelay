@@ -64,7 +64,7 @@ namespace BananaParty.WebSocketRelay
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"Failed to stop server process: {e.Message}");
+                UnityEngine.Debug.LogWarning($"Failed to stop server process: {e.Message}");
             }
             finally
             {

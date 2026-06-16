@@ -3,7 +3,7 @@
     "rootNamespace": "BananaParty.WebSocketRelay.Samples",
     "references": [
         "BananaParty.WebSocketRelay",
-        "BananaParty.WebSocketRelay.Server"
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
