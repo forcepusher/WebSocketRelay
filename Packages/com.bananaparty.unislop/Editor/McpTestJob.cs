@@ -7,32 +7,42 @@ using UnityEditor.TestTools.TestRunner.Api;
 namespace UniSlop.MCP
 {
     // Runs Unity tests as a non-blocking job. run_tests_start kicks it off and returns immediately;
-    // the MCP server polls run_tests_status. State, results AND the pending request are mirrored
-    // into SessionState so they survive the domain reload a Play Mode run triggers mid-run.
+    // the MCP server polls run_tests_status.
     //
-    // Results are recorded by the persistent listener in McpTestRunState (RecordResult), not by a
-    // per-run callback — a transient callback would be lost across the Play Mode reload, leaving the
-    // run stuck "running" forever (which also blocks every later run).
+    // "all" runs Edit Mode and Play Mode SEQUENTIALLY, one TestRunnerApi.Execute per mode, and
+    // aggregates the results. Passing both modes to a single Execute fires RunFinished after Edit
+    // Mode alone, so the poller would see "done" with only the Edit Mode counts and miss every Play
+    // Mode test. Each mode's result is captured by the persistent listener in McpTestRunState
+    // (RecordResult) — a transient per-run callback would be lost across the Play Mode domain reload.
+    //
+    // The run plan (remaining modes), the running accumulator and the pending request all live in
+    // SessionState so a Play Mode reload mid-run resumes cleanly instead of stalling or under-counting.
     [InitializeOnLoad]
     static class McpTestJob
     {
         const string StateKey = "unislop.tests.state";
         const string DataKey = "unislop.tests.data";
         const string MessageKey = "unislop.tests.message";
-        const string PendingModeKey = "unislop.tests.pendingMode";
-        const string PendingFilterKey = "unislop.tests.pendingFilter";
+        const string RemainingKey = "unislop.tests.remaining";
+        const string FilterKey = "unislop.tests.filter";
         const string StartTimeKey = "unislop.tests.startTime";
+
+        const string AccPassedKey = "unislop.tests.acc.passed";
+        const string AccFailedKey = "unislop.tests.acc.failed";
+        const string AccSkippedKey = "unislop.tests.acc.skipped";
+        const string AccDurationKey = "unislop.tests.acc.durationMs";
+        const string AccFailuresKey = "unislop.tests.acc.failures";
+        const string AccAbortedKey = "unislop.tests.acc.aborted";
 
         const string StateIdle = "idle";
         public const string StateRunning = "running";
         public const string StateDone = "done";
 
-        // A run with no RunFinished after this long (editor seconds) is treated as dead so a new run
+        // A run with no progress after this long (editor seconds) is treated as dead so a new run
         // can start. Comfortably longer than the MCP server's per-job budget.
         const double StaleRunSeconds = 360.0;
 
-        static volatile bool _pending;
-        static Filter[] _pendingFilters;
+        static volatile bool _executing;
 
         static readonly object CacheLock = new object();
         static string _state;
@@ -46,28 +56,14 @@ namespace UniSlop.MCP
             _state = SessionState.GetString(StateKey, StateIdle);
             _data = SessionState.GetString(DataKey, "");
             _message = SessionState.GetString(MessageKey, "");
+            _executing = false;
 
-            // Re-arm a request that was queued just before a domain reload (e.g. Play Mode tests:
-            // RequestStart persisted the intent, the reload wiped the in-memory _pending flag).
-            string pendingMode = SessionState.GetString(PendingModeKey, "");
-            if (!string.IsNullOrEmpty(pendingMode))
+            // Recover from a domain reload that happened mid-run (Play Mode) or a dead run.
+            if (_state == StateRunning && !McpTestRunState.IsRunActive)
             {
-                string pendingFilter = SessionState.GetString(PendingFilterKey, "");
-                if (TryBuildFilters(pendingMode, pendingFilter, out Filter[] filters, out _))
-                {
-                    _pendingFilters = filters;
-                    _pending = true;
-                }
-                else
-                {
-                    ClearPending();
-                }
-            }
-            else if (_state == StateRunning && !McpTestRunState.IsRunActive)
-            {
-                // "running" with no active run and nothing queued is a dead run left by an earlier
-                // reload — reset so status reads honestly and new runs aren't blocked.
-                Persist(StateIdle, "", "");
+                if (RemainingModes().Count == 0)
+                    Finalize(); // all modes ran; just publish the aggregate (or reset if empty)
+                // else: a mode is still queued — Tick will start it.
             }
 
             EditorApplication.update += Tick;
@@ -84,16 +80,13 @@ namespace UniSlop.MCP
         {
             error = null;
 
-            if (!TryBuildFilters(mode, filter, out Filter[] filters, out error))
+            if (!TryParseModes(mode, out List<TestMode> modes, out error))
                 return false;
 
-            foreach (Filter f in filters)
+            if (modes.Contains(TestMode.EditMode) && EditorApplication.isPlaying)
             {
-                if (f.testMode == TestMode.EditMode && EditorApplication.isPlaying)
-                {
-                    error = "Cannot run Edit Mode tests while Play Mode is active";
-                    return false;
-                }
+                error = "Cannot run Edit Mode tests while Play Mode is active";
+                return false;
             }
 
             if (IsRunInProgress())
@@ -103,26 +96,22 @@ namespace UniSlop.MCP
             }
 
             McpTestRunState.ClearActive();
-            Persist(StateRunning, "", "");
-
-            SessionState.SetString(PendingModeKey, string.IsNullOrEmpty(mode) ? "all" : mode);
-            SessionState.SetString(PendingFilterKey, filter ?? "");
+            ResetAccumulator();
+            SessionState.SetString(RemainingKey, ModesToString(modes));
+            SessionState.SetString(FilterKey, filter ?? "");
             SessionState.SetFloat(StartTimeKey, (float)EditorApplication.timeSinceStartup);
-
-            _pendingFilters = filters;
-            _pending = true;
+            _executing = false;
+            Persist(StateRunning, "", "");
 
             McpEditorPump.NotifyWork();
             return true;
         }
 
-        // A run counts as in progress only while it is genuinely active and not stale. A hung run
-        // (no RunFinished, e.g. an editor crash mid-run) is allowed to be superseded.
         static bool IsRunInProgress()
         {
-            if (_pending)
+            if (_executing)
                 return true;
-            if (!McpTestRunState.IsRunActive)
+            if (State != StateRunning)
                 return false;
 
             float start = SessionState.GetFloat(StartTimeKey, 0f);
@@ -149,87 +138,200 @@ namespace UniSlop.MCP
 
         static void Tick()
         {
-            if (!_pending)
+            if (_executing)
                 return;
-
+            if (State != StateRunning)
+                return;
             if (EditorApplication.isCompiling || EditorApplication.isUpdating || McpTestRunState.IsRunActive)
                 return;
 
-            Filter[] filters = _pendingFilters;
-            ClearPending();
-            StartRun(filters);
+            List<TestMode> remaining = RemainingModes();
+            if (remaining.Count == 0)
+                return;
+
+            StartRun(remaining[0]);
         }
 
-        static void StartRun(Filter[] filters)
+        static void StartRun(TestMode mode)
         {
+            string filter = SessionState.GetString(FilterKey, "");
+            _executing = true;
             try
             {
-                // The persistent McpTestRunState listener records RunFinished; do not register a
-                // transient callback here (it would not survive a Play Mode domain reload).
-                McpTestRunState.Api.Execute(new ExecutionSettings(filters));
+                var settings = new ExecutionSettings(BuildTestFilter(mode, filter));
+                McpTestRunState.Api.Execute(settings);
             }
             catch (Exception e)
             {
-                McpTestRunState.ClearActive();
-                Finish("Failed to start tests: " + e.Message, null);
+                _executing = false;
+                MarkAborted();
+                PopMode();
+                AdvanceOrFinish("Failed to start " + ModeLabel(mode) + " tests: " + e.Message);
             }
         }
 
-        static void ClearPending()
-        {
-            _pending = false;
-            _pendingFilters = null;
-            SessionState.EraseString(PendingModeKey);
-            SessionState.EraseString(PendingFilterKey);
-        }
-
-        // Called by McpTestRunState's persistent listener when a run finishes (main thread).
+        // Called by McpTestRunState's persistent listener when a mode's run finishes (main thread).
         public static void RecordResult(ITestResultAdaptor result)
         {
-            if (result == null)
+            Accumulate(result);
+            PopMode();
+            _executing = false;
+            AdvanceOrFinish(null);
+        }
+
+        // Starts the next queued mode, or finalizes the aggregate when none remain.
+        static void AdvanceOrFinish(string startError)
+        {
+            if (RemainingModes().Count > 0)
             {
-                Finish("Tests aborted without a result (likely a domain reload during the run)", null);
+                McpEditorPump.NotifyWork(); // Tick starts the next mode
                 return;
             }
 
-            int passed = result.PassCount;
-            int failed = result.FailCount;
-            int skipped = result.SkipCount;
+            Finalize(startError);
+        }
+
+        static void Finalize(string startError = null)
+        {
+            int passed = SessionState.GetInt(AccPassedKey, 0);
+            int failed = SessionState.GetInt(AccFailedKey, 0);
+            int skipped = SessionState.GetInt(AccSkippedKey, 0);
+            int durationMs = SessionState.GetInt(AccDurationKey, 0);
             int total = passed + failed + skipped;
+            bool aborted = SessionState.GetBool(AccAbortedKey, false);
+            string failures = SessionState.GetString(AccFailuresKey, "");
 
             var sb = new StringBuilder();
             sb.Append("{\"passed\":").Append(passed);
             sb.Append(",\"failed\":").Append(failed);
             sb.Append(",\"skipped\":").Append(skipped);
             sb.Append(",\"total\":").Append(total);
-            sb.Append(",\"durationMs\":").Append((long)(result.Duration * 1000));
+            sb.Append(",\"durationMs\":").Append(durationMs);
+            if (!string.IsNullOrEmpty(failures))
+                sb.Append(",\"failures\":[").Append(failures).Append(']');
+            if (aborted)
+                sb.Append(",\"aborted\":true");
+            sb.Append('}');
+
+            string message;
+            if (!string.IsNullOrEmpty(startError))
+                message = startError;
+            else if (aborted)
+                message = $"Test run aborted before completing ({passed}/{total} passed so far)";
+            else if (total == 0)
+                message = "No tests matched the requested mode/filter";
+            else if (failed > 0)
+                message = $"Tests failed ({failed} failure(s), {passed}/{total} passed)";
+            else
+                message = $"Tests passed ({passed}/{total})";
+
+            ClearRun();
+            Persist(StateDone, sb.ToString(), message);
+        }
+
+        static void Accumulate(ITestResultAdaptor result)
+        {
+            if (result == null)
+            {
+                MarkAborted();
+                return;
+            }
+
+            SessionState.SetInt(AccPassedKey, SessionState.GetInt(AccPassedKey, 0) + result.PassCount);
+            SessionState.SetInt(AccFailedKey, SessionState.GetInt(AccFailedKey, 0) + result.FailCount);
+            SessionState.SetInt(AccSkippedKey, SessionState.GetInt(AccSkippedKey, 0) + result.SkipCount);
+            SessionState.SetInt(AccDurationKey, SessionState.GetInt(AccDurationKey, 0) + (int)(result.Duration * 1000));
 
             var failures = new List<string>();
             CollectFailures(result, failures);
             if (failures.Count > 0)
             {
-                sb.Append(",\"failures\":[");
-                sb.Append(string.Join(",", failures));
-                sb.Append(']');
+                string existing = SessionState.GetString(AccFailuresKey, "");
+                string added = string.Join(",", failures);
+                SessionState.SetString(AccFailuresKey, string.IsNullOrEmpty(existing) ? added : existing + "," + added);
             }
-
-            sb.Append('}');
-
-            string message;
-            if (total == 0)
-                message = "No tests matched the requested mode/filter";
-            else if (result.TestStatus == TestStatus.Passed)
-                message = $"Tests passed ({passed}/{total})";
-            else
-                message = $"Tests failed ({failed} failure(s), {passed}/{total} passed)";
-
-            Finish(message, sb.ToString());
         }
 
-        static void Finish(string message, string dataJson)
+        static void MarkAborted() => SessionState.SetBool(AccAbortedKey, true);
+
+        static void ResetAccumulator()
         {
-            Persist(StateDone, dataJson ?? "", message);
+            SessionState.SetInt(AccPassedKey, 0);
+            SessionState.SetInt(AccFailedKey, 0);
+            SessionState.SetInt(AccSkippedKey, 0);
+            SessionState.SetInt(AccDurationKey, 0);
+            SessionState.SetBool(AccAbortedKey, false);
+            SessionState.EraseString(AccFailuresKey);
         }
+
+        static void ClearRun()
+        {
+            SessionState.EraseString(RemainingKey);
+            SessionState.EraseString(FilterKey);
+        }
+
+        // --- run plan (remaining modes) -------------------------------------------------------
+
+        static List<TestMode> RemainingModes()
+        {
+            return ParseModeList(SessionState.GetString(RemainingKey, ""));
+        }
+
+        static void PopMode()
+        {
+            List<TestMode> modes = RemainingModes();
+            if (modes.Count > 0)
+                modes.RemoveAt(0);
+            SessionState.SetString(RemainingKey, ModesToString(modes));
+        }
+
+        static bool TryParseModes(string mode, out List<TestMode> modes, out string error)
+        {
+            error = null;
+            modes = new List<TestMode>();
+
+            string m = string.IsNullOrEmpty(mode) ? "all" : mode.ToLowerInvariant();
+            // Edit Mode first: it cannot run once Play Mode has been entered, and it is the faster
+            // pass, so failures surface sooner.
+            if (m == "all" || m == "editmode") modes.Add(TestMode.EditMode);
+            if (m == "all" || m == "playmode") modes.Add(TestMode.PlayMode);
+
+            if (modes.Count == 0)
+            {
+                error = $"Unknown test mode '{mode}' (expected 'all', 'editmode' or 'playmode')";
+                return false;
+            }
+            return true;
+        }
+
+        static string ModesToString(List<TestMode> modes)
+        {
+            var sb = new StringBuilder();
+            foreach (TestMode mode in modes)
+            {
+                if (sb.Length > 0) sb.Append(',');
+                sb.Append(mode == TestMode.EditMode ? "editmode" : "playmode");
+            }
+            return sb.ToString();
+        }
+
+        static List<TestMode> ParseModeList(string value)
+        {
+            var modes = new List<TestMode>();
+            if (string.IsNullOrEmpty(value))
+                return modes;
+
+            foreach (string part in value.Split(','))
+            {
+                if (part == "editmode") modes.Add(TestMode.EditMode);
+                else if (part == "playmode") modes.Add(TestMode.PlayMode);
+            }
+            return modes;
+        }
+
+        static string ModeLabel(TestMode mode) => mode == TestMode.EditMode ? "Edit Mode" : "Play Mode";
+
+        // --- persistence ----------------------------------------------------------------------
 
         // Writes both durable SessionState (survives reload) and the thread-safe cache (read by
         // the background poller). Always called on the main thread.
@@ -244,28 +346,6 @@ namespace UniSlop.MCP
                 _data = data;
                 _message = message;
             }
-        }
-
-        static bool TryBuildFilters(string mode, string filter, out Filter[] filters, out string error)
-        {
-            error = null;
-            filters = null;
-
-            string m = string.IsNullOrEmpty(mode) ? "all" : mode.ToLowerInvariant();
-            bool runEdit = m == "all" || m == "editmode";
-            bool runPlay = m == "all" || m == "playmode";
-
-            if (!runEdit && !runPlay)
-            {
-                error = $"Unknown test mode '{mode}' (expected 'all', 'editmode' or 'playmode')";
-                return false;
-            }
-
-            var list = new List<Filter>();
-            if (runEdit) list.Add(BuildTestFilter(TestMode.EditMode, filter));
-            if (runPlay) list.Add(BuildTestFilter(TestMode.PlayMode, filter));
-            filters = list.ToArray();
-            return true;
         }
 
         static Filter BuildTestFilter(TestMode testMode, string filter)

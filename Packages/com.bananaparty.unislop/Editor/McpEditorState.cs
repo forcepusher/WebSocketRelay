@@ -12,36 +12,48 @@ namespace UniSlop.MCP
     [InitializeOnLoad]
     static class McpTestRunState
     {
-        // SessionState survives domain reloads, so an in-progress run started before a Play Mode
-        // reload is still recognized as active afterwards.
+        // Active flag is mirrored two ways: a volatile bool so the background MCP poller can read it
+        // off the main thread (SessionState is main-thread only), and SessionState so an in-progress
+        // run started before a Play Mode reload is still recognized as active afterwards.
         const string ActiveKey = "unislop.tests.active";
 
         static TestRunnerApi _api;
+        static volatile bool _runActive;
 
-        public static bool IsRunActive => SessionState.GetBool(ActiveKey, false);
+        public static bool IsRunActive => _runActive;
 
         public static TestRunnerApi Api
         {
             get { return _api; }
         }
 
-        public static void ClearActive() => SessionState.SetBool(ActiveKey, false);
+        // Main thread only.
+        public static void ClearActive() => SetActive(false);
 
         static McpTestRunState()
         {
             if (!McpEditorProcess.IsMainEditor) return;
 
+            _runActive = SessionState.GetBool(ActiveKey, false);
+
             _api = ScriptableObject.CreateInstance<TestRunnerApi>();
             _api.RegisterCallbacks(new RunStateListener());
         }
 
+        // Main thread only (Unity test callbacks fire on the main thread).
+        static void SetActive(bool active)
+        {
+            _runActive = active;
+            SessionState.SetBool(ActiveKey, active);
+        }
+
         sealed class RunStateListener : ICallbacks
         {
-            public void RunStarted(ITestAdaptor testsToRun) => SessionState.SetBool(ActiveKey, true);
+            public void RunStarted(ITestAdaptor testsToRun) => SetActive(true);
 
             public void RunFinished(ITestResultAdaptor result)
             {
-                SessionState.SetBool(ActiveKey, false);
+                SetActive(false);
                 McpTestJob.RecordResult(result);
             }
 
