@@ -30,6 +30,10 @@ namespace UniSlop.MCP
         // Main thread only.
         public static void ClearActive() => SetActive(false);
 
+        // Called before TestRunnerApi.Execute so a Play Mode domain reload still sees an active run
+        // and McpTestJob.Tick does not start a second Execute on top of TestJobDataHolder's resume.
+        public static void MarkExecuting() => SetActive(true);
+
         static McpTestRunState()
         {
             if (!McpEditorProcess.IsMainEditor) return;
@@ -47,7 +51,7 @@ namespace UniSlop.MCP
             SessionState.SetBool(ActiveKey, active);
         }
 
-        sealed class RunStateListener : ICallbacks
+        sealed class RunStateListener : IErrorCallbacks
         {
             public void RunStarted(ITestAdaptor testsToRun) => SetActive(true);
 
@@ -55,6 +59,12 @@ namespace UniSlop.MCP
             {
                 SetActive(false);
                 McpTestJob.RecordResult(result);
+            }
+
+            public void OnError(string message)
+            {
+                SetActive(false);
+                McpTestJob.RecordFailure(message);
             }
 
             public void TestStarted(ITestAdaptor test) { }

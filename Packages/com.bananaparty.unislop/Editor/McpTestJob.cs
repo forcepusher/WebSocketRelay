@@ -26,6 +26,7 @@ namespace UniSlop.MCP
         const string RemainingKey = "unislop.tests.remaining";
         const string FilterKey = "unislop.tests.filter";
         const string StartTimeKey = "unislop.tests.startTime";
+        const string ExecutingKey = "unislop.tests.executing";
 
         const string AccPassedKey = "unislop.tests.acc.passed";
         const string AccFailedKey = "unislop.tests.acc.failed";
@@ -56,10 +57,10 @@ namespace UniSlop.MCP
             _state = SessionState.GetString(StateKey, StateIdle);
             _data = SessionState.GetString(DataKey, "");
             _message = SessionState.GetString(MessageKey, "");
-            _executing = false;
+            _executing = SessionState.GetBool(ExecutingKey, false);
 
             // Recover from a domain reload that happened mid-run (Play Mode) or a dead run.
-            if (_state == StateRunning && !McpTestRunState.IsRunActive)
+            if (_state == StateRunning && !_executing && !McpTestRunState.IsRunActive)
             {
                 if (RemainingModes().Count == 0)
                     Finalize(); // all modes ran; just publish the aggregate (or reset if empty)
@@ -100,6 +101,7 @@ namespace UniSlop.MCP
             SessionState.SetString(RemainingKey, ModesToString(modes));
             SessionState.SetString(FilterKey, filter ?? "");
             SessionState.SetFloat(StartTimeKey, (float)EditorApplication.timeSinceStartup);
+            SessionState.SetBool(ExecutingKey, false);
             _executing = false;
             Persist(StateRunning, "", "");
 
@@ -155,7 +157,9 @@ namespace UniSlop.MCP
         static void StartRun(TestMode mode)
         {
             string filter = SessionState.GetString(FilterKey, "");
+            SessionState.SetBool(ExecutingKey, true);
             _executing = true;
+            McpTestRunState.MarkExecuting();
             try
             {
                 var settings = new ExecutionSettings(BuildTestFilter(mode, filter));
@@ -163,7 +167,7 @@ namespace UniSlop.MCP
             }
             catch (Exception e)
             {
-                _executing = false;
+                ClearExecuting();
                 MarkAborted();
                 PopMode();
                 AdvanceOrFinish("Failed to start " + ModeLabel(mode) + " tests: " + e.Message);
@@ -175,8 +179,23 @@ namespace UniSlop.MCP
         {
             Accumulate(result);
             PopMode();
-            _executing = false;
+            ClearExecuting();
             AdvanceOrFinish(null);
+        }
+
+        // TestRunnerApi reports RunFailed (not RunFinished) when the internal task pipeline errors.
+        public static void RecordFailure(string message)
+        {
+            MarkAborted();
+            PopMode();
+            ClearExecuting();
+            AdvanceOrFinish(message);
+        }
+
+        static void ClearExecuting()
+        {
+            SessionState.SetBool(ExecutingKey, false);
+            _executing = false;
         }
 
         // Starts the next queued mode, or finalizes the aggregate when none remain.
