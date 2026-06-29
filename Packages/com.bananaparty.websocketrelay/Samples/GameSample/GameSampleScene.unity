@@ -339,8 +339,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 785604b5a364ec74c9a1363d923a180a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameState
-  _playerCharacterState: {fileID: 1822008114}
-  _botCharacterState: {fileID: 6874780850343231334}
   _itemSpawns:
   - {fileID: 472791616}
   - {fileID: 614933109}
@@ -412,6 +410,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 334815507}
+  - component: {fileID: 334815508}
   m_Layer: 0
   m_Name: CharacterSpawn
   m_TagString: Untagged
@@ -434,6 +433,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &334815508
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 334815506}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37fa0557b04e02d49a74a23c610144bc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.CharacterSpawn
+  _playerCharacterPrefab: {fileID: 6874780850883058954, guid: e0b504692cc65ab448036b1fc974dd2d, type: 3}
+  _botCharacterPrefab: {fileID: 8786267789517560676, guid: 0342636bc2ae2f54ba85dd6cc43c1555, type: 3}
 --- !u!1 &419942227
 GameObject:
   m_ObjectHideFlags: 0
@@ -2002,17 +2015,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1771828701}
   m_CullTransparentMesh: 1
---- !u!114 &1822008114 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 6874780850883058954, guid: e0b504692cc65ab448036b1fc974dd2d, type: 3}
-  m_PrefabInstance: {fileID: 5557970400718775192}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: afcb542baf6bb5c4c85a47f7aeb6a989, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BananaParty.WebSocketRelay.Samples.Character
 --- !u!1 &2122646711
 GameObject:
   m_ObjectHideFlags: 0
@@ -2239,17 +2241,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: e0b504692cc65ab448036b1fc974dd2d, type: 3}
---- !u!114 &6874780850343231334 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 8786267789517560676, guid: 0342636bc2ae2f54ba85dd6cc43c1555, type: 3}
-  m_PrefabInstance: {fileID: 2808873435409618610}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: afcb542baf6bb5c4c85a47f7aeb6a989, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BananaParty.WebSocketRelay.Samples.Character
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

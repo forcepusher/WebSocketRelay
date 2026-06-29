@@ -5,7 +5,7 @@
       "depth": 0,
       "source": "git",
       "dependencies": {},
-      "hash": "7d2d1c695d31efcd0852cb20e4aff9caeaa2efb0"
+      "hash": "0e1a81a6468db07fba0ebfe30be1e0ea66244ce1"
     },
     "com.bananaparty.websocketrelay": {
       "version": "file:com.bananaparty.websocketrelay",

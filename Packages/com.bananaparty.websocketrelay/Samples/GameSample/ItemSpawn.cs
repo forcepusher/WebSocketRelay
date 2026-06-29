@@ -11,8 +11,8 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField]
         private Item _itemPrefab;
 
-        private FloatState _timeToSpawn = new(nameof(_timeToSpawn), RespawnDelay);
-        private List<Item> _items = new List<Item>();
+        private readonly FloatState _timeToSpawn = new(nameof(_timeToSpawn), RespawnDelay);
+        private readonly List<Item> _items = new();
         private DynamicArrayState<Item> _itemsState;
         private List<IState> _states;
 
