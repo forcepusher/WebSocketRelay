@@ -10,3 +10,9 @@ export const RelayMessageType = {
 export const RelayMessageHeaderLength = 5;
 
 export const RelayMessagePayloadOffset = 5;
+
+export const RelayRoomTopicPrefix = "room:";
+
+export function relayRoomTopic(roomId: number): string {
+    return `${RelayRoomTopicPrefix}${roomId}`;
+}

@@ -2,16 +2,12 @@ import {
     RelayMessageHeaderLength,
     RelayMessagePayloadOffset,
     RelayMessageType,
+    relayRoomTopic,
 } from "./RelayMessageType";
 
 export class RelayServer {
     #port: number;
     #server: Bun.Server<any> | null = null;
-
-    // Maps each WebSocket to the set of room IDs it belongs to
-    #socketRooms: Map<Bun.ServerWebSocket, Set<number>> = new Map();
-    // Maps each room ID to the set of WebSockets in that room
-    #roomSockets: Map<number, Set<Bun.ServerWebSocket>> = new Map();
 
     constructor(port: number = 23144) {
         this.#port = port;
@@ -27,18 +23,10 @@ export class RelayServer {
                 return new Response("WebSocket Relay Server");
             },
             websocket: {
-                open: (ws) => {
-                    this.#socketRooms.set(ws, new Set());
+                open: () => {
                     console.log(`Client connected.`);
                 },
-                close: (ws) => {
-                    const rooms = this.#socketRooms.get(ws);
-                    if (rooms) {
-                        for (const roomId of rooms) {
-                            this.#leaveRoom(ws, roomId);
-                        }
-                    }
-                    this.#socketRooms.delete(ws);
+                close: () => {
                     console.log(`Client disconnected.`);
                 },
                 message: (ws, message) => {
@@ -73,8 +61,6 @@ export class RelayServer {
         if (this.#server) {
             this.#server.stop();
             this.#server = null;
-            this.#socketRooms.clear();
-            this.#roomSockets.clear();
             console.log("Relay Server stopped.");
         }
     }
@@ -112,52 +98,33 @@ export class RelayServer {
     ): void {
         if (view.byteLength < RelayMessageHeaderLength) return;
         const roomId = view.getInt32(1, true);
+        const topic = relayRoomTopic(roomId);
 
-        const roomMembers = this.#roomSockets.get(roomId);
-        if (!roomMembers?.has(ws)) return;
+        if (!ws.isSubscribed(topic)) return;
 
-        for (const client of roomMembers) {
-            if (client !== ws) {
-                const dataLength = message.byteLength - RelayMessagePayloadOffset;
-                const response = new Uint8Array(RelayMessageHeaderLength + dataLength);
-                const respView = new DataView(response.buffer);
-                respView.setUint8(0, RelayMessageType.RoomMessage);
-                respView.setInt32(1, roomId, true);
-                response.set(message.subarray(RelayMessagePayloadOffset), RelayMessagePayloadOffset);
-                client.send(response);
-            }
-        }
+        const dataLength = message.byteLength - RelayMessagePayloadOffset;
+        const response = new Uint8Array(RelayMessageHeaderLength + dataLength);
+        const respView = new DataView(response.buffer);
+        respView.setUint8(0, RelayMessageType.RoomMessage);
+        respView.setInt32(1, roomId, true);
+        response.set(message.subarray(RelayMessagePayloadOffset), RelayMessagePayloadOffset);
+
+        ws.publish(topic, response);
     }
 
     #joinRoom(ws: Bun.ServerWebSocket, roomId: number): boolean {
-        const socketRooms = this.#socketRooms.get(ws);
-        if (!socketRooms) return false;
+        const topic = relayRoomTopic(roomId);
+        if (ws.isSubscribed(topic)) return false;
 
-        if (socketRooms.has(roomId)) return false;
-
-        socketRooms.add(roomId);
-
-        if (!this.#roomSockets.has(roomId)) {
-            this.#roomSockets.set(roomId, new Set());
-        }
-        this.#roomSockets.get(roomId)!.add(ws);
+        ws.subscribe(topic);
         return true;
     }
 
     #leaveRoom(ws: Bun.ServerWebSocket, roomId: number): boolean {
-        const socketRooms = this.#socketRooms.get(ws);
-        if (!socketRooms?.has(roomId)) return false;
+        const topic = relayRoomTopic(roomId);
+        if (!ws.isSubscribed(topic)) return false;
 
-        socketRooms.delete(roomId);
-
-        const roomSockets = this.#roomSockets.get(roomId);
-        if (roomSockets) {
-            roomSockets.delete(ws);
-            if (roomSockets.size === 0) {
-                this.#roomSockets.delete(roomId);
-            }
-        }
-
+        ws.unsubscribe(topic);
         return true;
     }
 }
