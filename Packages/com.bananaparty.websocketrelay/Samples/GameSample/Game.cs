@@ -11,6 +11,8 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField]
         private Character _botCharacterState;
 
+        private CharacterSpawn _characterSpawn = new();
+
         [SerializeField]
         private List<ItemSpawn> _itemSpawns;
         private StaticArrayState<ItemSpawn> _itemSpawnsState;
@@ -25,6 +27,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
             _states = new List<IState>
             {
+                _characterSpawn,
                 _playTimeState,
                 _playerCharacterState,
                 _botCharacterState,

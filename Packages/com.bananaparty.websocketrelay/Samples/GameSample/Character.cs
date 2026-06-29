@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -5,11 +6,14 @@ using UnityEngine.InputSystem;
 namespace BananaParty.WebSocketRelay.Samples
 {
     [RequireComponent(typeof(CharacterController))]
-    public class Character : MonoBehaviour, IState
+    public class Character : MonoBehaviour, IKeyedState
     {
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float rotationSpeed = 10f;
         [SerializeField] private float jumpHeight = 2f;
+
+        public string StateName => transform.name;
+        public GuidState StateKey { get; } = new(nameof(StateKey), Guid.Empty);
 
         private CharacterController _characteController;
         private IICharacterInput _characterInput;
@@ -19,8 +23,6 @@ namespace BananaParty.WebSocketRelay.Samples
         private FloatState _health = new(nameof(_health), 100f);
         private Vector3State _position = new(nameof(_position), Vector3.zero);
         private List<IState> _states;
-
-        public string StateName => transform.name;
 
         private void Awake()
         {
