@@ -339,6 +339,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 785604b5a364ec74c9a1363d923a180a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameState
+  _playerCharacterSpawn: {fileID: 334815508}
+  _botCharacterSpawn: {fileID: 1779472019}
   _itemSpawns:
   - {fileID: 472791616}
   - {fileID: 614933109}
@@ -412,7 +414,7 @@ GameObject:
   - component: {fileID: 334815507}
   - component: {fileID: 334815508}
   m_Layer: 0
-  m_Name: CharacterSpawn
+  m_Name: PlayerCharacterSpawn
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -442,11 +444,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 334815506}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 37fa0557b04e02d49a74a23c610144bc, type: 3}
+  m_Script: {fileID: 11500000, guid: a85ad37a5b3415f4c93ed73af74f4fdc, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.CharacterSpawn
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.PlayerCharacterSpawn
   _playerCharacterPrefab: {fileID: 6874780850883058954, guid: e0b504692cc65ab448036b1fc974dd2d, type: 3}
-  _botCharacterPrefab: {fileID: 8786267789517560676, guid: 0342636bc2ae2f54ba85dd6cc43c1555, type: 3}
 --- !u!1 &419942227
 GameObject:
   m_ObjectHideFlags: 0
@@ -2015,6 +2016,51 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1771828701}
   m_CullTransparentMesh: 1
+--- !u!1 &1779472018
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1779472020}
+  - component: {fileID: 1779472019}
+  m_Layer: 0
+  m_Name: BotCharacterSpawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1779472019
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1779472018}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e32b522696a1644bb71bce502c7e456, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.BotCharacterSpawn
+  _botCharacterPrefab: {fileID: 8786267789517560676, guid: 0342636bc2ae2f54ba85dd6cc43c1555, type: 3}
+--- !u!4 &1779472020
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1779472018}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2122646711
 GameObject:
   m_ObjectHideFlags: 0
@@ -2247,6 +2293,7 @@ SceneRoots:
   m_Roots:
   - {fileID: 306160918}
   - {fileID: 334815507}
+  - {fileID: 1779472020}
   - {fileID: 315795247}
   - {fileID: 963194228}
   - {fileID: 705507995}
