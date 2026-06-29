@@ -1,6 +1,9 @@
-using UnityEngine;
+using System.Collections.Generic;
 
-public class RelayConnection
+namespace BananaParty.WebSocketRelay
 {
-
+    public class RelayConnection
+    {
+        public List<RoomConnection> _roomConnections = new();
+    }
 }
