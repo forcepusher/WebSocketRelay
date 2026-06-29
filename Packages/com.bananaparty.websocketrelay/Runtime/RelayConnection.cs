@@ -100,6 +100,10 @@ namespace BananaParty.WebSocketRelay
 
                 switch (type)
                 {
+                    case 0x10: // JOINED_ROOM
+                    case 0x11: // LEFT_ROOM
+                        processedLength = ProcessRoomControlMessage(payloadBytes);
+                        break;
                     case 0x12: // ROOM_MESSAGE
                         processedLength = ProcessRoomMessage(payloadBytes);
                         break;
@@ -115,6 +119,14 @@ namespace BananaParty.WebSocketRelay
                 Array.Copy(payloadBytes, processedLength, remaining, 0, remaining.Length);
                 payloadBytes = remaining;
             }
+        }
+
+        private int ProcessRoomControlMessage(byte[] data)
+        {
+            if (data.Length < 5)
+                throw new InvalidDataException("Incomplete room control message.");
+
+            return 5;
         }
 
         private int ProcessRoomMessage(byte[] data)

@@ -66,9 +66,10 @@ namespace BananaParty.WebSocketRelay.Tests
 
             roomA.Send(sentBytes);
 
-            yield return new WaitWhile(() => !relayB.HasUnreadPayloadQueue, TestParameters.ReceiveTimeoutThreshold);
-            Assert.IsTrue(relayB.HasUnreadPayloadQueue, "Client B did not receive payload within timeout.");
-            relayB.CheckPayloads();
+            yield return TestParameters.WaitForCondition(
+                () => captured,
+                TestParameters.ReceiveTimeoutThreshold,
+                () => relayB.CheckPayloads());
 
             Assert.IsTrue(captured, "Room message was never processed.");
 
