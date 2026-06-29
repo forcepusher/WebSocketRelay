@@ -1,7 +1,6 @@
-namespace BananaParty.WebSocketRelay
-{
-    public class RelayConnection
-    {
+using UnityEngine;
 
-    }
+public class RelayConnection
+{
+
 }
