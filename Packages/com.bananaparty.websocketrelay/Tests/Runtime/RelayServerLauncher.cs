@@ -60,7 +60,7 @@ namespace BananaParty.WebSocketRelay.Tests
                     _ => "LaunchServer-Linux.sh"
                 };
 
-                string scriptPath = Path.Combine(Environment.CurrentDirectory, "Packages", "com.bananaparty.websocketrelay", "Server", scriptName);
+                string scriptPath = Path.Combine(Environment.CurrentDirectory, "Packages", "com.bananaparty.websocketrelay", "Runtime", "Server", scriptName);
 
                 if (!File.Exists(scriptPath))
                 {

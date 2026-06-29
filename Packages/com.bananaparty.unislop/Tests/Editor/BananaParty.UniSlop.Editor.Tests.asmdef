@@ -1,18 +1,20 @@
 {
-    "name": "BananaParty.WebSocketRelay.Tests.Editor",
+    "name": "BananaParty.UniSlop.Editor.Tests",
     "rootNamespace": "",
     "references": [
-        "GUID:643ecafecb4f73549872dab43388c742",
-        "GUID:27619889b8ba8c24980f49ee34dbb44a",
-        "GUID:0acc523941302664db1f4e527237feb3"
+        "BananaParty.UniSlop",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
     ],
     "includePlatforms": [
         "Editor"
     ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
     "autoReferenced": false,
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS"
