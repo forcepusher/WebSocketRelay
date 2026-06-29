@@ -37,11 +37,8 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void OnDestroy()
         {
-            if (_server == null)
-                return;
-
-            _server.Stop();
-            _socket.Dispose();
+            _server?.Stop();
+            _socket?.Dispose();
         }
     }
 }
