@@ -1,7 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
@@ -9,58 +7,24 @@ namespace BananaParty.WebSocketRelay
     public class Server
     {
         private Process _process;
-        private readonly string _basePath;
 
-        public Server()
+        public void Start(bool verboseDebug = true)
         {
-        }
+            if (_process != null && !_process.HasExited)
+                return;
 
-        public void Start()
-        {
-            if (_process != null && !_process.HasExited) return;
-
-            string basePath = GetServerBasePath();
-            string scriptName = GetScriptName();
-            string fullPath = Path.Combine(basePath, scriptName);
-
-            if (!File.Exists(fullPath))
-            {
-                throw new FileNotFoundException($"Server launch script not found at: {fullPath}");
-            }
-
-            ProcessStartInfo startInfo = new ProcessStartInfo
-            {
-                FileName = fullPath,
-                UseShellExecute = true,
-                CreateNoWindow = false
-            };
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                startInfo.FileName = "/bin/bash";
-                startInfo.Arguments = $"\"{fullPath}\"";
-                startInfo.UseShellExecute = false;
-            }
-
-            _process = Process.Start(startInfo);
-        }
-
-        private string GetServerBasePath()
-        {
-            // This works in the Unity Editor.
-            return Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages", "com.bananaparty.websocketrelay", "Runtime", "Server"));
+            _process = RelayServerProcess.Start(createNoWindow: false, verboseDebug: verboseDebug);
         }
 
         public void Stop()
         {
-            if (_process == null) return;
+            if (_process == null)
+                return;
 
             try
             {
                 if (!_process.HasExited)
-                {
                     _process.Kill();
-                }
             }
             catch (Exception e)
             {
@@ -68,16 +32,9 @@ namespace BananaParty.WebSocketRelay
             }
             finally
             {
+                _process.Dispose();
                 _process = null;
             }
-        }
-
-        private string GetScriptName()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return "LaunchServer-Windows.bat";
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) return "LaunchServer-Linux.sh";
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return "LaunchServer-MacOS.sh";
-            throw new PlatformNotSupportedException("Unsupported operating system");
         }
     }
 }

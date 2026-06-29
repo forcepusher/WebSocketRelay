@@ -16,3 +16,16 @@ export const RelayRoomTopicPrefix = "room:";
 export function relayRoomTopic(roomId: number): string {
     return `${RelayRoomTopicPrefix}${roomId}`;
 }
+
+const relayMessageTypeNames: Record<number, string> = {
+    [RelayMessageType.JoinRoom]: "JoinRoom",
+    [RelayMessageType.LeaveRoom]: "LeaveRoom",
+    [RelayMessageType.SendMessage]: "SendMessage",
+    [RelayMessageType.JoinedRoom]: "JoinedRoom",
+    [RelayMessageType.LeftRoom]: "LeftRoom",
+    [RelayMessageType.RoomMessage]: "RoomMessage",
+};
+
+export function relayMessageTypeName(type: number): string {
+    return relayMessageTypeNames[type] ?? `Unknown(0x${type.toString(16)})`;
+}

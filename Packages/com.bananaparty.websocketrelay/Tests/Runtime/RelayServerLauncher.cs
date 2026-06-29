@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using UnityEngine;
 #if !UNITY_WEBGL || UNITY_EDITOR
 using System.Diagnostics;
-using System.IO;
 using System.Net.Sockets;
 #endif
 
@@ -48,50 +47,24 @@ namespace BananaParty.WebSocketRelay.Tests
             try
             {
                 if (await IsPortOpenAsync(TestParameters.RelayServerPort).ConfigureAwait(false))
+                {
+                    UnityEngine.Debug.Log(
+                        $"[RelayServer] Using existing relay server on port {TestParameters.RelayServerPort}. " +
+                        "Start the server from Unity to forward Bun logs to the Console.");
                     return true;
+                }
 
                 if (_serverProcess != null && !_serverProcess.HasExited)
                     return await WaitForPortAsync(TestParameters.RelayServerPort, ServerStartupTimeoutMs).ConfigureAwait(false);
 
-                string scriptName = Application.platform switch
-                {
-                    RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsPlayer => "LaunchServer-Windows.bat",
-                    RuntimePlatform.OSXEditor or RuntimePlatform.OSXPlayer => "LaunchServer-MacOS.sh",
-                    _ => "LaunchServer-Linux.sh"
-                };
-
-                string scriptPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages", "com.bananaparty.websocketrelay", "Runtime", "Server", scriptName));
-
-                if (!File.Exists(scriptPath))
-                {
-                    UnityEngine.Debug.LogError($"Relay Server script not found at: {scriptPath}");
-                    return false;
-                }
-
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    CreateNoWindow = true,
-                    WorkingDirectory = Path.GetDirectoryName(scriptPath)
-                };
-
-                if (Application.platform == RuntimePlatform.WindowsEditor || Application.platform == RuntimePlatform.WindowsPlayer)
-                {
-                    startInfo.FileName = "cmd.exe";
-                    startInfo.Arguments = $"/c \"{scriptPath}\"";
-                    startInfo.UseShellExecute = false;
-                }
-                else
-                {
-                    startInfo.FileName = "/bin/bash";
-                    startInfo.Arguments = $"\"{scriptPath}\"";
-                    startInfo.UseShellExecute = false;
-                }
-
                 try
                 {
-                    _serverProcess = Process.Start(startInfo);
+                    _serverProcess = RelayServerProcess.Start(
+                        createNoWindow: true,
+                        verboseDebug: true,
+                        relayPort: TestParameters.RelayServerPort);
                     _weOwnProcess = true;
-                    UnityEngine.Debug.Log($"Started local relay server using {scriptName}. Waiting for port {TestParameters.RelayServerPort}...");
+                    UnityEngine.Debug.Log($"Started local relay server. Waiting for port {TestParameters.RelayServerPort}...");
 
                     if (await WaitForPortAsync(TestParameters.RelayServerPort, ServerStartupTimeoutMs).ConfigureAwait(false))
                         return true;
