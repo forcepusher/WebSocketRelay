@@ -7,7 +7,7 @@ namespace BananaParty.WebSocketRelay.Samples
     {
         private readonly string _serverAddress = "ws://127.0.0.1:23144";
         private Server _server;
-        private Socket _socket;
+        private RelayConnection _connection;
 
         public void StartServer()
         {
@@ -31,28 +31,33 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void Connect()
         {
-            if (_socket != null)
-                throw new InvalidOperationException("Socket already running");
+            if (_connection != null)
+                throw new InvalidOperationException("Already connected");
 
-            _socket = new Socket(_serverAddress);
-            _socket.Connect();
+            _connection = new RelayConnection(_serverAddress);
+            _connection.Connect();
             Debug.Log($"Connected to relay server at {_serverAddress}");
         }
 
         public void Disconnect()
         {
-            if (_socket == null)
-                throw new InvalidOperationException("Socket not connected to disconect it");
+            if (_connection == null)
+                throw new InvalidOperationException("Not connected to disconnect");
 
-            _socket.Disconnect();
-            _socket = null;
+            _connection.Dispose();
+            _connection = null;
             Debug.Log("Disconnected from relay server.");
+        }
+
+        private void Update()
+        {
+            _connection?.ProcessIncomingMessages();
         }
 
         private void OnDestroy()
         {
             _server?.Stop();
-            _socket?.Dispose();
+            _connection?.Dispose();
         }
     }
 }
