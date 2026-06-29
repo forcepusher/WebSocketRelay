@@ -375,6 +375,30 @@ namespace BananaParty.WebSocketRelay.Tests
                 "Staging creates must precede any real mutations.");
         }
 
+        [Test]
+        public void ShouldReadCurrentStateBeforeInvokingCreateOrDispose_Binary()
+        {
+            // Verifies the same snapshot-then-mutate ordering for BinaryStateInput.
+            // All staging creates (Guid.Empty) must occur BEFORE any real create/dispose.
+
+            var source = new List<MockEntry>
+            {
+                Entry(Id1, 10),
+                Entry(Id2, 20)
+            };
+            MockEntry existingOne = Entry(Id1);
+            MockEntry orphanThree = Entry(Id3);
+            var target = new List<MockEntry> { existingOne, orphanThree };
+            var factory = new OrderedFactory();
+
+            BinaryRoundTrip(source, target, factory);
+
+            Assert.AreEqual(2, factory.StagingCreateCount, "All incoming entries must create staging objects.");
+            Assert.AreEqual(1, factory.RealCreateCount, "Only Id2 should trigger a real Create.");
+            Assert.GreaterOrEqual(factory.FirstRealCreateIndex, 2,
+                "Staging creates must precede any real mutations in BinaryStateInput.");
+        }
+
         [UnityTest]
         public IEnumerator ShouldSynchronizeDynamicArrayOverRelay()
         {

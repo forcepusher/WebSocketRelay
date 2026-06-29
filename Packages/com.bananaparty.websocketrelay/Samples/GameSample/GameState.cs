@@ -3,14 +3,8 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
-    public class Game : MonoBehaviour, IState
+    public class GameState : MonoBehaviour, IState
     {
-        [SerializeField]
-        private Character _playerCharacterState;
-
-        [SerializeField]
-        private Character _botCharacterState;
-
         private CharacterSpawn _characterSpawn = new();
 
         [SerializeField]
@@ -29,8 +23,6 @@ namespace BananaParty.WebSocketRelay.Samples
             {
                 _characterSpawn,
                 _playTimeState,
-                _playerCharacterState,
-                _botCharacterState,
                 _itemSpawnsState
             };
         }

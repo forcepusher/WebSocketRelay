@@ -3,8 +3,11 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
-    public class CharacterSpawn : IState, IFactory<Character>
+    public class CharacterSpawn : MonoBehaviour, IState, IFactory<Character>
     {
+        [SerializeField]
+        private Character _characterPrefab;
+
         public string StateName => nameof(CharacterSpawn);
 
         public Character Create(Guid key) => throw new NotImplementedException();
