@@ -57,6 +57,12 @@ namespace BananaParty.WebSocketRelay
 
         public void ReadDynamicArray<T>(string name, List<T> states, IFactory<T> factory) where T : IKeyedState
         {
+            // 1. Snapshot current keys before reading
+            var existingMap = new Dictionary<Guid, int>();
+            for (int i = 0; i < states.Count; i++)
+                existingMap[states[i].StateKey.Value] = i;
+
+            // 2. Read incoming data
             StartArray(name);
             int count = ReadIntArrayEntry();
 
@@ -68,52 +74,36 @@ namespace BananaParty.WebSocketRelay
                 incoming.Add(staging);
             }
 
-            var incomingKeys = new HashSet<Guid>();
-            foreach (T entry in incoming)
-                incomingKeys.Add(entry.StateKey.Value);
+            EndArray();
 
-            for (int i = states.Count - 1; i >= 0; i--)
-            {
-                if (incomingKeys.Contains(states[i].StateKey.Value))
-                    continue;
-
-                factory.Dispose(states[i]);
-                states.RemoveAt(i);
-            }
-
+            // 3. Diff and apply mutations
             var next = new List<T>(incoming.Count);
             foreach (T staging in incoming)
             {
-                Guid entryKey = staging.StateKey.Value;
-                T existing = default;
-                foreach (T state in states)
+                Guid key = staging.StateKey.Value;
+                if (existingMap.TryGetValue(key, out int idx))
                 {
-                    if (state.StateKey.Value != entryKey)
-                        continue;
-
-                    existing = state;
-                    break;
-                }
-
-                if (existing != null)
-                {
+                    T existing = states[idx];
                     CopyStateFrom(staging, existing);
-                    factory.Dispose(staging);
                     next.Add(existing);
+                    existingMap.Remove(key);
                 }
                 else
                 {
-                    T entry = factory.Create(entryKey);
+                    T entry = factory.Create(key);
                     CopyStateFrom(staging, entry);
-                    factory.Dispose(staging);
                     next.Add(entry);
                 }
+
+                factory.Dispose(staging);
             }
+
+            // 4. Dispose only orphaned states (exist in current but not incoming)
+            foreach (int idx in existingMap.Values)
+                factory.Dispose(states[idx]);
 
             states.Clear();
             states.AddRange(next);
-
-            EndArray();
         }
 
         private void CopyStateFrom(IState source, IState target)

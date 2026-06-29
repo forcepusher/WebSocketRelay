@@ -64,8 +64,13 @@ namespace BananaParty.WebSocketRelay
 
         public void ReadDynamicArray<T>(string name, List<T> states, IFactory<T> factory) where T : IKeyedState
         {
-            StartArray(name);
+            // 1. Snapshot current keys before reading
+            var existingMap = new Dictionary<Guid, int>();
+            for (int i = 0; i < states.Count; i++)
+                existingMap[states[i].StateKey.Value] = i;
 
+            // 2. Read incoming data
+            StartArray(name);
             var incoming = new List<T>();
             while (HasNextArrayElement())
             {
@@ -73,20 +78,19 @@ namespace BananaParty.WebSocketRelay
                 staging.ReadState(this);
                 incoming.Add(staging);
             }
+            EndArray();
 
-            var stateMap = new Dictionary<Guid, T>();
-            foreach (T state in states)
-                stateMap[state.StateKey.Value] = state;
-
+            // 3. Diff and apply mutations
             var next = new List<T>(incoming.Count);
             foreach (T staging in incoming)
             {
                 Guid key = staging.StateKey.Value;
-                if (stateMap.TryGetValue(key, out T existing))
+                if (existingMap.TryGetValue(key, out int idx))
                 {
+                    T existing = states[idx];
                     CopyStateFrom(staging, existing);
                     next.Add(existing);
-                    stateMap.Remove(key);
+                    existingMap.Remove(key);
                 }
                 else
                 {
@@ -94,16 +98,16 @@ namespace BananaParty.WebSocketRelay
                     CopyStateFrom(staging, entry);
                     next.Add(entry);
                 }
+
                 factory.Dispose(staging);
             }
 
-            foreach (T orphaned in stateMap.Values)
-                factory.Dispose(orphaned);
+            // 4. Dispose only orphaned states (exist in current but not incoming)
+            foreach (int idx in existingMap.Values)
+                factory.Dispose(states[idx]);
 
             states.Clear();
             states.AddRange(next);
-
-            EndArray();
         }
 
         private void CopyStateFrom(IState source, IState target)

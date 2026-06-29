@@ -146,6 +146,112 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void ShouldNotMutateExistingStateOnReadFailure()
+        {
+            // Existing state must not be mutated if reading incoming data fails.
+            // Snapshot is captured BEFORE mutations; read happens after snapshot;
+            // therefore a read error aborts before any create/dispose of existing entries.
+
+            var source = new List<MockEntry>
+            {
+                Entry(Id1, 42),
+                Entry(Id2, 99)
+            };
+
+            var output = new BinaryStateOutput();
+            new ObjectState("Root", new List<IState> { new DynamicArrayState<MockEntry>("Items", source) }).WriteState(output);
+
+            byte[] data = output.ToArray();
+            int truncationPoint = (int)(data.Length * 0.6f);
+            if (truncationPoint < data.Length)
+                Array.Resize(ref data, truncationPoint);
+
+            MockEntry existingOne = Entry(Id1, -999);
+            var target = new List<MockEntry> { existingOne };
+            var factory = new MockEntryFactory();
+            var targetState = new DynamicArrayState<MockEntry>("Items", target, factory);
+
+            Assert.Throws<EndOfStreamException>(() =>
+                new ObjectState("Root", new List<IState> { targetState })
+                    .ReadState(new BinaryStateInput(data.AsMemory())));
+
+            Assert.AreEqual(-999, existingOne.Value,
+                "Existing entry Value must remain unchanged on read failure.");
+        }
+
+        [Test]
+        public void ShouldOnlyCreateDisposeDelta()
+        {
+            // Only entries that actually changed should be created or disposed.
+            // Existing Id1 is updated; orphaned Id3 is disposed; new Id2 is created.
+            // Staging objects are internal to the input reader and counted by factory.
+
+            var source = new List<MockEntry>
+            {
+                Entry(Id1, 50),
+                Entry(Id2, 60)
+            };
+            MockEntry existingOne = Entry(Id1);
+            MockEntry orphanThree = Entry(Id3);
+            var target = new List<MockEntry> { existingOne, orphanThree };
+            var factory = new MockEntryFactory();
+
+            RoundTrip(source, target, factory);
+
+            Assert.AreEqual(2, target.Count);
+            Assert.AreSame(existingOne, target[0]);
+            Assert.AreEqual(50, target[0].Value);
+
+            // 2 staging creates + 1 real create (Id2)
+            Assert.AreEqual(3, factory.CreateCount);
+            // 2 staging disposes + 1 orphan dispose (Id3)
+            Assert.AreEqual(3, factory.DisposeCount);
+            Assert.Contains(orphanThree, factory.Disposed,
+                "Orphaned entry must be disposed.");
+
+            var factoryBin = new MockEntryFactory();
+            var targetBin = new List<MockEntry> { existingOne, orphanThree };
+            BinaryRoundTrip(source, targetBin, factoryBin);
+
+            Assert.AreEqual(2, targetBin.Count);
+            Assert.AreSame(existingOne, targetBin[0]);
+            Assert.AreEqual(50, targetBin[0].Value);
+        }
+
+        [Test]
+        public void ShouldNotCreateOrDisposeForReorderedEntries()
+        {
+            // Same entries in different order must NOT trigger real creates/disposes.
+            // Only internal staging objects are created/disposed by the reader.
+
+            var source = new List<MockEntry>
+            {
+                Entry(Id3, 70),
+                Entry(Id2, 60),
+                Entry(Id1, 50)
+            };
+            MockEntry a = Entry(Id1);
+            MockEntry b = Entry(Id2);
+            MockEntry c = Entry(Id3);
+            var target = new List<MockEntry> { a, b, c };
+            var factory = new MockEntryFactory();
+
+            RoundTrip(source, target, factory);
+
+            // 3 staging creates (internal), no real creates
+            Assert.AreEqual(3, factory.CreateCount);
+            // 3 staging disposes (internal), no orphan disposes — Disposed only contains staging objects, not originals
+            Assert.AreEqual(3, factory.DisposeCount);
+            Assert.IsFalse(factory.Disposed.Contains(a) || factory.Disposed.Contains(b) || factory.Disposed.Contains(c),
+                "No original entries should be disposed when all exist in incoming.");
+
+            Assert.AreEqual(3, target.Count);
+            Assert.AreSame(a, target[2]);
+            Assert.AreSame(b, target[1]);
+            Assert.AreSame(c, target[0]);
+        }
+
+        [Test]
         public void ShouldShrinkWithoutFactory()
         {
             var source = new List<MockEntry> { Entry(Id1, 7) };
@@ -243,6 +349,30 @@ namespace BananaParty.WebSocketRelay.Tests
             Assert.AreSame(idTwo, target[1]);
             Assert.AreEqual(10, target[0].Value);
             Assert.AreEqual(20, target[1].Value);
+        }
+
+        [Test]
+        public void ShouldReadCurrentStateBeforeInvokingCreateOrDispose()
+        {
+            // Verifies that all staging creates (Guid.Empty) occur BEFORE any real create/dispose.
+            // OrderedFactory tracks this ordering via FirstRealCreateIndex.
+
+            var source = new List<MockEntry>
+            {
+                Entry(Id1, 10),
+                Entry(Id2, 20)
+            };
+            MockEntry existingOne = Entry(Id1);
+            MockEntry orphanThree = Entry(Id3);
+            var target = new List<MockEntry> { existingOne, orphanThree };
+            var factory = new OrderedFactory();
+
+            RoundTrip(source, target, factory);
+
+            Assert.AreEqual(2, factory.StagingCreateCount, "All incoming entries must create staging objects.");
+            Assert.AreEqual(1, factory.RealCreateCount, "Only Id2 should trigger a real Create.");
+            Assert.GreaterOrEqual(factory.FirstRealCreateIndex, 2,
+                "Staging creates must precede any real mutations.");
         }
 
         [UnityTest]
@@ -373,6 +503,39 @@ namespace BananaParty.WebSocketRelay.Tests
             {
                 DisposeCount++;
                 Disposed.Add(entry);
+            }
+        }
+
+        // Records factory operations to prove snapshot-then-mutate pattern.
+        private class OrderedFactory : IFactory<MockEntry>
+        {
+            public int StagingCreateCount { get; private set; }      // Create(Guid.Empty) calls
+            public int RealCreateCount { get; private set; }         // Create(actualKey) calls
+            public List<Guid> RealCreatedKeys { get; } = new();
+            public int DisposeCount { get; private set; }
+
+            // Index in combined operation sequence where first real create occurs.
+            public int FirstRealCreateIndex => _firstReal;
+            private int _firstReal = int.MaxValue;
+
+            public MockEntry Create(Guid id)
+            {
+                if (id == Guid.Empty)
+                    StagingCreateCount++;
+                else
+                {
+                    RealCreateCount++;
+                    RealCreatedKeys.Add(id);
+                    if (_firstReal == int.MaxValue)
+                        _firstReal = StagingCreateCount + DisposeCount;
+                }
+
+                return Entry(id);
+            }
+
+            public void Dispose(MockEntry entry)
+            {
+                DisposeCount++;
             }
         }
 
