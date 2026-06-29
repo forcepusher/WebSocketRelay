@@ -5,8 +5,10 @@ namespace BananaParty.WebSocketRelay.Samples
 {
     public class GameState : MonoBehaviour, IState
     {
-        private CharacterSpawn _characterSpawn = new();
-
+        [SerializeField]
+        private PlayerCharacterSpawn _playerCharacterSpawn;
+        [SerializeField]
+        private BotCharacterSpawn _botCharacterSpawn;
         [SerializeField]
         private List<ItemSpawn> _itemSpawns;
         private StaticArrayState<ItemSpawn> _itemSpawnsState;
@@ -21,7 +23,8 @@ namespace BananaParty.WebSocketRelay.Samples
 
             _states = new List<IState>
             {
-                _characterSpawn,
+                _playerCharacterSpawn,
+                _botCharacterSpawn,
                 _playTimeState,
                 _itemSpawnsState
             };

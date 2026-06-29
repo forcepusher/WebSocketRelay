@@ -4,12 +4,10 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
-    public class CharacterSpawn : MonoBehaviour, IState, IFactory<Character>
+    public class PlayerCharacterSpawn : MonoBehaviour, IState, IFactory<Character>
     {
         [SerializeField]
         private Character _playerCharacterPrefab;
-        [SerializeField]
-        private Character _botCharacterPrefab;
 
         private readonly List<Character> _characters = new();
         private DynamicArrayState<Character> _charactersState;
@@ -25,8 +23,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public Character Create(Guid key)
         {
-            Character prefab = _botCharacterPrefab != null ? _botCharacterPrefab : _playerCharacterPrefab;
-            Character character = Instantiate(prefab, transform);
+            Character character = Instantiate(_playerCharacterPrefab, transform);
             character.StateKey.Value = key;
 
             return character;
