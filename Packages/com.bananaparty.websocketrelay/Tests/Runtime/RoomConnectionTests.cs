@@ -32,6 +32,7 @@ namespace BananaParty.WebSocketRelay.Tests
         [UnityTest] public IEnumerator MultipleRooms_JoinAndSwitch() => TestMultiRoomJoin();
         [UnityTest] public IEnumerator SameRoomDifferentIds_AreIsolated() => TestSameRoomDifferentIds();
         [UnityTest] public IEnumerator LeaveStopsReceiving() => TestLeaveStopsReceiving();
+        [UnityTest] public IEnumerator SendAfterLeave_ThrowsObjectDisposedException() => TestSendAfterLeaveThrows();
 
         // === Edge Cases ===
 
@@ -228,6 +229,27 @@ namespace BananaParty.WebSocketRelay.Tests
             aRoom.Send(new byte[] { 0xFF });
             yield return TestParameters.WaitForDuration(1f, () => _relayB.CheckPayloads());
             Assert.IsFalse(bReceivedAfterLeave, "B received payload after leaving.");
+
+            Cleanup();
+        }
+
+        private IEnumerator TestSendAfterLeaveThrows()
+        {
+            _relayA = CreateRelay();
+            _relayB = CreateRelay();
+            _relayA.Connect();
+            _relayB.Connect();
+            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+
+            RoomConnection bRoom = _relayB.JoinRoom(400);
+            _relayB.CheckPayloads();
+            yield return null;
+
+            _relayB.LeaveRoom(400);
+            _relayB.CheckPayloads();
+            yield return null;
+
+            Assert.Throws<ObjectDisposedException>(() => bRoom.Send(new byte[] { 0x01 }));
 
             Cleanup();
         }

@@ -70,6 +70,7 @@ namespace BananaParty.WebSocketRelay
             _socket.Send(leaveMessage);
 
             _roomConnections.Remove(roomId);
+            roomConnection.Dispose();
         }
 
         public void Dispose()
@@ -149,9 +150,7 @@ namespace BananaParty.WebSocketRelay
 
         private int SkipUnknownMessage(byte[] data, byte type)
         {
-            Console.WriteLine($"[RelayConnection] Unknown message type: 0x{type:X2}");
-            // Cannot determine length of unknown messages; skip what we can
-            return 1;
+            return data.Length;
         }
     }
 }

@@ -77,9 +77,8 @@ export class RelayServer {
         if (view.byteLength < 5) return;
         const roomId = view.getInt32(1, true);
 
-        this.#joinRoom(ws, roomId);
+        if (!this.#joinRoom(ws, roomId)) return;
 
-        // Send JOINED_ROOM confirmation
         const response = new Uint8Array(5);
         const respView = new DataView(response.buffer);
         respView.setUint8(0, 0x10);
@@ -91,9 +90,8 @@ export class RelayServer {
         if (view.byteLength < 5) return;
         const roomId = view.getInt32(1, true);
 
-        this.#leaveRoom(ws, roomId);
+        if (!this.#leaveRoom(ws, roomId)) return;
 
-        // Send LEFT_ROOM confirmation
         const response = new Uint8Array(5);
         const respView = new DataView(response.buffer);
         respView.setUint8(0, 0x11);
@@ -110,11 +108,10 @@ export class RelayServer {
         const roomId = view.getInt32(1, true);
 
         const roomMembers = this.#roomSockets.get(roomId);
-        if (!roomMembers) return;
+        if (!roomMembers?.has(ws)) return;
 
         for (const client of roomMembers) {
             if (client !== ws) {
-                // Build ROOM_MESSAGE: type byte + room ID + original payload (from offset 5)
                 const dataLength = message.byteLength - 5;
                 const response = new Uint8Array(5 + dataLength);
                 const respView = new DataView(response.buffer);
@@ -126,12 +123,11 @@ export class RelayServer {
         }
     }
 
-    #joinRoom(ws: Bun.ServerWebSocket, roomId: number): void {
+    #joinRoom(ws: Bun.ServerWebSocket, roomId: number): boolean {
         const socketRooms = this.#socketRooms.get(ws);
-        if (!socketRooms) return;
+        if (!socketRooms) return false;
 
-        // Only join if not already in the room
-        if (socketRooms.has(roomId)) return;
+        if (socketRooms.has(roomId)) return false;
 
         socketRooms.add(roomId);
 
@@ -139,13 +135,14 @@ export class RelayServer {
             this.#roomSockets.set(roomId, new Set());
         }
         this.#roomSockets.get(roomId)!.add(ws);
+        return true;
     }
 
-    #leaveRoom(ws: Bun.ServerWebSocket, roomId: number): void {
+    #leaveRoom(ws: Bun.ServerWebSocket, roomId: number): boolean {
         const socketRooms = this.#socketRooms.get(ws);
-        if (socketRooms) {
-            socketRooms.delete(roomId);
-        }
+        if (!socketRooms?.has(roomId)) return false;
+
+        socketRooms.delete(roomId);
 
         const roomSockets = this.#roomSockets.get(roomId);
         if (roomSockets) {
@@ -154,5 +151,7 @@ export class RelayServer {
                 this.#roomSockets.delete(roomId);
             }
         }
+
+        return true;
     }
 }
