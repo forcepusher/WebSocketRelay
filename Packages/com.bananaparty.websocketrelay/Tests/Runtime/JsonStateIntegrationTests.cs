@@ -33,52 +33,50 @@ namespace BananaParty.WebSocketRelay.Tests
             stateA.Health = 80f;
             stateA.Position = new Vector3(1, 2, 3);
 
-            using Socket socketA = new Socket(ServerAddress);
-            using Socket socketB = new Socket(ServerAddress);
+            using RelayConnection relayA = new(ServerAddress);
+            using RelayConnection relayB = new(ServerAddress);
 
-            socketA.Connect();
-            socketB.Connect();
+            relayA.Connect();
+            relayB.Connect();
 
-            // Wait for connections
-            float timeout = 5f;
-            float elapsed = 0;
-            while (!socketA.IsConnected || !socketB.IsConnected)
-            {
-                if (elapsed > timeout) Assert.Fail("Sockets failed to connect within timeout");
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
+            yield return new WaitWhile(() => !relayA.IsConnected || !relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            Assert.IsTrue(relayA.IsConnected && relayB.IsConnected, "Relays failed to connect.");
 
-            // Act: Client A serializes and sends state
+            RoomConnection roomA = relayA.JoinRoom(888);
+            RoomConnection roomB = relayB.JoinRoom(888);
+            relayA.CheckPayloads();
+            relayB.CheckPayloads();
+            yield return null;
+
+            // Act: Client A serializes and sends state via room
             JsonStateOutput writeGraph = new();
             stateA.WriteState(writeGraph);
-            string jsonPayload = writeGraph.ToString();
-            byte[] bytesToSend = Encoding.UTF8.GetBytes(jsonPayload);
+            byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
-            socketA.Send(bytesToSend);
-
-            // Wait for Client B to receive the payload
-            elapsed = 0;
-            while (!socketB.HasUnreadPayloadQueue)
+            bool captured = false;
+            roomB.OnMessageReceived += (data) =>
             {
-                if (elapsed > timeout) Assert.Fail("Client B did not receive payload within timeout");
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
+                if (!captured)
+                {
+                    JsonStateInput readGraph = new(Encoding.UTF8.GetString(data));
+                    stateB.ReadState(readGraph);
+                    captured = true;
+                }
+            };
 
-            byte[] receivedBytes = socketB.ReadPayloadQueue();
-            string receivedJson = Encoding.UTF8.GetString(receivedBytes);
+            roomA.Send(sentBytes);
 
-            // Client B deserializes the state
-            JsonStateInput readGraph = new JsonStateInput(receivedJson);
-            stateB.ReadState(readGraph);
+            yield return new WaitWhile(() => !relayB.HasUnreadPayloadQueue, TestParameters.ReceiveTimeoutThreshold);
+            Assert.IsTrue(relayB.HasUnreadPayloadQueue, "Client B did not receive payload within timeout.");
+            relayB.CheckPayloads();
+
+            Assert.IsTrue(captured, "Room message was never processed.");
 
             // Assert: Verify values were synchronized
-            Assert.AreEqual(stateA.PlayTime, stateB.PlayTime, "PlayTime should be synchronized");
-            Assert.AreEqual(stateA.Health, stateB.Health, 0.01f, "Health should be synchronized");
-            Assert.AreEqual(stateA.Position, stateB.Position, "Position should be synchronized");
+            Assert.AreEqual(stateA.PlayTime, stateB.PlayTime);
+            Assert.AreEqual(stateA.Health, stateB.Health, 0.01f);
+            Assert.AreEqual(stateA.Position, stateB.Position);
 
-            // Cleanup GameObjects
             UnityEngine.Object.DestroyImmediate(clientAObj);
             UnityEngine.Object.DestroyImmediate(clientBObj);
         }

@@ -12,6 +12,8 @@ namespace BananaParty.WebSocketRelay
 
         public bool IsConnected => _socket.IsConnected;
 
+        public bool HasUnreadPayloadQueue => _socket.HasUnreadPayloadQueue;
+
         public event Action<RoomConnection, byte[]> OnRoomMessage;
 
         public RelayConnection(string serverAddress)
@@ -29,7 +31,11 @@ namespace BananaParty.WebSocketRelay
             _socket.Send(data);
         }
 
-        internal void CheckPayloads()
+        /// <summary>
+        /// Poll the underlying socket for incoming payloads and dispatch them to room connections.
+        /// Call this periodically (e.g., in Update) to process received messages.
+        /// </summary>
+        public void CheckPayloads()
         {
             while (_socket.HasUnreadPayloadQueue)
             {
