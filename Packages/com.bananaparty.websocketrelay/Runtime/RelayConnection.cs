@@ -32,10 +32,10 @@ namespace BananaParty.WebSocketRelay
         }
 
         /// <summary>
-        /// Poll the underlying socket for incoming payloads and dispatch them to room connections.
-        /// Call this periodically (e.g., in Update) to process received messages.
+        /// Drains queued WebSocket frames and dispatches room messages to their <see cref="RoomConnection"/> handlers.
+        /// Call this periodically (e.g. in Update).
         /// </summary>
-        public void CheckPayloads()
+        public void ProcessIncomingMessages()
         {
             while (_socket.HasUnreadPayloadQueue)
             {

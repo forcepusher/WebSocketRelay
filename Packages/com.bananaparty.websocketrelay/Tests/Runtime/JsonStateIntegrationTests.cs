@@ -44,8 +44,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
             RoomConnection roomA = relayA.JoinRoom(888);
             RoomConnection roomB = relayB.JoinRoom(888);
-            relayA.CheckPayloads();
-            relayB.CheckPayloads();
+            relayA.ProcessIncomingMessages();
+            relayB.ProcessIncomingMessages();
             yield return null;
 
             // Act: Client A serializes and sends state via room
@@ -69,7 +69,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return TestParameters.WaitForCondition(
                 () => captured,
                 TestParameters.ReceiveTimeoutThreshold,
-                () => relayB.CheckPayloads());
+                () => relayB.ProcessIncomingMessages());
 
             Assert.IsTrue(captured, "Room message was never processed.");
 

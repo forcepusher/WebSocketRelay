@@ -60,9 +60,9 @@ namespace BananaParty.WebSocketRelay.Tests
             if (clientCount >= 3) roomC = _relayC.JoinRoom(roomId);
 
             // Drain JOINED_ROOM confirmations
-            _relayA.CheckPayloads();
-            _relayB.CheckPayloads();
-            if (clientCount >= 3) _relayC.CheckPayloads();
+            _relayA.ProcessIncomingMessages();
+            _relayB.ProcessIncomingMessages();
+            if (clientCount >= 3) _relayC.ProcessIncomingMessages();
             yield return null;
 
             byte[] sent = GenerateRandomBytes(64);
@@ -80,9 +80,9 @@ namespace BananaParty.WebSocketRelay.Tests
                 TestParameters.ReceiveTimeoutThreshold,
                 () =>
                 {
-                    _relayB.CheckPayloads();
+                    _relayB.ProcessIncomingMessages();
                     if (clientCount >= 3)
-                        _relayC.CheckPayloads();
+                        _relayC.ProcessIncomingMessages();
                 });
 
             Assert.AreEqual(clientCount - 1, recvCount, $"Expected {clientCount - 1} receivers, got {recvCount}.");
@@ -103,8 +103,8 @@ namespace BananaParty.WebSocketRelay.Tests
             RoomConnection aRoom100 = _relayA.JoinRoom(100);
             RoomConnection bRoom200 = _relayB.JoinRoom(200);
 
-            _relayA.CheckPayloads();
-            _relayB.CheckPayloads();
+            _relayA.ProcessIncomingMessages();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             bool bReceived = false;
@@ -112,7 +112,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             aRoom100.Send(new byte[] { 0xAA });
 
-            yield return TestParameters.WaitForDuration(1f, () => _relayB.CheckPayloads());
+            yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
             Assert.IsFalse(bReceived, "Client B received message from room it is not in.");
 
             Cleanup();
@@ -130,8 +130,8 @@ namespace BananaParty.WebSocketRelay.Tests
             RoomConnection bRoom100 = _relayB.JoinRoom(100);
             RoomConnection bRoom200 = _relayB.JoinRoom(200);
 
-            _relayA.CheckPayloads();
-            _relayB.CheckPayloads();
+            _relayA.ProcessIncomingMessages();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             // A sends in room 100 -> B's room100 receives
@@ -141,19 +141,19 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return TestParameters.WaitForCondition(
                 () => bGot100,
                 TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.CheckPayloads());
+                () => _relayB.ProcessIncomingMessages());
             Assert.IsTrue(bGot100, "B did not receive room 100 message.");
 
             // B sends in room 200 -> A is NOT in room 200, no relay to A
             bool aGot200 = false;
             aRoom100.OnMessageReceived += _ => aGot200 = true;
             bRoom200.Send(new byte[] { 0xDD });
-            yield return TestParameters.WaitForDuration(1f, () => _relayA.CheckPayloads());
+            yield return TestParameters.WaitForDuration(1f, () => _relayA.ProcessIncomingMessages());
             Assert.IsFalse(aGot200, "A received message from room it is not in.");
 
             // Now join A to room 200
             RoomConnection aRoom200 = _relayA.JoinRoom(200);
-            _relayA.CheckPayloads();
+            _relayA.ProcessIncomingMessages();
             yield return null;
 
             bool aGotFromB = false;
@@ -162,7 +162,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return TestParameters.WaitForCondition(
                 () => aGotFromB,
                 TestParameters.ReceiveTimeoutThreshold,
-                () => _relayA.CheckPayloads());
+                () => _relayA.ProcessIncomingMessages());
             Assert.IsTrue(aGotFromB, "A did not receive room 200 message after joining.");
 
             Cleanup();
@@ -179,15 +179,15 @@ namespace BananaParty.WebSocketRelay.Tests
             RoomConnection a100 = _relayA.JoinRoom(100);
             RoomConnection b200 = _relayB.JoinRoom(200);
 
-            _relayA.CheckPayloads();
-            _relayB.CheckPayloads();
+            _relayA.ProcessIncomingMessages();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             bool bReceived = false;
             b200.OnMessageReceived += _ => bReceived = true;
             a100.Send(new byte[] { 0xDD });
 
-            yield return TestParameters.WaitForDuration(1f, () => _relayB.CheckPayloads());
+            yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
             Assert.IsFalse(bReceived);
 
             Cleanup();
@@ -204,8 +204,8 @@ namespace BananaParty.WebSocketRelay.Tests
             RoomConnection aRoom = _relayA.JoinRoom(100);
             RoomConnection bRoom = _relayB.JoinRoom(100);
 
-            _relayA.CheckPayloads();
-            _relayB.CheckPayloads();
+            _relayA.ProcessIncomingMessages();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             // A sends -> B receives
@@ -215,19 +215,19 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return TestParameters.WaitForCondition(
                 () => bReceivedFirst,
                 TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.CheckPayloads());
+                () => _relayB.ProcessIncomingMessages());
             Assert.IsTrue(bReceivedFirst, "B did not receive before leave.");
 
             // B leaves room
             _relayB.LeaveRoom(100);
-            _relayB.CheckPayloads();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             // A sends again -> B should NOT receive (no longer in room)
             bool bReceivedAfterLeave = false;
             bRoom.OnMessageReceived += _ => bReceivedAfterLeave = true;
             aRoom.Send(new byte[] { 0xFF });
-            yield return TestParameters.WaitForDuration(1f, () => _relayB.CheckPayloads());
+            yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
             Assert.IsFalse(bReceivedAfterLeave, "B received payload after leaving.");
 
             Cleanup();
@@ -242,11 +242,11 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
 
             RoomConnection bRoom = _relayB.JoinRoom(400);
-            _relayB.CheckPayloads();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             _relayB.LeaveRoom(400);
-            _relayB.CheckPayloads();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             Assert.Throws<ObjectDisposedException>(() => bRoom.Send(new byte[] { 0x01 }));
@@ -265,8 +265,8 @@ namespace BananaParty.WebSocketRelay.Tests
             RoomConnection aRoom = _relayA.JoinRoom(300);
             RoomConnection bRoom = _relayB.JoinRoom(300);
 
-            _relayA.CheckPayloads();
-            _relayB.CheckPayloads();
+            _relayA.ProcessIncomingMessages();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             byte[] received = null;
@@ -276,7 +276,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return TestParameters.WaitForCondition(
                 () => received != null,
                 TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.CheckPayloads());
+                () => _relayB.ProcessIncomingMessages());
 
             Assert.IsNotNull(received, "Empty message was not received.");
             Assert.AreEqual(0, received.Length);
@@ -295,8 +295,8 @@ namespace BananaParty.WebSocketRelay.Tests
             RoomConnection aRoom = _relayA.JoinRoom(301);
             RoomConnection bRoom = _relayB.JoinRoom(301);
 
-            _relayA.CheckPayloads();
-            _relayB.CheckPayloads();
+            _relayA.ProcessIncomingMessages();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             byte[] sent = GenerateRandomBytes(40_000);
@@ -307,7 +307,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return TestParameters.WaitForCondition(
                 () => received != null,
                 TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.CheckPayloads());
+                () => _relayB.ProcessIncomingMessages());
 
             Assert.IsNotNull(received);
             Assert.True(sent.SequenceEqual(received));
@@ -326,8 +326,8 @@ namespace BananaParty.WebSocketRelay.Tests
             RoomConnection aRoom = _relayA.JoinRoom(302);
             RoomConnection bRoom = _relayB.JoinRoom(302);
 
-            _relayA.CheckPayloads();
-            _relayB.CheckPayloads();
+            _relayA.ProcessIncomingMessages();
+            _relayB.ProcessIncomingMessages();
             yield return null;
 
             for (int i = 0; i < count; i++)
@@ -339,7 +339,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return TestParameters.WaitForCondition(
                 () => receivedCount >= count,
                 TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.CheckPayloads());
+                () => _relayB.ProcessIncomingMessages());
 
             Assert.AreEqual(count, receivedCount, $"Expected {count} messages, received {receivedCount}.");
 
