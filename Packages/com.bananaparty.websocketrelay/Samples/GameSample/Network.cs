@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
@@ -10,6 +11,9 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void StartServer()
         {
+            if (_server != null)
+                throw new InvalidOperationException("Server already running");
+
             _server = new Server();
             _server.Start();
             Debug.Log("Relay server started.");
@@ -17,6 +21,9 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void StopServer()
         {
+            if (_server == null)
+                throw new InvalidOperationException("Server not started to stop it");
+
             _server.Stop();
             _server = null;
             Debug.Log("Relay server stopped.");
@@ -24,6 +31,9 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void Connect()
         {
+            if (_socket != null)
+                throw new InvalidOperationException("Socket already running");
+
             _socket = new Socket(_serverAddress);
             _socket.Connect();
             Debug.Log($"Connected to relay server at {_serverAddress}");
@@ -31,7 +41,11 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void Disconnect()
         {
+            if (_socket == null)
+                throw new InvalidOperationException("Socket not connected to disconect it");
+
             _socket.Disconnect();
+            _socket = null;
             Debug.Log("Disconnected from relay server.");
         }
 
