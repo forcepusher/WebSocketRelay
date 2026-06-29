@@ -1,3 +1,9 @@
+import {
+    RelayMessageHeaderLength,
+    RelayMessagePayloadOffset,
+    RelayMessageType,
+} from "./RelayMessageType";
+
 export class RelayServer {
     #port: number;
     #server: Bun.Server<any> | null = null;
@@ -46,13 +52,13 @@ export class RelayServer {
                     const type = view.getUint8(0);
 
                     switch (type) {
-                        case 0x01: // JOIN_ROOM
+                        case RelayMessageType.JoinRoom:
                             this.#handleJoinRoom(ws, view);
                             break;
-                        case 0x02: // LEAVE_ROOM
+                        case RelayMessageType.LeaveRoom:
                             this.#handleLeaveRoom(ws, view);
                             break;
-                        case 0x03: // SEND_MESSAGE
+                        case RelayMessageType.SendMessage:
                             this.#handleSendMessage(ws, message, view);
                             break;
                     }
@@ -74,27 +80,27 @@ export class RelayServer {
     }
 
     #handleJoinRoom(ws: Bun.ServerWebSocket, view: DataView): void {
-        if (view.byteLength < 5) return;
+        if (view.byteLength < RelayMessageHeaderLength) return;
         const roomId = view.getInt32(1, true);
 
         if (!this.#joinRoom(ws, roomId)) return;
 
-        const response = new Uint8Array(5);
+        const response = new Uint8Array(RelayMessageHeaderLength);
         const respView = new DataView(response.buffer);
-        respView.setUint8(0, 0x10);
+        respView.setUint8(0, RelayMessageType.JoinedRoom);
         respView.setInt32(1, roomId, true);
         ws.send(response);
     }
 
     #handleLeaveRoom(ws: Bun.ServerWebSocket, view: DataView): void {
-        if (view.byteLength < 5) return;
+        if (view.byteLength < RelayMessageHeaderLength) return;
         const roomId = view.getInt32(1, true);
 
         if (!this.#leaveRoom(ws, roomId)) return;
 
-        const response = new Uint8Array(5);
+        const response = new Uint8Array(RelayMessageHeaderLength);
         const respView = new DataView(response.buffer);
-        respView.setUint8(0, 0x11);
+        respView.setUint8(0, RelayMessageType.LeftRoom);
         respView.setInt32(1, roomId, true);
         ws.send(response);
     }
@@ -104,7 +110,7 @@ export class RelayServer {
         message: Uint8Array,
         view: DataView,
     ): void {
-        if (view.byteLength < 5) return;
+        if (view.byteLength < RelayMessageHeaderLength) return;
         const roomId = view.getInt32(1, true);
 
         const roomMembers = this.#roomSockets.get(roomId);
@@ -112,12 +118,12 @@ export class RelayServer {
 
         for (const client of roomMembers) {
             if (client !== ws) {
-                const dataLength = message.byteLength - 5;
-                const response = new Uint8Array(5 + dataLength);
+                const dataLength = message.byteLength - RelayMessagePayloadOffset;
+                const response = new Uint8Array(RelayMessageHeaderLength + dataLength);
                 const respView = new DataView(response.buffer);
-                respView.setUint8(0, 0x12);
+                respView.setUint8(0, RelayMessageType.RoomMessage);
                 respView.setInt32(1, roomId, true);
-                response.set(message.subarray(5), 5);
+                response.set(message.subarray(RelayMessagePayloadOffset), RelayMessagePayloadOffset);
                 client.send(response);
             }
         }

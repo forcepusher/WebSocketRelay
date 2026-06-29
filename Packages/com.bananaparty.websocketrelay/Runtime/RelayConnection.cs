@@ -49,9 +49,9 @@ namespace BananaParty.WebSocketRelay
             if (_roomConnections.TryGetValue(roomId, out RoomConnection existing))
                 return existing;
 
-            byte[] joinMessage = new byte[5];
-            joinMessage[0] = 0x01;
-            BinaryPrimitives.WriteInt32LittleEndian(joinMessage.AsSpan(1), roomId);
+            byte[] joinMessage = new byte[RelayMessageHeader.Length];
+            joinMessage[0] = RelayMessageType.JoinRoom;
+            BinaryPrimitives.WriteInt32LittleEndian(joinMessage.AsSpan(RelayMessageHeader.RoomIdOffset), roomId);
             _socket.Send(joinMessage);
 
             RoomConnection roomConnection = new RoomConnection(this, roomId);
@@ -64,9 +64,9 @@ namespace BananaParty.WebSocketRelay
             if (!_roomConnections.TryGetValue(roomId, out RoomConnection roomConnection))
                 throw new KeyNotFoundException($"Not connected to room {roomId}.");
 
-            byte[] leaveMessage = new byte[5];
-            leaveMessage[0] = 0x02;
-            BinaryPrimitives.WriteInt32LittleEndian(leaveMessage.AsSpan(1), roomId);
+            byte[] leaveMessage = new byte[RelayMessageHeader.Length];
+            leaveMessage[0] = RelayMessageType.LeaveRoom;
+            BinaryPrimitives.WriteInt32LittleEndian(leaveMessage.AsSpan(RelayMessageHeader.RoomIdOffset), roomId);
             _socket.Send(leaveMessage);
 
             _roomConnections.Remove(roomId);
@@ -101,11 +101,11 @@ namespace BananaParty.WebSocketRelay
 
                 switch (type)
                 {
-                    case 0x10: // JOINED_ROOM
-                    case 0x11: // LEFT_ROOM
+                    case RelayMessageType.JoinedRoom:
+                    case RelayMessageType.LeftRoom:
                         processedLength = ProcessRoomControlMessage(payloadBytes);
                         break;
-                    case 0x12: // ROOM_MESSAGE
+                    case RelayMessageType.RoomMessage:
                         processedLength = ProcessRoomMessage(payloadBytes);
                         break;
                     default:
@@ -124,23 +124,23 @@ namespace BananaParty.WebSocketRelay
 
         private int ProcessRoomControlMessage(byte[] data)
         {
-            if (data.Length < 5)
+            if (data.Length < RelayMessageHeader.Length)
                 throw new InvalidDataException("Incomplete room control message.");
 
-            return 5;
+            return RelayMessageHeader.Length;
         }
 
         private int ProcessRoomMessage(byte[] data)
         {
-            if (data.Length < 5)
+            if (data.Length < RelayMessageHeader.Length)
                 throw new InvalidDataException("Incomplete ROOM_MESSAGE payload.");
 
-            int roomId = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(1, 4));
+            int roomId = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(RelayMessageHeader.RoomIdOffset, 4));
 
             if (_roomConnections.TryGetValue(roomId, out RoomConnection room))
             {
-                byte[] messageData = new byte[data.Length - 5];
-                Array.Copy(data, 5, messageData, 0, messageData.Length);
+                byte[] messageData = new byte[data.Length - RelayMessageHeader.PayloadOffset];
+                Array.Copy(data, RelayMessageHeader.PayloadOffset, messageData, 0, messageData.Length);
                 OnRoomMessage?.Invoke(room, messageData);
                 room.InvokeOnMessage(messageData);
             }

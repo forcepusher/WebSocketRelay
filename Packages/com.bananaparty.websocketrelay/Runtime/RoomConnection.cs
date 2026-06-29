@@ -24,10 +24,10 @@ namespace BananaParty.WebSocketRelay
             if (_isDisposed)
                 throw new ObjectDisposedException(nameof(RoomConnection));
 
-            byte[] message = new byte[5 + data.Length];
-            message[0] = 0x03;
-            BinaryPrimitives.WriteInt32LittleEndian(message.AsSpan(1), _roomId);
-            Array.Copy(data, 0, message, 5, data.Length);
+            byte[] message = new byte[RelayMessageHeader.PayloadOffset + data.Length];
+            message[0] = RelayMessageType.SendMessage;
+            BinaryPrimitives.WriteInt32LittleEndian(message.AsSpan(RelayMessageHeader.RoomIdOffset), _roomId);
+            Array.Copy(data, 0, message, RelayMessageHeader.PayloadOffset, data.Length);
 
             _relayConnection.SendToServer(message);
         }

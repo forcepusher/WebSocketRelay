@@ -1,30 +1,35 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { RelayServer } from "./RelayServer";
+import {
+    RelayMessageHeaderLength,
+    RelayMessagePayloadOffset,
+    RelayMessageType,
+} from "./RelayMessageType";
 
 const testPort = 23145;
 
 function joinRoom(ws: WebSocket, roomId: number): void {
-    const message = new Uint8Array(5);
+    const message = new Uint8Array(RelayMessageHeaderLength);
     const view = new DataView(message.buffer);
-    view.setUint8(0, 0x01);
+    view.setUint8(0, RelayMessageType.JoinRoom);
     view.setInt32(1, roomId, true);
     ws.send(message);
 }
 
 function leaveRoom(ws: WebSocket, roomId: number): void {
-    const message = new Uint8Array(5);
+    const message = new Uint8Array(RelayMessageHeaderLength);
     const view = new DataView(message.buffer);
-    view.setUint8(0, 0x02);
+    view.setUint8(0, RelayMessageType.LeaveRoom);
     view.setInt32(1, roomId, true);
     ws.send(message);
 }
 
 function sendRoomMessage(ws: WebSocket, roomId: number, payload: Uint8Array): void {
-    const message = new Uint8Array(5 + payload.byteLength);
+    const message = new Uint8Array(RelayMessagePayloadOffset + payload.byteLength);
     const view = new DataView(message.buffer);
-    view.setUint8(0, 0x03);
+    view.setUint8(0, RelayMessageType.SendMessage);
     view.setInt32(1, roomId, true);
-    message.set(payload, 5);
+    message.set(payload, RelayMessagePayloadOffset);
     ws.send(message);
 }
 
@@ -72,7 +77,7 @@ describe("RelayServer", () => {
         joinRoom(ws, 42);
 
         const response = await receiveBinary(ws);
-        expect(response[0]).toBe(0x10);
+        expect(response[0]).toBe(RelayMessageType.JoinedRoom);
         expect(new DataView(response.buffer).getInt32(1, true)).toBe(42);
 
         ws.close();
@@ -107,9 +112,9 @@ describe("RelayServer", () => {
         sendRoomMessage(sender, 100, new Uint8Array([0xaa, 0xbb]));
 
         const response = await receiveBinary(receiver);
-        expect(response[0]).toBe(0x12);
+        expect(response[0]).toBe(RelayMessageType.RoomMessage);
         expect(new DataView(response.buffer).getInt32(1, true)).toBe(100);
-        expect(Array.from(response.subarray(5))).toEqual([0xaa, 0xbb]);
+        expect(Array.from(response.subarray(RelayMessagePayloadOffset))).toEqual([0xaa, 0xbb]);
 
         sender.close();
         receiver.close();
