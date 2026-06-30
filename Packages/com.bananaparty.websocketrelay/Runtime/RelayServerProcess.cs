@@ -9,6 +9,10 @@ namespace BananaParty.WebSocketRelay
 {
     public class RelayServerProcess
     {
+        private const string ProcessMarker = "-relay-server";
+        private const string UnityPackageEntry = "com.bananaparty.websocketrelay/Runtime/Server/Source/index.ts";
+        private const string StandaloneEntry = "Source/index.ts";
+
         public static string GetServerDirectory() =>
             Path.GetFullPath(Path.Combine(
                 Application.dataPath,
@@ -21,12 +25,14 @@ namespace BananaParty.WebSocketRelay
         public static Process Start(bool createNoWindow, bool verboseDebug, int? relayPort = null)
         {
             string serverDirectory = GetServerDirectory();
-            string scriptPath = GetScriptPath(serverDirectory);
+            RunStopScript(serverDirectory);
 
-            if (!File.Exists(scriptPath))
-                throw new FileNotFoundException($"Server launch script not found at: {scriptPath}");
+            string bunPath = GetBunPath(serverDirectory);
+            if (!File.Exists(bunPath))
+                throw new FileNotFoundException($"Bundled Bun runtime not found at: {bunPath}");
 
-            ProcessStartInfo startInfo = CreateStartInfo(scriptPath, serverDirectory, createNoWindow, verboseDebug, relayPort);
+            (string workingDirectory, string entryScript) = GetLaunchPaths(serverDirectory);
+            ProcessStartInfo startInfo = CreateBunStartInfo(bunPath, serverDirectory, workingDirectory, entryScript, createNoWindow, verboseDebug, relayPort);
             Process process = Process.Start(startInfo);
 
             process.EnableRaisingEvents = true;
@@ -41,14 +47,7 @@ namespace BananaParty.WebSocketRelay
         public static void Stop(Process process)
         {
             string serverDirectory = GetServerDirectory();
-            string scriptPath = GetScriptPath(serverDirectory);
-
-            if (File.Exists(scriptPath))
-            {
-                ProcessStartInfo stopInfo = CreateStartInfo(scriptPath, serverDirectory, createNoWindow: true, verboseDebug: false, relayPort: null, stopOnly: true);
-                using Process stopProcess = Process.Start(stopInfo);
-                stopProcess?.WaitForExit(5000);
-            }
+            RunStopScript(serverDirectory);
 
             if (process == null || process.HasExited)
                 return;
@@ -57,44 +56,86 @@ namespace BananaParty.WebSocketRelay
             process.WaitForExit(5000);
         }
 
-        private static ProcessStartInfo CreateStartInfo(
-            string scriptPath,
+        private static void RunStopScript(string serverDirectory)
+        {
+            string scriptPath = GetScriptPath(serverDirectory);
+            if (!File.Exists(scriptPath))
+                return;
+
+            ProcessStartInfo stopInfo = new ProcessStartInfo
+            {
+                WorkingDirectory = serverDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                stopInfo.FileName = "cmd.exe";
+                stopInfo.Arguments = $"/c \"{scriptPath}\" stop";
+            }
+            else
+            {
+                stopInfo.FileName = "/bin/bash";
+                stopInfo.Arguments = $"\"{scriptPath}\" stop";
+            }
+
+            using Process stopProcess = Process.Start(stopInfo);
+            stopProcess?.WaitForExit(5000);
+        }
+
+        private static ProcessStartInfo CreateBunStartInfo(
+            string bunPath,
             string serverDirectory,
+            string workingDirectory,
+            string entryScript,
             bool createNoWindow,
             bool verboseDebug,
-            int? relayPort,
-            bool stopOnly = false)
+            int? relayPort)
         {
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
+                FileName = bunPath,
+                Arguments = $"--cwd \"{workingDirectory}\" {entryScript} {ProcessMarker}",
                 WorkingDirectory = serverDirectory,
-                RedirectStandardOutput = !stopOnly,
-                RedirectStandardError = !stopOnly,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = createNoWindow,
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8,
             };
 
-            if (!stopOnly)
-            {
-                startInfo.Environment["RELAY_DEBUG"] = verboseDebug ? "1" : "0";
-                if (relayPort.HasValue)
-                    startInfo.Environment["RELAY_PORT"] = relayPort.Value.ToString();
-            }
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                startInfo.FileName = "cmd.exe";
-                startInfo.Arguments = stopOnly ? $"/c \"{scriptPath}\" stop" : $"/c \"{scriptPath}\"";
-            }
-            else
-            {
-                startInfo.FileName = "/bin/bash";
-                startInfo.Arguments = stopOnly ? $"\"{scriptPath}\" stop" : $"\"{scriptPath}\"";
-            }
+            startInfo.Environment["RELAY_DEBUG"] = verboseDebug ? "1" : "0";
+            if (relayPort.HasValue)
+                startInfo.Environment["RELAY_PORT"] = relayPort.Value.ToString();
 
             return startInfo;
+        }
+
+        private static (string WorkingDirectory, string EntryScript) GetLaunchPaths(string serverDirectory)
+        {
+            string unityPackageManifest = Path.GetFullPath(Path.Combine(serverDirectory, "..", "..", "package.json"));
+            if (File.Exists(unityPackageManifest))
+            {
+                return (
+                    Path.GetFullPath(Path.Combine(serverDirectory, "..", "..", "..")),
+                    UnityPackageEntry);
+            }
+
+            return (serverDirectory, StandaloneEntry);
+        }
+
+        private static string GetBunPath(string serverDirectory)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return Path.Combine(serverDirectory, "Bun", "bun-windows-x64", "bun.exe");
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                return Path.Combine(serverDirectory, "Bun", "bun-darwin-aarch64", "bun");
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                return Path.Combine(serverDirectory, "Bun", "bun-linux-x64", "bun");
+
+            throw new PlatformNotSupportedException("Unsupported operating system");
         }
 
         private static string GetScriptPath(string serverDirectory)
