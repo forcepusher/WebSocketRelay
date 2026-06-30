@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class Server
+    public class RelayServer
     {
         private Process _process;
 
@@ -23,8 +23,7 @@ namespace BananaParty.WebSocketRelay
 
             try
             {
-                if (!_process.HasExited)
-                    _process.Kill();
+                RelayServerProcess.Stop(_process);
             }
             catch (Exception e)
             {

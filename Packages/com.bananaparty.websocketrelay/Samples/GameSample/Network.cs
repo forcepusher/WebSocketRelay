@@ -6,7 +6,7 @@ namespace BananaParty.WebSocketRelay.Samples
     public class Network : MonoBehaviour
     {
         private readonly string _serverAddress = "ws://127.0.0.1:23144";
-        private Server _server;
+        private RelayServer _server;
         private RelayConnection _connection;
 
         public void StartServer()
@@ -14,7 +14,7 @@ namespace BananaParty.WebSocketRelay.Samples
             if (_server != null)
                 throw new InvalidOperationException("Server already running");
 
-            _server = new Server();
+            _server = new RelayServer();
             _server.Start();
             Debug.Log("Relay server started.");
         }

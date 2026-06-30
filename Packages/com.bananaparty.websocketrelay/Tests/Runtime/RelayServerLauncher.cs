@@ -158,8 +158,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
                 try
                 {
-                    _serverProcess.Kill();
-                    await Task.Run(() => _serverProcess.WaitForExit(5000)).ConfigureAwait(false);
+                    RelayServerProcess.Stop(_serverProcess);
                     _serverProcess.Dispose();
                     UnityEngine.Debug.Log("Stopped local relay server.");
                 }

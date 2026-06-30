@@ -38,37 +38,60 @@ namespace BananaParty.WebSocketRelay
             return process;
         }
 
+        public static void Stop(Process process)
+        {
+            string serverDirectory = GetServerDirectory();
+            string scriptPath = GetScriptPath(serverDirectory);
+
+            if (File.Exists(scriptPath))
+            {
+                ProcessStartInfo stopInfo = CreateStartInfo(scriptPath, serverDirectory, createNoWindow: true, verboseDebug: false, relayPort: null, stopOnly: true);
+                using Process stopProcess = Process.Start(stopInfo);
+                stopProcess?.WaitForExit(5000);
+            }
+
+            if (process == null || process.HasExited)
+                return;
+
+            process.Kill();
+            process.WaitForExit(5000);
+        }
+
         private static ProcessStartInfo CreateStartInfo(
             string scriptPath,
             string serverDirectory,
             bool createNoWindow,
             bool verboseDebug,
-            int? relayPort)
+            int? relayPort,
+            bool stopOnly = false)
         {
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
                 WorkingDirectory = serverDirectory,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
+                RedirectStandardOutput = !stopOnly,
+                RedirectStandardError = !stopOnly,
                 UseShellExecute = false,
                 CreateNoWindow = createNoWindow,
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8,
             };
 
-            startInfo.Environment["RELAY_DEBUG"] = verboseDebug ? "1" : "0";
-            if (relayPort.HasValue)
-                startInfo.Environment["RELAY_PORT"] = relayPort.Value.ToString();
+            if (!stopOnly)
+            {
+                startInfo.Environment["RELAY_DEBUG"] = verboseDebug ? "1" : "0";
+                if (relayPort.HasValue)
+                    startInfo.Environment["RELAY_PORT"] = relayPort.Value.ToString();
+            }
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 startInfo.FileName = "cmd.exe";
-                startInfo.Arguments = $"/c \"{scriptPath}\"";
+                startInfo.Arguments = stopOnly ? $"/c \"{scriptPath}\" stop" : $"/c \"{scriptPath}\"";
             }
             else
             {
                 startInfo.FileName = "/bin/bash";
-                startInfo.Arguments = $"\"{scriptPath}\"";
+                startInfo.Arguments = stopOnly ? $"\"{scriptPath}\" stop" : $"\"{scriptPath}\"";
             }
 
             return startInfo;
