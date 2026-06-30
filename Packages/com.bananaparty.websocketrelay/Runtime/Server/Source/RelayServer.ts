@@ -1,9 +1,10 @@
 import {
-    RelayMessageHeaderLength,
-    RelayMessagePayloadOffset,
     RelayMessageType,
     relayMessageTypeName,
-    relayRoomTopic,
+    relayPayloadOffset,
+    relayReadTopic,
+    relayReadTopicLength,
+    relayWriteMessage,
 } from "./RelayMessageType";
 import { RelayServerLog } from "./RelayServerLog";
 
@@ -58,26 +59,21 @@ export class RelayServer {
                         return;
                     }
 
-                    const view = new DataView(
-                        message.buffer,
-                        message.byteOffset,
-                        message.byteLength,
-                    );
-                    const type = view.getUint8(0);
+                    const type = message[0];
 
                     RelayServerLog.debug(
                         `message id=${ws.data.connectionId} type=${relayMessageTypeName(type)} bytes=${message.byteLength}`,
                     );
 
                     switch (type) {
-                        case RelayMessageType.JoinRoom:
-                            this.#handleJoinRoom(ws, view);
+                        case RelayMessageType.Subscribe:
+                            this.#handleSubscribe(ws, message);
                             break;
-                        case RelayMessageType.LeaveRoom:
-                            this.#handleLeaveRoom(ws, view);
+                        case RelayMessageType.Unsubscribe:
+                            this.#handleUnsubscribe(ws, message);
                             break;
-                        case RelayMessageType.SendMessage:
-                            this.#handleSendMessage(ws, message, view);
+                        case RelayMessageType.Send:
+                            this.#handleSend(ws, message);
                             break;
                         default:
                             RelayServerLog.warn(
@@ -102,110 +98,95 @@ export class RelayServer {
         }
     }
 
-    #handleJoinRoom(ws: Bun.ServerWebSocket<RelayWebSocketData>, view: DataView): void {
-        if (view.byteLength < RelayMessageHeaderLength) {
+    #handleSubscribe(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
+        const topic = relayReadTopic(message);
+        if (!topic) {
             RelayServerLog.warn(
-                `join rejected id=${ws.data.connectionId} reason=short-frame bytes=${view.byteLength}`,
+                `subscribe rejected id=${ws.data.connectionId} reason=missing-topic bytes=${message.byteLength}`,
             );
             return;
         }
 
-        const roomId = view.getInt32(1, true);
-        const topic = relayRoomTopic(roomId);
-
-        if (!this.#joinRoom(ws, roomId)) {
+        if (!this.#subscribe(ws, topic)) {
             RelayServerLog.debug(
-                `join ignored id=${ws.data.connectionId} room=${roomId} reason=already-subscribed`,
+                `subscribe ignored id=${ws.data.connectionId} topic=${topic} reason=already-subscribed`,
             );
             return;
         }
 
-        const response = new Uint8Array(RelayMessageHeaderLength);
-        const respView = new DataView(response.buffer);
-        respView.setUint8(0, RelayMessageType.JoinedRoom);
-        respView.setInt32(1, roomId, true);
-        ws.send(response);
+        ws.send(relayWriteMessage(RelayMessageType.Subscribed, topic));
 
         RelayServerLog.info(
-            `joined id=${ws.data.connectionId} room=${roomId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
+            `subscribed id=${ws.data.connectionId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
         );
     }
 
-    #handleLeaveRoom(ws: Bun.ServerWebSocket<RelayWebSocketData>, view: DataView): void {
-        if (view.byteLength < RelayMessageHeaderLength) {
+    #handleUnsubscribe(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
+        const topic = relayReadTopic(message);
+        if (!topic) {
             RelayServerLog.warn(
-                `leave rejected id=${ws.data.connectionId} reason=short-frame bytes=${view.byteLength}`,
+                `unsubscribe rejected id=${ws.data.connectionId} reason=missing-topic bytes=${message.byteLength}`,
             );
             return;
         }
 
-        const roomId = view.getInt32(1, true);
-        const topic = relayRoomTopic(roomId);
-
-        if (!this.#leaveRoom(ws, roomId)) {
+        if (!this.#unsubscribe(ws, topic)) {
             RelayServerLog.debug(
-                `leave ignored id=${ws.data.connectionId} room=${roomId} reason=not-subscribed`,
+                `unsubscribe ignored id=${ws.data.connectionId} topic=${topic} reason=not-subscribed`,
             );
             return;
         }
 
-        const response = new Uint8Array(RelayMessageHeaderLength);
-        const respView = new DataView(response.buffer);
-        respView.setUint8(0, RelayMessageType.LeftRoom);
-        respView.setInt32(1, roomId, true);
-        ws.send(response);
+        ws.send(relayWriteMessage(RelayMessageType.Unsubscribed, topic));
 
         RelayServerLog.info(
-            `left id=${ws.data.connectionId} room=${roomId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
+            `unsubscribed id=${ws.data.connectionId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
         );
     }
 
-    #handleSendMessage(
-        ws: Bun.ServerWebSocket<RelayWebSocketData>,
-        message: Uint8Array,
-        view: DataView,
-    ): void {
-        if (view.byteLength < RelayMessageHeaderLength) {
+    #handleSend(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
+        const topicLength = relayReadTopicLength(message);
+        if (topicLength < 0) {
             RelayServerLog.warn(
-                `send rejected id=${ws.data.connectionId} reason=short-frame bytes=${view.byteLength}`,
+                `send rejected id=${ws.data.connectionId} reason=short-frame bytes=${message.byteLength}`,
             );
             return;
         }
 
-        const roomId = view.getInt32(1, true);
-        const topic = relayRoomTopic(roomId);
+        const topic = relayReadTopic(message);
+        if (!topic) {
+            RelayServerLog.warn(
+                `send rejected id=${ws.data.connectionId} reason=missing-topic bytes=${message.byteLength}`,
+            );
+            return;
+        }
 
         if (!ws.isSubscribed(topic)) {
             RelayServerLog.warn(
-                `send rejected id=${ws.data.connectionId} room=${roomId} reason=not-subscribed`,
+                `send rejected id=${ws.data.connectionId} topic=${topic} reason=not-subscribed`,
             );
             return;
         }
 
-        const payloadBytes = message.byteLength - RelayMessagePayloadOffset;
-        const response = new Uint8Array(RelayMessageHeaderLength + payloadBytes);
-        const respView = new DataView(response.buffer);
-        respView.setUint8(0, RelayMessageType.RoomMessage);
-        respView.setInt32(1, roomId, true);
-        response.set(message.subarray(RelayMessagePayloadOffset), RelayMessagePayloadOffset);
+        const payloadOffset = relayPayloadOffset(topicLength);
+        const payload = message.subarray(payloadOffset);
+        const response = relayWriteMessage(RelayMessageType.TopicMessage, topic, payload);
 
         const deliveredTo = ws.publish(topic, response);
 
         RelayServerLog.debug(
-            `published id=${ws.data.connectionId} room=${roomId} topic=${topic} payloadBytes=${payloadBytes} deliveredTo=${deliveredTo}`,
+            `published id=${ws.data.connectionId} topic=${topic} payloadBytes=${payload.byteLength} deliveredTo=${deliveredTo}`,
         );
     }
 
-    #joinRoom(ws: Bun.ServerWebSocket<RelayWebSocketData>, roomId: number): boolean {
-        const topic = relayRoomTopic(roomId);
+    #subscribe(ws: Bun.ServerWebSocket<RelayWebSocketData>, topic: string): boolean {
         if (ws.isSubscribed(topic)) return false;
 
         ws.subscribe(topic);
         return true;
     }
 
-    #leaveRoom(ws: Bun.ServerWebSocket<RelayWebSocketData>, roomId: number): boolean {
-        const topic = relayRoomTopic(roomId);
+    #unsubscribe(ws: Bun.ServerWebSocket<RelayWebSocketData>, topic: string): boolean {
         if (!ws.isSubscribed(topic)) return false;
 
         ws.unsubscribe(topic);

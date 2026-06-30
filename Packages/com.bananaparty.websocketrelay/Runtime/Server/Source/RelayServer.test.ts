@@ -1,36 +1,19 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { RelayServer } from "./RelayServer";
-import {
-    RelayMessageHeaderLength,
-    RelayMessagePayloadOffset,
-    RelayMessageType,
-} from "./RelayMessageType";
+import { RelayMessageType, relayPayloadOffset, relayReadTopic, relayReadTopicLength, relayWriteMessage } from "./RelayMessageType";
 
 const testPort = 23145;
 
-function joinRoom(ws: WebSocket, roomId: number): void {
-    const message = new Uint8Array(RelayMessageHeaderLength);
-    const view = new DataView(message.buffer);
-    view.setUint8(0, RelayMessageType.JoinRoom);
-    view.setInt32(1, roomId, true);
-    ws.send(message);
+function subscribe(ws: WebSocket, topic: string): void {
+    ws.send(relayWriteMessage(RelayMessageType.Subscribe, topic));
 }
 
-function leaveRoom(ws: WebSocket, roomId: number): void {
-    const message = new Uint8Array(RelayMessageHeaderLength);
-    const view = new DataView(message.buffer);
-    view.setUint8(0, RelayMessageType.LeaveRoom);
-    view.setInt32(1, roomId, true);
-    ws.send(message);
+function unsubscribe(ws: WebSocket, topic: string): void {
+    ws.send(relayWriteMessage(RelayMessageType.Unsubscribe, topic));
 }
 
-function sendRoomMessage(ws: WebSocket, roomId: number, payload: Uint8Array): void {
-    const message = new Uint8Array(RelayMessagePayloadOffset + payload.byteLength);
-    const view = new DataView(message.buffer);
-    view.setUint8(0, RelayMessageType.SendMessage);
-    view.setInt32(1, roomId, true);
-    message.set(payload, RelayMessagePayloadOffset);
-    ws.send(message);
+function sendTopicMessage(ws: WebSocket, topic: string, payload: Uint8Array): void {
+    ws.send(relayWriteMessage(RelayMessageType.Send, topic, payload));
 }
 
 async function openSocket(): Promise<WebSocket> {
@@ -72,23 +55,23 @@ describe("RelayServer", () => {
         server.stop();
     });
 
-    test("join sends JOINED_ROOM confirmation", async () => {
+    test("subscribe sends SUBSCRIBED confirmation", async () => {
         const ws = await openSocket();
-        joinRoom(ws, 42);
+        subscribe(ws, "lobby");
 
         const response = await receiveBinary(ws);
-        expect(response[0]).toBe(RelayMessageType.JoinedRoom);
-        expect(new DataView(response.buffer).getInt32(1, true)).toBe(42);
+        expect(response[0]).toBe(RelayMessageType.Subscribed);
+        expect(relayReadTopic(response)).toBe("lobby");
 
         ws.close();
     });
 
-    test("duplicate join does not send another confirmation", async () => {
+    test("duplicate subscribe does not send another confirmation", async () => {
         const ws = await openSocket();
-        joinRoom(ws, 7);
+        subscribe(ws, "events");
         await receiveBinary(ws);
 
-        joinRoom(ws, 7);
+        subscribe(ws, "events");
         let duplicateConfirmation = false;
         ws.onmessage = () => {
             duplicateConfirmation = true;
@@ -100,39 +83,41 @@ describe("RelayServer", () => {
         ws.close();
     });
 
-    test("relays room messages to other members", async () => {
+    test("relays topic messages to other subscribers", async () => {
         const sender = await openSocket();
         const receiver = await openSocket();
 
-        joinRoom(sender, 100);
-        joinRoom(receiver, 100);
+        subscribe(sender, "chat");
+        subscribe(receiver, "chat");
         await receiveBinary(sender);
         await receiveBinary(receiver);
 
-        sendRoomMessage(sender, 100, new Uint8Array([0xaa, 0xbb]));
+        sendTopicMessage(sender, "chat", new Uint8Array([0xaa, 0xbb]));
 
         const response = await receiveBinary(receiver);
-        expect(response[0]).toBe(RelayMessageType.RoomMessage);
-        expect(new DataView(response.buffer).getInt32(1, true)).toBe(100);
-        expect(Array.from(response.subarray(RelayMessagePayloadOffset))).toEqual([0xaa, 0xbb]);
+        expect(response[0]).toBe(RelayMessageType.TopicMessage);
+        expect(relayReadTopic(response)).toBe("chat");
+        expect(Array.from(response.subarray(relayPayloadOffset(relayReadTopicLength(response))))).toEqual([
+            0xaa, 0xbb,
+        ]);
 
         sender.close();
         receiver.close();
     });
 
-    test("does not relay to clients in other rooms", async () => {
+    test("does not relay to clients on other topics", async () => {
         const sender = await openSocket();
-        const otherRoomClient = await openSocket();
+        const otherTopicClient = await openSocket();
 
-        joinRoom(sender, 200);
-        joinRoom(otherRoomClient, 201);
+        subscribe(sender, "alpha");
+        subscribe(otherTopicClient, "beta");
         await receiveBinary(sender);
-        await receiveBinary(otherRoomClient);
+        await receiveBinary(otherTopicClient);
 
-        sendRoomMessage(sender, 200, new Uint8Array([0x01]));
+        sendTopicMessage(sender, "alpha", new Uint8Array([0x01]));
 
         let unexpectedMessage = false;
-        otherRoomClient.onmessage = () => {
+        otherTopicClient.onmessage = () => {
             unexpectedMessage = true;
         };
 
@@ -140,22 +125,22 @@ describe("RelayServer", () => {
         expect(unexpectedMessage).toBe(false);
 
         sender.close();
-        otherRoomClient.close();
+        otherTopicClient.close();
     });
 
-    test("rejects send from client that left the room", async () => {
+    test("rejects send from client that unsubscribed", async () => {
         const sender = await openSocket();
         const receiver = await openSocket();
 
-        joinRoom(sender, 300);
-        joinRoom(receiver, 300);
+        subscribe(sender, "game");
+        subscribe(receiver, "game");
         await receiveBinary(sender);
         await receiveBinary(receiver);
 
-        leaveRoom(sender, 300);
+        unsubscribe(sender, "game");
         await receiveBinary(sender);
 
-        sendRoomMessage(sender, 300, new Uint8Array([0x99]));
+        sendTopicMessage(sender, "game", new Uint8Array([0x99]));
 
         let unexpectedMessage = false;
         receiver.onmessage = () => {
@@ -169,10 +154,10 @@ describe("RelayServer", () => {
         receiver.close();
     });
 
-    test("leave sends LEFT_ROOM only when client was in the room", async () => {
+    test("unsubscribe sends UNSUBSCRIBED only when client was subscribed", async () => {
         const ws = await openSocket();
 
-        leaveRoom(ws, 999);
+        unsubscribe(ws, "missing");
 
         let unexpectedMessage = false;
         ws.onmessage = () => {

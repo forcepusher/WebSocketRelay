@@ -421,8 +421,8 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return new WaitWhile(() => !relayA.IsConnected || !relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
             Assert.IsTrue(relayA.IsConnected && relayB.IsConnected, "Relays failed to connect within timeout.");
 
-            relayA.JoinRoom(999);
-            relayB.JoinRoom(999);
+            relayA.Subscribe("dynamic-state");
+            relayB.Subscribe("dynamic-state");
 
             relayA.ProcessIncomingMessages();
             relayB.ProcessIncomingMessages();
@@ -433,23 +433,23 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
             bool receivedDataCaptured = false;
-            relayB.OnRoomMessage += (roomId, data) =>
+            relayB.OnTopicMessage += (topic, data) =>
             {
-                if (roomId != 999 || receivedDataCaptured)
+                if (topic != "dynamic-state" || receivedDataCaptured)
                     return;
 
                 stateB.ReadState(new JsonStateInput(Encoding.UTF8.GetString(data)));
                 receivedDataCaptured = true;
             };
 
-            relayA.Send(999, sentBytes);
+            relayA.Send("dynamic-state", sentBytes);
 
             yield return TestParameters.WaitForCondition(
                 () => receivedDataCaptured,
                 TestParameters.ReceiveTimeoutThreshold,
                 () => relayB.ProcessIncomingMessages());
 
-            Assert.IsTrue(receivedDataCaptured, "Room message was never processed.");
+            Assert.IsTrue(receivedDataCaptured, "Topic message was never processed.");
             Assert.AreEqual(2, stateB.Items.Count);
             Assert.AreEqual(4, stateB.CreateCount);
             Assert.AreEqual(10, stateB.Items[0].Value);

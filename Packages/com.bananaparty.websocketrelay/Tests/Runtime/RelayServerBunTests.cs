@@ -31,12 +31,12 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private static IEnumerable<string> BunTestCaseNames()
         {
-            yield return "RelayServer > join sends JOINED_ROOM confirmation";
-            yield return "RelayServer > duplicate join does not send another confirmation";
-            yield return "RelayServer > relays room messages to other members";
-            yield return "RelayServer > does not relay to clients in other rooms";
-            yield return "RelayServer > rejects send from client that left the room";
-            yield return "RelayServer > leave sends LEFT_ROOM only when client was in the room";
+            yield return "RelayServer > subscribe sends SUBSCRIBED confirmation";
+            yield return "RelayServer > duplicate subscribe does not send another confirmation";
+            yield return "RelayServer > relays topic messages to other subscribers";
+            yield return "RelayServer > does not relay to clients on other topics";
+            yield return "RelayServer > rejects send from client that unsubscribed";
+            yield return "RelayServer > unsubscribe sends UNSUBSCRIBED only when client was subscribed";
         }
 
         [TestCaseSource(nameof(BunTestCaseNames))]

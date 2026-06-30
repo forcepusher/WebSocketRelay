@@ -42,21 +42,21 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return new WaitWhile(() => !relayA.IsConnected || !relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
             Assert.IsTrue(relayA.IsConnected && relayB.IsConnected, "Relays failed to connect.");
 
-            relayA.JoinRoom(888);
-            relayB.JoinRoom(888);
+            relayA.Subscribe("state-sync");
+            relayB.Subscribe("state-sync");
             relayA.ProcessIncomingMessages();
             relayB.ProcessIncomingMessages();
             yield return null;
 
-            // Act: Client A serializes and sends state via room
+            // Act: Client A serializes and sends state via topic
             JsonStateOutput writeGraph = new();
             stateA.WriteState(writeGraph);
             byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
             bool captured = false;
-            relayB.OnRoomMessage += (roomId, data) =>
+            relayB.OnTopicMessage += (topic, data) =>
             {
-                if (roomId != 888 || captured)
+                if (topic != "state-sync" || captured)
                     return;
 
                 JsonStateInput readGraph = new(Encoding.UTF8.GetString(data));
@@ -64,14 +64,14 @@ namespace BananaParty.WebSocketRelay.Tests
                 captured = true;
             };
 
-            relayA.Send(888, sentBytes);
+            relayA.Send("state-sync", sentBytes);
 
             yield return TestParameters.WaitForCondition(
                 () => captured,
                 TestParameters.ReceiveTimeoutThreshold,
                 () => relayB.ProcessIncomingMessages());
 
-            Assert.IsTrue(captured, "Room message was never processed.");
+            Assert.IsTrue(captured, "Topic message was never processed.");
 
             // Assert: Verify values were synchronized
             Assert.AreEqual(stateA.PlayTime, stateB.PlayTime);

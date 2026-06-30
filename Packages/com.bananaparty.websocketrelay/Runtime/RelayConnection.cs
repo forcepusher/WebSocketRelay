@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 
@@ -8,13 +7,13 @@ namespace BananaParty.WebSocketRelay
     public class RelayConnection : IDisposable
     {
         private readonly Socket _socket;
-        private readonly HashSet<int> _joinedRooms = new();
+        private readonly HashSet<string> _subscriptions = new();
 
         public bool IsConnected => _socket.IsConnected;
 
         public bool HasUnreadPayloadQueue => _socket.HasUnreadPayloadQueue;
 
-        public event Action<int, byte[]> OnRoomMessage;
+        public event Action<string, byte[]> OnTopicMessage;
 
         public RelayConnection(string serverAddress)
         {
@@ -27,7 +26,7 @@ namespace BananaParty.WebSocketRelay
         }
 
         /// <summary>
-        /// Drains queued WebSocket frames and dispatches room messages.
+        /// Drains queued WebSocket frames and dispatches topic messages.
         /// Call this periodically (e.g. in Update).
         /// </summary>
         public void ProcessIncomingMessages()
@@ -39,44 +38,33 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        public void JoinRoom(int roomId)
+        public void Subscribe(string topic)
         {
-            if (!_joinedRooms.Add(roomId))
+            if (!_subscriptions.Add(topic))
                 return;
 
-            byte[] joinMessage = new byte[RelayMessageHeader.Length];
-            joinMessage[0] = RelayMessageType.JoinRoom;
-            BinaryPrimitives.WriteInt32LittleEndian(joinMessage.AsSpan(RelayMessageHeader.RoomIdOffset), roomId);
-            _socket.Send(joinMessage);
+            _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Subscribe, topic));
         }
 
-        public void LeaveRoom(int roomId)
+        public void Unsubscribe(string topic)
         {
-            if (!_joinedRooms.Remove(roomId))
-                throw new KeyNotFoundException($"Not connected to room {roomId}.");
+            if (!_subscriptions.Remove(topic))
+                throw new KeyNotFoundException($"Not subscribed to topic '{topic}'.");
 
-            byte[] leaveMessage = new byte[RelayMessageHeader.Length];
-            leaveMessage[0] = RelayMessageType.LeaveRoom;
-            BinaryPrimitives.WriteInt32LittleEndian(leaveMessage.AsSpan(RelayMessageHeader.RoomIdOffset), roomId);
-            _socket.Send(leaveMessage);
+            _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Unsubscribe, topic));
         }
 
-        public void Send(int roomId, byte[] data)
+        public void Send(string topic, byte[] data)
         {
-            if (!_joinedRooms.Contains(roomId))
-                throw new KeyNotFoundException($"Not connected to room {roomId}.");
+            if (!_subscriptions.Contains(topic))
+                throw new KeyNotFoundException($"Not subscribed to topic '{topic}'.");
 
-            byte[] message = new byte[RelayMessageHeader.PayloadOffset + data.Length];
-            message[0] = RelayMessageType.SendMessage;
-            BinaryPrimitives.WriteInt32LittleEndian(message.AsSpan(RelayMessageHeader.RoomIdOffset), roomId);
-            Array.Copy(data, 0, message, RelayMessageHeader.PayloadOffset, data.Length);
-
-            _socket.Send(message);
+            _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Send, topic, data));
         }
 
         public void Dispose()
         {
-            _joinedRooms.Clear();
+            _subscriptions.Clear();
 
             try
             {
@@ -98,15 +86,15 @@ namespace BananaParty.WebSocketRelay
 
                 switch (type)
                 {
-                    case RelayMessageType.JoinedRoom:
-                    case RelayMessageType.LeftRoom:
-                        processedLength = ProcessRoomControlMessage(payloadBytes);
+                    case RelayMessageType.Subscribed:
+                    case RelayMessageType.Unsubscribed:
+                        processedLength = ProcessTopicControlMessage(payloadBytes);
                         break;
-                    case RelayMessageType.RoomMessage:
-                        processedLength = ProcessRoomMessage(payloadBytes);
+                    case RelayMessageType.TopicMessage:
+                        processedLength = ProcessTopicMessage(payloadBytes);
                         break;
                     default:
-                        processedLength = SkipUnknownMessage(payloadBytes, type);
+                        processedLength = SkipUnknownMessage(payloadBytes);
                         break;
                 }
 
@@ -119,32 +107,35 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        private int ProcessRoomControlMessage(byte[] data)
+        private int ProcessTopicControlMessage(byte[] data)
         {
-            if (data.Length < RelayMessageHeader.Length)
-                throw new InvalidDataException("Incomplete room control message.");
+            int topicLength = RelayMessageCodec.ReadTopicLength(data);
+            if (topicLength < 0)
+                throw new InvalidDataException("Incomplete topic control message.");
 
-            return RelayMessageHeader.Length;
+            return RelayMessageCodec.GetPayloadOffset(topicLength);
         }
 
-        private int ProcessRoomMessage(byte[] data)
+        private int ProcessTopicMessage(byte[] data)
         {
-            if (data.Length < RelayMessageHeader.Length)
-                throw new InvalidDataException("Incomplete ROOM_MESSAGE payload.");
+            int topicLength = RelayMessageCodec.ReadTopicLength(data);
+            if (topicLength < 0)
+                throw new InvalidDataException("Incomplete topic message.");
 
-            int roomId = BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(RelayMessageHeader.RoomIdOffset, 4));
+            string topic = RelayMessageCodec.ReadTopic(data);
+            int payloadOffset = RelayMessageCodec.GetPayloadOffset(topicLength);
 
-            if (!_joinedRooms.Contains(roomId))
+            if (!_subscriptions.Contains(topic))
                 return data.Length;
 
-            byte[] messageData = new byte[data.Length - RelayMessageHeader.PayloadOffset];
-            Array.Copy(data, RelayMessageHeader.PayloadOffset, messageData, 0, messageData.Length);
-            OnRoomMessage?.Invoke(roomId, messageData);
+            byte[] messageData = new byte[data.Length - payloadOffset];
+            Array.Copy(data, payloadOffset, messageData, 0, messageData.Length);
+            OnTopicMessage?.Invoke(topic, messageData);
 
             return data.Length;
         }
 
-        private int SkipUnknownMessage(byte[] data, byte type)
+        private static int SkipUnknownMessage(byte[] data)
         {
             return data.Length;
         }
