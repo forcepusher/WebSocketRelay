@@ -421,8 +421,8 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return new WaitWhile(() => !relayA.IsConnected || !relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
             Assert.IsTrue(relayA.IsConnected && relayB.IsConnected, "Relays failed to connect within timeout.");
 
-            RoomConnection roomA = relayA.JoinRoom(999);
-            RoomConnection roomB = relayB.JoinRoom(999);
+            relayA.JoinRoom(999);
+            relayB.JoinRoom(999);
 
             relayA.ProcessIncomingMessages();
             relayB.ProcessIncomingMessages();
@@ -433,16 +433,16 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
             bool receivedDataCaptured = false;
-            roomB.OnMessageReceived += (data) =>
+            relayB.OnRoomMessage += (roomId, data) =>
             {
-                if (!receivedDataCaptured)
-                {
-                    stateB.ReadState(new JsonStateInput(Encoding.UTF8.GetString(data)));
-                    receivedDataCaptured = true;
-                }
+                if (roomId != 999 || receivedDataCaptured)
+                    return;
+
+                stateB.ReadState(new JsonStateInput(Encoding.UTF8.GetString(data)));
+                receivedDataCaptured = true;
             };
 
-            roomA.Send(sentBytes);
+            relayA.Send(999, sentBytes);
 
             yield return TestParameters.WaitForCondition(
                 () => receivedDataCaptured,
