@@ -9,6 +9,7 @@ namespace BananaParty.WebSocketRelay
 {
     public class RelayServerProcess
     {
+        private const string ProcessMarker = "-relay-server";
         private const string UnityPackageEntry = "com.bananaparty.websocketrelay/Runtime/Server/Source/index.ts";
         private const string StandaloneEntry = "Source/index.ts";
 
@@ -24,7 +25,7 @@ namespace BananaParty.WebSocketRelay
         public static Process Start(bool createNoWindow, bool verboseDebug, int? relayPort = null)
         {
             string serverDirectory = GetServerDirectory();
-            RelayServerProcessTerminator.KillAll();
+            KillAll();
 
             string bunPath = GetBunPath(serverDirectory);
             if (!File.Exists(bunPath))
@@ -45,13 +46,49 @@ namespace BananaParty.WebSocketRelay
 
         public static void Stop(Process process)
         {
-            RelayServerProcessTerminator.KillAll();
+            KillAll();
 
             if (process == null || process.HasExited)
                 return;
 
             process.Kill();
             process.WaitForExit(5000);
+        }
+
+        private static void KillAll()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                KillAllWindows();
+            else
+                KillAllUnix();
+        }
+
+        private static void KillAllWindows()
+        {
+            ProcessStartInfo startInfo = new ProcessStartInfo
+            {
+                FileName = "wmic",
+                Arguments = $"process where \"name='bun.exe' and CommandLine like '%{ProcessMarker}%'\" call terminate",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+            };
+
+            using Process process = Process.Start(startInfo);
+            process?.WaitForExit(5000);
+        }
+
+        private static void KillAllUnix()
+        {
+            ProcessStartInfo startInfo = new ProcessStartInfo
+            {
+                FileName = "pkill",
+                Arguments = $"-f Source/index.ts {ProcessMarker}",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+            };
+
+            using Process process = Process.Start(startInfo);
+            process?.WaitForExit(5000);
         }
 
         private static ProcessStartInfo CreateBunStartInfo(
@@ -66,7 +103,7 @@ namespace BananaParty.WebSocketRelay
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
                 FileName = bunPath,
-                Arguments = $"--cwd \"{workingDirectory}\" {entryScript} {RelayServerProcessTerminator.ProcessMarker}",
+                Arguments = $"--cwd \"{workingDirectory}\" {entryScript} {ProcessMarker}",
                 WorkingDirectory = serverDirectory,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
