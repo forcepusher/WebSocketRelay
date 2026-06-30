@@ -1,6 +1,8 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.IO;
+using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -97,7 +99,22 @@ namespace BananaParty.WebSocketRelay
                     if (_disconnectTokenSource.IsCancellationRequested)
                         goto DisconnectRequested;
 
-                    result = receiveTask.Result;
+                    try
+                    {
+                        result = receiveTask.Result;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        goto DisconnectRequested;
+                    }
+                    catch (IOException)
+                    {
+                        goto ConnectionAborted;
+                    }
+                    catch (SocketException)
+                    {
+                        goto ConnectionAborted;
+                    }
 
                     payloadWriter.Write(new ArraySegment<byte>(payloadBytesBuffer, 0, result.Count));
                 }

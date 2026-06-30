@@ -369,7 +369,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public IEnumerator Teardown()
         {
             Cleanup();
-            yield return RelayServerLauncher.StopCoroutine();
+            yield return null;
         }
     }
 }
