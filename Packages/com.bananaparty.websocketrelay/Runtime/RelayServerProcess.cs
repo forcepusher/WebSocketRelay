@@ -9,7 +9,6 @@ namespace BananaParty.WebSocketRelay
 {
     public class RelayServerProcess
     {
-        private const string ProcessMarker = "-relay-server";
         private const string UnityPackageEntry = "com.bananaparty.websocketrelay/Runtime/Server/Source/index.ts";
         private const string StandaloneEntry = "Source/index.ts";
 
@@ -25,7 +24,7 @@ namespace BananaParty.WebSocketRelay
         public static Process Start(bool createNoWindow, bool verboseDebug, int? relayPort = null)
         {
             string serverDirectory = GetServerDirectory();
-            RunStopScript(serverDirectory);
+            RelayServerProcessTerminator.KillAll();
 
             string bunPath = GetBunPath(serverDirectory);
             if (!File.Exists(bunPath))
@@ -46,42 +45,13 @@ namespace BananaParty.WebSocketRelay
 
         public static void Stop(Process process)
         {
-            string serverDirectory = GetServerDirectory();
-            RunStopScript(serverDirectory);
+            RelayServerProcessTerminator.KillAll();
 
             if (process == null || process.HasExited)
                 return;
 
             process.Kill();
             process.WaitForExit(5000);
-        }
-
-        private static void RunStopScript(string serverDirectory)
-        {
-            string scriptPath = GetScriptPath(serverDirectory);
-            if (!File.Exists(scriptPath))
-                return;
-
-            ProcessStartInfo stopInfo = new ProcessStartInfo
-            {
-                WorkingDirectory = serverDirectory,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                stopInfo.FileName = "cmd.exe";
-                stopInfo.Arguments = $"/c \"{scriptPath}\" stop";
-            }
-            else
-            {
-                stopInfo.FileName = "/bin/bash";
-                stopInfo.Arguments = $"\"{scriptPath}\" stop";
-            }
-
-            using Process stopProcess = Process.Start(stopInfo);
-            stopProcess?.WaitForExit(5000);
         }
 
         private static ProcessStartInfo CreateBunStartInfo(
@@ -96,7 +66,7 @@ namespace BananaParty.WebSocketRelay
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
                 FileName = bunPath,
-                Arguments = $"--cwd \"{workingDirectory}\" {entryScript} {ProcessMarker}",
+                Arguments = $"--cwd \"{workingDirectory}\" {entryScript} {RelayServerProcessTerminator.ProcessMarker}",
                 WorkingDirectory = serverDirectory,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -134,18 +104,6 @@ namespace BananaParty.WebSocketRelay
                 return Path.Combine(serverDirectory, "Bun", "bun-darwin-aarch64", "bun");
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 return Path.Combine(serverDirectory, "Bun", "bun-linux-x64", "bun");
-
-            throw new PlatformNotSupportedException("Unsupported operating system");
-        }
-
-        private static string GetScriptPath(string serverDirectory)
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return Path.Combine(serverDirectory, "LaunchServer-Windows.bat");
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return Path.Combine(serverDirectory, "LaunchServer-MacOS.sh");
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                return Path.Combine(serverDirectory, "LaunchServer-Linux.sh");
 
             throw new PlatformNotSupportedException("Unsupported operating system");
         }
