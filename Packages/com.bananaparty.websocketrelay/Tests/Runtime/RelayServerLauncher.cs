@@ -4,7 +4,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 #if !UNITY_WEBGL || UNITY_EDITOR
-using System.Diagnostics;
 using System.Net.Sockets;
 #endif
 
@@ -15,7 +14,7 @@ namespace BananaParty.WebSocketRelay.Tests
         private const int ServerStartupTimeoutMs = 15000;
 
 #if !UNITY_WEBGL || UNITY_EDITOR
-        private static Process _serverProcess;
+        private static RelayServerProcess _serverProcess;
         private static bool _weOwnProcess;
         private static readonly SemaphoreSlim Gate = new(1, 1);
         private static readonly object EnsureTaskLock = new();
@@ -54,14 +53,15 @@ namespace BananaParty.WebSocketRelay.Tests
                     return true;
                 }
 
-                if (_serverProcess != null && !_serverProcess.HasExited)
+                if (_serverProcess != null && _serverProcess.IsRunning)
                     return await WaitForPortAsync(TestParameters.RelayServerPort, ServerStartupTimeoutMs).ConfigureAwait(false);
 
                 try
                 {
-                    _serverProcess = RelayServerProcess.Start(
-                        createNoWindow: true,
+                    _serverProcess = new RelayServerProcess();
+                    _serverProcess.Start(
                         verboseDebug: true,
+                        createNoWindow: true,
                         relayPort: TestParameters.RelayServerPort);
                     _weOwnProcess = true;
                     UnityEngine.Debug.Log($"Started local relay server. Waiting for port {TestParameters.RelayServerPort}...");
@@ -150,7 +150,7 @@ namespace BananaParty.WebSocketRelay.Tests
             await Gate.WaitAsync().ConfigureAwait(false);
             try
             {
-                if (!_weOwnProcess || _serverProcess == null || _serverProcess.HasExited)
+                if (!_weOwnProcess || _serverProcess == null || !_serverProcess.IsRunning)
                 {
                     _weOwnProcess = false;
                     return;
@@ -158,8 +158,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
                 try
                 {
-                    RelayServerProcess.Stop(_serverProcess);
-                    _serverProcess.Dispose();
+                    _serverProcess.Stop();
                     UnityEngine.Debug.Log("Stopped local relay server.");
                 }
                 catch (Exception e)

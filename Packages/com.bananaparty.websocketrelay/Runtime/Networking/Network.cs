@@ -8,7 +8,7 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private string _serverAddress = "ws://127.0.0.1:23144";
 
-        private RelayServer _server;
+        private RelayServerProcess _server;
         private RelayConnection _connection;
 
         public void StartServer()
@@ -16,7 +16,7 @@ namespace BananaParty.WebSocketRelay
             if (_server != null)
                 throw new InvalidOperationException("Server already running");
 
-            _server = new RelayServer();
+            _server = new RelayServerProcess();
             _server.Start();
             Debug.Log("Relay server started.");
         }

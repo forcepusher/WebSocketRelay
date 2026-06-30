@@ -13,6 +13,10 @@ namespace BananaParty.WebSocketRelay
         private const string UnityPackageEntry = "com.bananaparty.websocketrelay/Runtime/Server/Source/index.ts";
         private const string StandaloneEntry = "Source/index.ts";
 
+        private Process _process;
+
+        public bool IsRunning => _process != null && !_process.HasExited;
+
         public static string GetServerDirectory() =>
             Path.GetFullPath(Path.Combine(
                 Application.dataPath,
@@ -22,7 +26,35 @@ namespace BananaParty.WebSocketRelay
                 "Runtime",
                 "Server"));
 
-        public static Process Start(bool createNoWindow, bool verboseDebug, int? relayPort = null)
+        public void Start(bool verboseDebug = true, bool createNoWindow = false, int? relayPort = null)
+        {
+            if (IsRunning)
+                return;
+
+            _process = Launch(createNoWindow, verboseDebug, relayPort);
+        }
+
+        public void Stop()
+        {
+            if (_process == null)
+                return;
+
+            try
+            {
+                StopProcess(_process);
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.LogWarning($"Failed to stop server process: {e.Message}");
+            }
+            finally
+            {
+                _process.Dispose();
+                _process = null;
+            }
+        }
+
+        private static Process Launch(bool createNoWindow, bool verboseDebug, int? relayPort)
         {
             string serverDirectory = GetServerDirectory();
             KillAll();
@@ -44,7 +76,7 @@ namespace BananaParty.WebSocketRelay
             return process;
         }
 
-        public static void Stop(Process process)
+        private static void StopProcess(Process process)
         {
             KillAll();
 
