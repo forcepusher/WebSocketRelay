@@ -1,11 +1,13 @@
 using System;
 using UnityEngine;
 
-namespace BananaParty.WebSocketRelay.Samples
+namespace BananaParty.WebSocketRelay
 {
     public class Network : MonoBehaviour
     {
-        private readonly string _serverAddress = "ws://127.0.0.1:23144";
+        [SerializeField]
+        private string _serverAddress = "ws://127.0.0.1:23144";
+
         private RelayServer _server;
         private RelayConnection _connection;
 
