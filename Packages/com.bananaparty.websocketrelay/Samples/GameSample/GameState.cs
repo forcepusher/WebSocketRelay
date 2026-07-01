@@ -41,7 +41,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Update()
         {
-            _network.ManualUpdate();
+            _network.ManualUpdate(Time.unscaledDeltaTime);
         }
 
         public string StateName => transform.name;
