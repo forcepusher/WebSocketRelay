@@ -1,6 +1,6 @@
 using System;
 
-namespace BananaParty.WebSocketRelay
+namespace BananaParty.WebSocketRelay.Transport
 {
     public interface IRelayListener
     {

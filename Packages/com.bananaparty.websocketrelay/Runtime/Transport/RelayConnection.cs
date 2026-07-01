@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace BananaParty.WebSocketRelay
+namespace BananaParty.WebSocketRelay.Transport
 {
     public class RelayConnection : IDisposable
     {

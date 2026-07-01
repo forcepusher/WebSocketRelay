@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using BananaParty.WebSocketRelay.Transport;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;

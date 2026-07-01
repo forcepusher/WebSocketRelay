@@ -3,6 +3,8 @@ using System.Collections;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using BananaParty.WebSocketRelay.Transport;
+
 #if !UNITY_WEBGL || UNITY_EDITOR
 using System.Net.Sockets;
 #endif

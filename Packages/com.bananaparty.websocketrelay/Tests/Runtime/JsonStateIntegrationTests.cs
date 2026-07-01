@@ -6,6 +6,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using BananaParty.WebSocketRelay;
+using BananaParty.WebSocketRelay.Transport;
 
 namespace BananaParty.WebSocketRelay.Tests
 {

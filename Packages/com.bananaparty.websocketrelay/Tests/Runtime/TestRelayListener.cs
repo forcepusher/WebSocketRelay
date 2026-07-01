@@ -1,4 +1,5 @@
 using System;
+using BananaParty.WebSocketRelay.Transport;
 
 namespace BananaParty.WebSocketRelay.Tests
 {

@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Text;
 
-namespace BananaParty.WebSocketRelay
+namespace BananaParty.WebSocketRelay.Transport
 {
     public static class RelayMessageCodec
     {

@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
 
-namespace BananaParty.WebSocketRelay
+namespace BananaParty.WebSocketRelay.Transport
 {
     public class RelayServerProcess
     {

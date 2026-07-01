@@ -1,4 +1,4 @@
-namespace BananaParty.WebSocketRelay
+namespace BananaParty.WebSocketRelay.Transport
 {
     public static class RelayMessageType
     {
