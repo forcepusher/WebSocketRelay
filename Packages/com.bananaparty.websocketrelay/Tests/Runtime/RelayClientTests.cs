@@ -8,11 +8,11 @@ using UnityEngine.TestTools;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
-    public class RelayConnectionTests
+    public class RelayClientTests
     {
-        private RelayConnection _relayA;
-        private RelayConnection _relayB;
-        private RelayConnection _relayC;
+        private RelayClient _relayA;
+        private RelayClient _relayB;
+        private RelayClient _relayC;
         private TestRelayListener _listenerA;
         private TestRelayListener _listenerB;
         private TestRelayListener _listenerC;
@@ -405,10 +405,10 @@ namespace BananaParty.WebSocketRelay.Tests
             Cleanup();
         }
 
-        private RelayConnection CreateRelay(out TestRelayListener listener)
+        private RelayClient CreateRelay(out TestRelayListener listener)
         {
             listener = new TestRelayListener();
-            return new RelayConnection($"ws://localhost:{TestParameters.RelayServerPort}", listener);
+            return new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", listener);
         }
 
         private byte[] GenerateRandomBytes(int length)

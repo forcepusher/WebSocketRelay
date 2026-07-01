@@ -12,7 +12,7 @@ namespace BananaParty.WebSocketRelay
         private readonly List<NetworkPlayer> _networkPlayers = new();
 
         private RelayServerProcess _relayServerProcess;
-        private RelayConnection _relayConnection;
+        private RelayClient _relayClient;
 
         public Network(string serverAddress)
         {
@@ -41,33 +41,36 @@ namespace BananaParty.WebSocketRelay
 
         public void Connect()
         {
-            if (_relayConnection != null)
+            if (_relayClient != null)
                 throw new InvalidOperationException("Already connected");
 
-            _relayConnection = new RelayConnection(_serverAddress, this);
-            _relayConnection.Connect();
+            _relayClient = new RelayClient(_serverAddress, this);
+            _relayClient.Connect();
             Debug.Log($"Connected to relay server at {_serverAddress}");
         }
 
         public void Disconnect()
         {
-            if (_relayConnection == null)
+            if (_relayClient == null)
                 throw new InvalidOperationException("Not connected to disconnect");
 
-            _relayConnection.Dispose();
-            _relayConnection = null;
+            _relayClient.Dispose();
+            _relayClient = null;
             Debug.Log("Disconnected from relay server.");
         }
 
-        private void ManualUpdate()
+        public void ManualUpdate()
         {
-            _relayConnection?.ProcessIncomingMessages();
+            _relayClient?.ProcessIncomingMessages();
+
+            foreach (var networkPlayer in _networkPlayers)
+                networkPlayer.ManualUpdate();
         }
 
         public void Dispose()
         {
             _relayServerProcess?.Stop();
-            _relayConnection?.Dispose();
+            _relayClient?.Dispose();
         }
 
         public void OnConnectedToRelay(Guid clientGuid)

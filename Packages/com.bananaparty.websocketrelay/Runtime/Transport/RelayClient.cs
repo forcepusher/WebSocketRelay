@@ -4,7 +4,7 @@ using System.IO;
 
 namespace BananaParty.WebSocketRelay.Transport
 {
-    public class RelayConnection : IDisposable
+    public class RelayClient : IDisposable
     {
         private readonly Socket _socket;
         private readonly HashSet<string> _subscriptions = new();
@@ -17,7 +17,7 @@ namespace BananaParty.WebSocketRelay.Transport
 
         private IRelayListener _relayListener;
 
-        public RelayConnection(string serverAddress, IRelayListener relayListener)
+        public RelayClient(string serverAddress, IRelayListener relayListener)
         {
             _socket = new Socket(serverAddress);
             _relayListener = relayListener;

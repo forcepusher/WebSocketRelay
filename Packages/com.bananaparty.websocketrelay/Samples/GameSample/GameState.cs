@@ -39,6 +39,11 @@ namespace BananaParty.WebSocketRelay.Samples
             Debug.Log(jsonStateOutput.ToString());
         }
 
+        private void Update()
+        {
+            _network.ManualUpdate();
+        }
+
         public string StateName => transform.name;
 
         public void WriteState(IStateOutput writeGraph)

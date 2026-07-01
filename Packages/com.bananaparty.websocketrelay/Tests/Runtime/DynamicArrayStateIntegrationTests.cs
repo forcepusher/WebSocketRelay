@@ -415,8 +415,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
             TestRelayListener listenerA = new();
             TestRelayListener listenerB = new();
-            using RelayConnection relayA = new(ServerAddress, listenerA);
-            using RelayConnection relayB = new(ServerAddress, listenerB);
+            using RelayClient relayA = new(ServerAddress, listenerA);
+            using RelayClient relayB = new(ServerAddress, listenerB);
 
             relayA.Connect();
             relayB.Connect();
