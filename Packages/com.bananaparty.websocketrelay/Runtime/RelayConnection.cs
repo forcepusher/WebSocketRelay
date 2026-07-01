@@ -15,11 +15,12 @@ namespace BananaParty.WebSocketRelay
 
         public Guid ClientId { get; private set; }
 
-        public event Action<Guid, string, byte[]> OnTopicMessage;
+        private IRelayListener _relayListener;
 
-        public RelayConnection(string serverAddress)
+        public RelayConnection(string serverAddress, IRelayListener relayListener)
         {
             _socket = new Socket(serverAddress);
+            _relayListener = relayListener;
         }
 
         public void Connect()
@@ -148,7 +149,7 @@ namespace BananaParty.WebSocketRelay
 
             byte[] messageData = new byte[data.Length - payloadOffset];
             Array.Copy(data, payloadOffset, messageData, 0, messageData.Length);
-            OnTopicMessage?.Invoke(senderId, topic, messageData);
+            _relayListener.ProcessRelayMessage(senderId, topic, messageData);
 
             return data.Length;
         }

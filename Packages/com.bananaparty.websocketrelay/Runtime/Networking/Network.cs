@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class Network : MonoBehaviour
+    public class Network : MonoBehaviour, IRelayListener
     {
         [SerializeField]
         private string _serverAddress = "ws://127.0.0.1:23144";
