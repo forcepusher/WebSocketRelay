@@ -412,8 +412,10 @@ namespace BananaParty.WebSocketRelay.Tests
 
             stateA.SetItems((Id1, 10), (Id2, 20));
 
-            using RelayConnection relayA = new(ServerAddress);
-            using RelayConnection relayB = new(ServerAddress);
+            TestRelayListener listenerA = new();
+            TestRelayListener listenerB = new();
+            using RelayConnection relayA = new(ServerAddress, listenerA);
+            using RelayConnection relayB = new(ServerAddress, listenerB);
 
             relayA.Connect();
             relayB.Connect();
@@ -433,7 +435,7 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
             bool receivedDataCaptured = false;
-            relayB.OnTopicMessage += (_, topic, data) =>
+            listenerB.MessageReceived += (_, topic, data) =>
             {
                 if (topic != "dynamic-state" || receivedDataCaptured)
                     return;

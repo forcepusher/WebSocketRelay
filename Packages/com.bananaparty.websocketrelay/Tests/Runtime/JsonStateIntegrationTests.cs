@@ -33,8 +33,10 @@ namespace BananaParty.WebSocketRelay.Tests
             stateA.Health = 80f;
             stateA.Position = new Vector3(1, 2, 3);
 
-            using RelayConnection relayA = new(ServerAddress);
-            using RelayConnection relayB = new(ServerAddress);
+            TestRelayListener listenerA = new();
+            TestRelayListener listenerB = new();
+            using RelayConnection relayA = new(ServerAddress, listenerA);
+            using RelayConnection relayB = new(ServerAddress, listenerB);
 
             relayA.Connect();
             relayB.Connect();
@@ -54,7 +56,7 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
             bool captured = false;
-            relayB.OnTopicMessage += (_, topic, data) =>
+            listenerB.MessageReceived += (_, topic, data) =>
             {
                 if (topic != "state-sync" || captured)
                     return;

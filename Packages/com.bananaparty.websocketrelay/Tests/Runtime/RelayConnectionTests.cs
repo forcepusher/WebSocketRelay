@@ -12,6 +12,9 @@ namespace BananaParty.WebSocketRelay.Tests
         private RelayConnection _relayA;
         private RelayConnection _relayB;
         private RelayConnection _relayC;
+        private TestRelayListener _listenerA;
+        private TestRelayListener _listenerB;
+        private TestRelayListener _listenerC;
 
         [UnitySetUp]
         public IEnumerator Setup()
@@ -34,7 +37,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestClientReceivesGuidOnConnect()
         {
-            _relayA = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
             _relayA.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
 
@@ -50,8 +53,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestTopicMessageIncludesSenderGuid()
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
@@ -72,7 +75,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             Guid receivedSenderId = Guid.Empty;
-            _relayB.OnTopicMessage += (senderId, topic, _) =>
+            _listenerB.MessageReceived += (senderId, topic, _) =>
             {
                 if (topic != "guid-test")
                     return;
@@ -93,9 +96,9 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestTopicMessage(string topic, int clientCount)
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
-            if (clientCount >= 3) _relayC = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
+            if (clientCount >= 3) _relayC = CreateRelay(out _listenerC);
 
             _relayA.Connect();
             _relayB.Connect();
@@ -118,7 +121,7 @@ namespace BananaParty.WebSocketRelay.Tests
             int recvCount = 0;
             byte[] receivedData = null;
 
-            _relayB.OnTopicMessage += (_, receivedTopic, data) =>
+            _listenerB.MessageReceived += (_, receivedTopic, data) =>
             {
                 if (receivedTopic != topic) return;
                 recvCount++;
@@ -126,7 +129,7 @@ namespace BananaParty.WebSocketRelay.Tests
             };
             if (clientCount >= 3)
             {
-                _relayC.OnTopicMessage += (_, receivedTopic, data) =>
+                _listenerC.MessageReceived += (_, receivedTopic, data) =>
                 {
                     if (receivedTopic != topic) return;
                     recvCount++;
@@ -155,8 +158,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestTopicIsolation()
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
@@ -169,7 +172,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bReceived = false;
-            _relayB.OnTopicMessage += (_, topic, _) => { if (topic == "beta") bReceived = true; };
+            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "beta") bReceived = true; };
 
             _relayA.Send("alpha", new byte[] { 0xAA });
 
@@ -181,8 +184,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestMultiTopicSubscribe()
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
@@ -196,7 +199,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bGotA = false;
-            _relayB.OnTopicMessage += (_, topic, _) => { if (topic == "topic-a") bGotA = true; };
+            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "topic-a") bGotA = true; };
             _relayA.Send("topic-a", new byte[] { 0xCC });
             yield return TestParameters.WaitForCondition(
                 () => bGotA,
@@ -205,7 +208,7 @@ namespace BananaParty.WebSocketRelay.Tests
             Assert.IsTrue(bGotA, "B did not receive topic-a message.");
 
             bool aGotB = false;
-            _relayA.OnTopicMessage += (_, topic, _) => { if (topic == "topic-b") aGotB = true; };
+            _listenerA.MessageReceived += (_, topic, _) => { if (topic == "topic-b") aGotB = true; };
             _relayB.Send("topic-b", new byte[] { 0xDD });
             yield return TestParameters.WaitForDuration(1f, () => _relayA.ProcessIncomingMessages());
             Assert.IsFalse(aGotB, "A received message from a topic it is not subscribed to.");
@@ -215,7 +218,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool aGotFromB = false;
-            _relayA.OnTopicMessage += (_, topic, _) => { if (topic == "topic-b") aGotFromB = true; };
+            _listenerA.MessageReceived += (_, topic, _) => { if (topic == "topic-b") aGotFromB = true; };
             _relayB.Send("topic-b", new byte[] { 0xEE });
             yield return TestParameters.WaitForCondition(
                 () => aGotFromB,
@@ -228,8 +231,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestDifferentTopicNames()
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
@@ -242,7 +245,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bReceived = false;
-            _relayB.OnTopicMessage += (_, topic, _) => { if (topic == "two") bReceived = true; };
+            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "two") bReceived = true; };
             _relayA.Send("one", new byte[] { 0xDD });
 
             yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
@@ -253,8 +256,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestUnsubscribeStopsReceiving()
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
@@ -267,7 +270,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bReceivedFirst = false;
-            _relayB.OnTopicMessage += (_, topic, _) => { if (topic == "shared") bReceivedFirst = true; };
+            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "shared") bReceivedFirst = true; };
             _relayA.Send("shared", new byte[] { 0xEE });
             yield return TestParameters.WaitForCondition(
                 () => bReceivedFirst,
@@ -280,7 +283,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bReceivedAfterUnsubscribe = false;
-            _relayB.OnTopicMessage += (_, topic, _) => { if (topic == "shared") bReceivedAfterUnsubscribe = true; };
+            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "shared") bReceivedAfterUnsubscribe = true; };
             _relayA.Send("shared", new byte[] { 0xFF });
             yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
             Assert.IsFalse(bReceivedAfterUnsubscribe, "B received payload after unsubscribing.");
@@ -290,8 +293,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestSendAfterUnsubscribeThrows()
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
@@ -311,8 +314,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestEmptyMessage()
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
@@ -325,7 +328,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             byte[] received = null;
-            _relayB.OnTopicMessage += (_, topic, data) => { if (topic == "empty") received = data; };
+            _listenerB.MessageReceived += (_, topic, data) => { if (topic == "empty") received = data; };
             _relayA.Send("empty", new byte[0]);
 
             yield return TestParameters.WaitForCondition(
@@ -341,8 +344,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestLargeMessage()
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
@@ -356,7 +359,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             byte[] sent = GenerateRandomBytes(40_000);
             byte[] received = null;
-            _relayB.OnTopicMessage += (_, topic, data) => { if (topic == "large") received = data; };
+            _listenerB.MessageReceived += (_, topic, data) => { if (topic == "large") received = data; };
 
             _relayA.Send("large", sent);
             yield return TestParameters.WaitForCondition(
@@ -372,8 +375,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private IEnumerator TestRapidMessages(int count)
         {
-            _relayA = CreateRelay();
-            _relayB = CreateRelay();
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
@@ -389,7 +392,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 _relayA.Send("rapid", new byte[] { (byte)i });
 
             int receivedCount = 0;
-            _relayB.OnTopicMessage += (_, topic, _) => { if (topic == "rapid") receivedCount++; };
+            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "rapid") receivedCount++; };
 
             yield return TestParameters.WaitForCondition(
                 () => receivedCount >= count,
@@ -401,8 +404,11 @@ namespace BananaParty.WebSocketRelay.Tests
             Cleanup();
         }
 
-        private RelayConnection CreateRelay()
-            => new($"ws://localhost:{TestParameters.RelayServerPort}");
+        private RelayConnection CreateRelay(out TestRelayListener listener)
+        {
+            listener = new TestRelayListener();
+            return new RelayConnection($"ws://localhost:{TestParameters.RelayServerPort}", listener);
+        }
 
         private byte[] GenerateRandomBytes(int length)
         {
