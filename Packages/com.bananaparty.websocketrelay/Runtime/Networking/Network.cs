@@ -62,9 +62,20 @@ namespace BananaParty.WebSocketRelay
             _relayConnection?.Dispose();
         }
 
-        public void ProcessRelayMessage(Guid senderGuid, string topic, byte[] data)
+        public void ProcessConnected(Guid clientGuid)
         {
+        }
 
+        public void ProcessSubscribed(string topic)
+        {
+        }
+
+        public void ProcessUnsubscribed(string topic)
+        {
+        }
+
+        public void ProcessTopicMessage(Guid senderGuid, string topic, byte[] data)
+        {
         }
     }
 }

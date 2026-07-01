@@ -75,7 +75,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             Guid receivedSenderId = Guid.Empty;
-            _listenerB.MessageReceived += (senderId, topic, _) =>
+            _listenerB.TopicMessageReceived += (senderId, topic, _) =>
             {
                 if (topic != "guid-test")
                     return;
@@ -121,7 +121,7 @@ namespace BananaParty.WebSocketRelay.Tests
             int recvCount = 0;
             byte[] receivedData = null;
 
-            _listenerB.MessageReceived += (_, receivedTopic, data) =>
+            _listenerB.TopicMessageReceived += (_, receivedTopic, data) =>
             {
                 if (receivedTopic != topic) return;
                 recvCount++;
@@ -129,7 +129,7 @@ namespace BananaParty.WebSocketRelay.Tests
             };
             if (clientCount >= 3)
             {
-                _listenerC.MessageReceived += (_, receivedTopic, data) =>
+                _listenerC.TopicMessageReceived += (_, receivedTopic, data) =>
                 {
                     if (receivedTopic != topic) return;
                     recvCount++;
@@ -172,7 +172,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bReceived = false;
-            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "beta") bReceived = true; };
+            _listenerB.TopicMessageReceived += (_, topic, _) => { if (topic == "beta") bReceived = true; };
 
             _relayA.Send("alpha", new byte[] { 0xAA });
 
@@ -199,7 +199,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bGotA = false;
-            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "topic-a") bGotA = true; };
+            _listenerB.TopicMessageReceived += (_, topic, _) => { if (topic == "topic-a") bGotA = true; };
             _relayA.Send("topic-a", new byte[] { 0xCC });
             yield return TestParameters.WaitForCondition(
                 () => bGotA,
@@ -208,7 +208,7 @@ namespace BananaParty.WebSocketRelay.Tests
             Assert.IsTrue(bGotA, "B did not receive topic-a message.");
 
             bool aGotB = false;
-            _listenerA.MessageReceived += (_, topic, _) => { if (topic == "topic-b") aGotB = true; };
+            _listenerA.TopicMessageReceived += (_, topic, _) => { if (topic == "topic-b") aGotB = true; };
             _relayB.Send("topic-b", new byte[] { 0xDD });
             yield return TestParameters.WaitForDuration(1f, () => _relayA.ProcessIncomingMessages());
             Assert.IsFalse(aGotB, "A received message from a topic it is not subscribed to.");
@@ -218,7 +218,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool aGotFromB = false;
-            _listenerA.MessageReceived += (_, topic, _) => { if (topic == "topic-b") aGotFromB = true; };
+            _listenerA.TopicMessageReceived += (_, topic, _) => { if (topic == "topic-b") aGotFromB = true; };
             _relayB.Send("topic-b", new byte[] { 0xEE });
             yield return TestParameters.WaitForCondition(
                 () => aGotFromB,
@@ -245,7 +245,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bReceived = false;
-            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "two") bReceived = true; };
+            _listenerB.TopicMessageReceived += (_, topic, _) => { if (topic == "two") bReceived = true; };
             _relayA.Send("one", new byte[] { 0xDD });
 
             yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
@@ -270,7 +270,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bReceivedFirst = false;
-            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "shared") bReceivedFirst = true; };
+            _listenerB.TopicMessageReceived += (_, topic, _) => { if (topic == "shared") bReceivedFirst = true; };
             _relayA.Send("shared", new byte[] { 0xEE });
             yield return TestParameters.WaitForCondition(
                 () => bReceivedFirst,
@@ -283,7 +283,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             bool bReceivedAfterUnsubscribe = false;
-            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "shared") bReceivedAfterUnsubscribe = true; };
+            _listenerB.TopicMessageReceived += (_, topic, _) => { if (topic == "shared") bReceivedAfterUnsubscribe = true; };
             _relayA.Send("shared", new byte[] { 0xFF });
             yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
             Assert.IsFalse(bReceivedAfterUnsubscribe, "B received payload after unsubscribing.");
@@ -328,7 +328,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             byte[] received = null;
-            _listenerB.MessageReceived += (_, topic, data) => { if (topic == "empty") received = data; };
+            _listenerB.TopicMessageReceived += (_, topic, data) => { if (topic == "empty") received = data; };
             _relayA.Send("empty", new byte[0]);
 
             yield return TestParameters.WaitForCondition(
@@ -359,7 +359,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             byte[] sent = GenerateRandomBytes(40_000);
             byte[] received = null;
-            _listenerB.MessageReceived += (_, topic, data) => { if (topic == "large") received = data; };
+            _listenerB.TopicMessageReceived += (_, topic, data) => { if (topic == "large") received = data; };
 
             _relayA.Send("large", sent);
             yield return TestParameters.WaitForCondition(
@@ -392,7 +392,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 _relayA.Send("rapid", new byte[] { (byte)i });
 
             int receivedCount = 0;
-            _listenerB.MessageReceived += (_, topic, _) => { if (topic == "rapid") receivedCount++; };
+            _listenerB.TopicMessageReceived += (_, topic, _) => { if (topic == "rapid") receivedCount++; };
 
             yield return TestParameters.WaitForCondition(
                 () => receivedCount >= count,

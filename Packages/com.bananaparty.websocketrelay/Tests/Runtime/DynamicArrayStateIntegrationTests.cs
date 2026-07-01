@@ -435,7 +435,7 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
             bool receivedDataCaptured = false;
-            listenerB.MessageReceived += (_, topic, data) =>
+            listenerB.TopicMessageReceived += (_, topic, data) =>
             {
                 if (topic != "dynamic-state" || receivedDataCaptured)
                     return;

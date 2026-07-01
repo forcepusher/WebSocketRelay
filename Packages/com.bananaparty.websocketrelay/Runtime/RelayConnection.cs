@@ -93,8 +93,10 @@ namespace BananaParty.WebSocketRelay
                         processedLength = ProcessConnectedMessage(payloadBytes);
                         break;
                     case RelayMessageType.Subscribed:
+                        processedLength = ProcessSubscribedMessage(payloadBytes);
+                        break;
                     case RelayMessageType.Unsubscribed:
-                        processedLength = ProcessTopicControlMessage(payloadBytes);
+                        processedLength = ProcessUnsubscribedMessage(payloadBytes);
                         break;
                     case RelayMessageType.TopicMessage:
                         processedLength = ProcessTopicMessage(payloadBytes);
@@ -119,15 +121,27 @@ namespace BananaParty.WebSocketRelay
                 throw new InvalidDataException("Incomplete connected message.");
 
             ClientId = RelayMessageCodec.ReadGuid(data);
+            _relayListener.ProcessConnected(ClientId);
             return RelayMessageCodec.ConnectedMessageSize;
         }
 
-        private int ProcessTopicControlMessage(byte[] data)
+        private int ProcessSubscribedMessage(byte[] data)
         {
             int topicLength = RelayMessageCodec.ReadTopicLength(data);
             if (topicLength < 0)
                 throw new InvalidDataException("Incomplete topic control message.");
 
+            _relayListener.ProcessSubscribed(RelayMessageCodec.ReadTopic(data));
+            return RelayMessageCodec.GetPayloadOffset(topicLength);
+        }
+
+        private int ProcessUnsubscribedMessage(byte[] data)
+        {
+            int topicLength = RelayMessageCodec.ReadTopicLength(data);
+            if (topicLength < 0)
+                throw new InvalidDataException("Incomplete topic control message.");
+
+            _relayListener.ProcessUnsubscribed(RelayMessageCodec.ReadTopic(data));
             return RelayMessageCodec.GetPayloadOffset(topicLength);
         }
 
@@ -149,7 +163,7 @@ namespace BananaParty.WebSocketRelay
 
             byte[] messageData = new byte[data.Length - payloadOffset];
             Array.Copy(data, payloadOffset, messageData, 0, messageData.Length);
-            _relayListener.ProcessRelayMessage(senderId, topic, messageData);
+            _relayListener.ProcessTopicMessage(senderId, topic, messageData);
 
             return data.Length;
         }
