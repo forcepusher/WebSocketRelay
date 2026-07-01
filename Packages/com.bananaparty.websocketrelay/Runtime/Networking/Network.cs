@@ -8,58 +8,63 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private string _serverAddress = "ws://127.0.0.1:23144";
 
-        private RelayServerProcess _server;
-        private RelayConnection _connection;
+        private RelayServerProcess _relayServerProcess;
+        private RelayConnection _relayConnection;
 
         public void StartServer()
         {
-            if (_server != null)
+            if (_relayServerProcess != null)
                 throw new InvalidOperationException("Server already running");
 
-            _server = new RelayServerProcess();
-            _server.Start();
+            _relayServerProcess = new RelayServerProcess();
+            _relayServerProcess.Start();
             Debug.Log("Relay server started.");
         }
 
         public void StopServer()
         {
-            if (_server == null)
+            if (_relayServerProcess == null)
                 throw new InvalidOperationException("Server not started to stop it");
 
-            _server.Stop();
-            _server = null;
+            _relayServerProcess.Stop();
+            _relayServerProcess = null;
             Debug.Log("Relay server stopped.");
         }
 
         public void Connect()
         {
-            if (_connection != null)
+            if (_relayConnection != null)
                 throw new InvalidOperationException("Already connected");
 
-            _connection = new RelayConnection(_serverAddress);
-            _connection.Connect();
+            _relayConnection = new RelayConnection(_serverAddress, this);
+            _relayConnection.Connect();
             Debug.Log($"Connected to relay server at {_serverAddress}");
         }
 
         public void Disconnect()
         {
-            if (_connection == null)
+            if (_relayConnection == null)
                 throw new InvalidOperationException("Not connected to disconnect");
 
-            _connection.Dispose();
-            _connection = null;
+            _relayConnection.Dispose();
+            _relayConnection = null;
             Debug.Log("Disconnected from relay server.");
         }
 
         private void Update()
         {
-            _connection?.ProcessIncomingMessages();
+            _relayConnection?.ProcessIncomingMessages();
         }
 
         private void OnDestroy()
         {
-            _server?.Stop();
-            _connection?.Dispose();
+            _relayServerProcess?.Stop();
+            _relayConnection?.Dispose();
+        }
+
+        public void ProcessRelayMessage(Guid senderGuid, string topic, byte[] data)
+        {
+
         }
     }
 }
