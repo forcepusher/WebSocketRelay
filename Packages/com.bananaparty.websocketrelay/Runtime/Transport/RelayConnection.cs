@@ -121,7 +121,7 @@ namespace BananaParty.WebSocketRelay
                 throw new InvalidDataException("Incomplete connected message.");
 
             ClientId = RelayMessageCodec.ReadGuid(data);
-            _relayListener.ProcessConnected(ClientId);
+            _relayListener.OnConnectedToRelay(ClientId);
             return RelayMessageCodec.ConnectedMessageSize;
         }
 
@@ -131,7 +131,7 @@ namespace BananaParty.WebSocketRelay
             if (topicLength < 0)
                 throw new InvalidDataException("Incomplete topic control message.");
 
-            _relayListener.ProcessSubscribed(RelayMessageCodec.ReadTopic(data));
+            _relayListener.OnSubscribedToTopic(RelayMessageCodec.ReadTopic(data));
             return RelayMessageCodec.GetPayloadOffset(topicLength);
         }
 
@@ -141,7 +141,7 @@ namespace BananaParty.WebSocketRelay
             if (topicLength < 0)
                 throw new InvalidDataException("Incomplete topic control message.");
 
-            _relayListener.ProcessUnsubscribed(RelayMessageCodec.ReadTopic(data));
+            _relayListener.OnUnsubscribedFtomTopic(RelayMessageCodec.ReadTopic(data));
             return RelayMessageCodec.GetPayloadOffset(topicLength);
         }
 
@@ -163,7 +163,7 @@ namespace BananaParty.WebSocketRelay
 
             byte[] messageData = new byte[data.Length - payloadOffset];
             Array.Copy(data, payloadOffset, messageData, 0, messageData.Length);
-            _relayListener.ProcessTopicMessage(senderId, topic, messageData);
+            _relayListener.OnTopicMessage(senderId, topic, messageData);
 
             return data.Length;
         }

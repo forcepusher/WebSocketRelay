@@ -4,12 +4,12 @@ namespace BananaParty.WebSocketRelay
 {
     public interface IRelayListener
     {
-        void ProcessConnected(Guid clientGuid);
+        void OnConnectedToRelay(Guid clientGuid);
 
-        void ProcessSubscribed(string topic);
+        void OnSubscribedToTopic(string topic);
 
-        void ProcessUnsubscribed(string topic);
+        void OnUnsubscribedFtomTopic(string topic);
 
-        void ProcessTopicMessage(Guid senderGuid, string topic, byte[] data);
+        void OnTopicMessage(Guid senderGuid, string topic, byte[] data);
     }
 }

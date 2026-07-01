@@ -6,7 +6,7 @@ namespace BananaParty.WebSocketRelay
 {
     public class Network : IRelayListener, IDisposable
     {
-        private readonly string _serverAddress = "ws://127.0.0.1:23144";
+        private readonly string _serverAddress;
 
         private readonly List<NetworkPlayer> _networkPlayers = new();
 
@@ -69,19 +69,19 @@ namespace BananaParty.WebSocketRelay
             _relayConnection?.Dispose();
         }
 
-        public void ProcessConnected(Guid clientGuid)
+        public void OnConnectedToRelay(Guid clientGuid)
         {
         }
 
-        public void ProcessSubscribed(string topic)
+        public void OnSubscribedToTopic(string topic)
         {
         }
 
-        public void ProcessUnsubscribed(string topic)
+        public void OnUnsubscribedFtomTopic(string topic)
         {
         }
 
-        public void ProcessTopicMessage(Guid senderGuid, string topic, byte[] data)
+        public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
         {
         }
     }

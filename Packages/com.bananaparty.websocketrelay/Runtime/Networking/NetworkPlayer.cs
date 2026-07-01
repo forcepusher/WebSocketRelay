@@ -1,10 +1,17 @@
+using System;
+
 namespace BananaParty.WebSocketRelay
 {
     public class NetworkPlayer
     {
         private const float ConnectionTimeoutSeconds = 15f;
 
-        private 
+        private Guid _playerGuid;
+
+        public NetworkPlayer(Guid playerGuid)
+        {
+            _playerGuid = playerGuid;
+        }
 
         public void ManualUpdate()
         {
