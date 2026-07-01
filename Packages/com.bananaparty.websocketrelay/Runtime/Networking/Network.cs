@@ -1,15 +1,22 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class Network : MonoBehaviour, IRelayListener
+    public class Network : IRelayListener, IDisposable
     {
-        [SerializeField]
-        private string _serverAddress = "ws://127.0.0.1:23144";
+        private readonly string _serverAddress = "ws://127.0.0.1:23144";
+
+        private readonly List<NetworkPlayer> _networkPlayers = new();
 
         private RelayServerProcess _relayServerProcess;
         private RelayConnection _relayConnection;
+
+        public Network(string serverAddress)
+        {
+            _serverAddress = serverAddress;
+        }
 
         public void StartServer()
         {
@@ -51,12 +58,12 @@ namespace BananaParty.WebSocketRelay
             Debug.Log("Disconnected from relay server.");
         }
 
-        private void Update()
+        private void ManualUpdate()
         {
             _relayConnection?.ProcessIncomingMessages();
         }
 
-        private void OnDestroy()
+        public void Dispose()
         {
             _relayServerProcess?.Stop();
             _relayConnection?.Dispose();

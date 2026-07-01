@@ -13,6 +13,8 @@ namespace BananaParty.WebSocketRelay.Samples
         private List<ItemSpawn> _itemSpawns;
         private StaticArrayState<ItemSpawn> _itemSpawnsState;
 
+        private Network _network = new();
+
         private IntegerState _playTimeState = new(nameof(_playTimeState), 0);
 
         private List<IState> _states;
