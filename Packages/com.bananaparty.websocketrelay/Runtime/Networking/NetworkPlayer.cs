@@ -6,7 +6,7 @@ namespace BananaParty.WebSocketRelay
     {
         private const float ConnectionTimeoutSeconds = 15f;
 
-        private Guid _playerGuid;
+        private readonly Guid _playerGuid;
 
         public NetworkPlayer(Guid playerGuid)
         {
@@ -16,6 +16,10 @@ namespace BananaParty.WebSocketRelay
         public void ManualUpdate()
         {
 
+        }
+
+        public void OnTopicMessage(string topic, byte[] data)
+        {
         }
 
         public void SendMessage(byte messageType, byte[] data)

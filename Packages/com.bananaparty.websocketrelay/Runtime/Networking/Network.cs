@@ -9,7 +9,7 @@ namespace BananaParty.WebSocketRelay
     {
         private readonly string _serverAddress;
 
-        private readonly List<NetworkPlayer> _networkPlayers = new();
+        private readonly Dictionary<Guid, NetworkPlayer> _guidToNetworkPlayers = new();
 
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
@@ -63,7 +63,7 @@ namespace BananaParty.WebSocketRelay
         {
             _relayClient?.ProcessIncomingMessages();
 
-            foreach (var networkPlayer in _networkPlayers)
+            foreach (var networkPlayer in _guidToNetworkPlayers.Values)
                 networkPlayer.ManualUpdate();
         }
 
@@ -87,6 +87,16 @@ namespace BananaParty.WebSocketRelay
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
         {
+            if (_guidToNetworkPlayers.ContainsKey(senderGuid))
+            {
+                _guidToNetworkPlayers[senderGuid].OnTopicMessage(topic, data);
+            }
+            else
+            {
+                NetworkPlayer networkPlayer = new NetworkPlayer(senderGuid);
+                _guidToNetworkPlayers[senderGuid] = networkPlayer;
+                networkPlayer.OnTopicMessage(topic, data);
+            }
         }
     }
 }
