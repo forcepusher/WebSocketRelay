@@ -13,7 +13,9 @@ namespace BananaParty.WebSocketRelay
 
         public bool HasUnreadPayloadQueue => _socket.HasUnreadPayloadQueue;
 
-        public event Action<string, byte[]> OnTopicMessage;
+        public Guid ClientId { get; private set; }
+
+        public event Action<Guid, string, byte[]> OnTopicMessage;
 
         public RelayConnection(string serverAddress)
         {
@@ -86,6 +88,9 @@ namespace BananaParty.WebSocketRelay
 
                 switch (type)
                 {
+                    case RelayMessageType.Connected:
+                        processedLength = ProcessConnectedMessage(payloadBytes);
+                        break;
                     case RelayMessageType.Subscribed:
                     case RelayMessageType.Unsubscribed:
                         processedLength = ProcessTopicControlMessage(payloadBytes);
@@ -107,6 +112,15 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
+        private int ProcessConnectedMessage(byte[] data)
+        {
+            if (data.Length < RelayMessageCodec.ConnectedMessageSize)
+                throw new InvalidDataException("Incomplete connected message.");
+
+            ClientId = RelayMessageCodec.ReadGuid(data);
+            return RelayMessageCodec.ConnectedMessageSize;
+        }
+
         private int ProcessTopicControlMessage(byte[] data)
         {
             int topicLength = RelayMessageCodec.ReadTopicLength(data);
@@ -118,19 +132,23 @@ namespace BananaParty.WebSocketRelay
 
         private int ProcessTopicMessage(byte[] data)
         {
-            int topicLength = RelayMessageCodec.ReadTopicLength(data);
+            int topicLength = RelayMessageCodec.ReadTopicLength(data, RelayMessageCodec.TopicMessageTopicLengthOffset);
             if (topicLength < 0)
                 throw new InvalidDataException("Incomplete topic message.");
 
-            string topic = RelayMessageCodec.ReadTopic(data);
-            int payloadOffset = RelayMessageCodec.GetPayloadOffset(topicLength);
+            Guid senderId = RelayMessageCodec.ReadGuid(data, RelayMessageCodec.TopicMessageGuidOffset);
+            string topic = RelayMessageCodec.ReadTopic(data, RelayMessageCodec.TopicMessageTopicLengthOffset);
+            int payloadOffset = RelayMessageCodec.GetTopicMessagePayloadOffset(topicLength);
+
+            if (data.Length < payloadOffset)
+                throw new InvalidDataException("Incomplete topic message.");
 
             if (!_subscriptions.Contains(topic))
                 return data.Length;
 
             byte[] messageData = new byte[data.Length - payloadOffset];
             Array.Copy(data, payloadOffset, messageData, 0, messageData.Length);
-            OnTopicMessage?.Invoke(topic, messageData);
+            OnTopicMessage?.Invoke(senderId, topic, messageData);
 
             return data.Length;
         }

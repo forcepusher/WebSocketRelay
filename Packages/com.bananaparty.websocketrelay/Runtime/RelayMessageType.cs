@@ -9,5 +9,6 @@ namespace BananaParty.WebSocketRelay
         public const byte Subscribed = 0x10;
         public const byte Unsubscribed = 0x11;
         public const byte TopicMessage = 0x12;
+        public const byte Connected = 0x13;
     }
 }

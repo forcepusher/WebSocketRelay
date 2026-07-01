@@ -26,6 +26,8 @@ namespace BananaParty.WebSocketRelay
                 "Runtime",
                 "Server"));
 
+        public static void KillAllRelayServers() => KillAll();
+
         public void Start(bool verboseDebug = true, bool createNoWindow = false, int? relayPort = null)
         {
             if (IsRunning)

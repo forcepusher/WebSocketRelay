@@ -54,7 +54,7 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
             bool captured = false;
-            relayB.OnTopicMessage += (topic, data) =>
+            relayB.OnTopicMessage += (_, topic, data) =>
             {
                 if (topic != "state-sync" || captured)
                     return;

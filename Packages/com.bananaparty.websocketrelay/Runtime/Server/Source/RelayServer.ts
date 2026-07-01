@@ -4,12 +4,15 @@ import {
     relayPayloadOffset,
     relayReadTopic,
     relayReadTopicLength,
+    relayWriteConnectedMessage,
     relayWriteMessage,
+    relayWriteTopicMessage,
 } from "./RelayMessageType";
 import { RelayServerLog } from "./RelayServerLog";
 
 type RelayWebSocketData = {
     connectionId: number;
+    clientGuid: string;
 };
 
 export class RelayServer {
@@ -28,7 +31,7 @@ export class RelayServer {
                 const connectionId = this.#nextConnectionId++;
                 if (
                     server.upgrade(req, {
-                        data: { connectionId },
+                        data: { connectionId, clientGuid: "" },
                     })
                 ) {
                     RelayServerLog.debug(
@@ -42,13 +45,17 @@ export class RelayServer {
             websocket: {
                 data: {} as RelayWebSocketData,
                 open: (ws) => {
+                    const clientGuid = crypto.randomUUID();
+                    ws.data.clientGuid = clientGuid;
+                    ws.send(relayWriteConnectedMessage(clientGuid));
+
                     RelayServerLog.info(
-                        `connected id=${ws.data.connectionId} remote=${ws.remoteAddress} subscriptions=[]`,
+                        `connected id=${ws.data.connectionId} guid=${clientGuid} remote=${ws.remoteAddress} subscriptions=[]`,
                     );
                 },
                 close: (ws) => {
                     RelayServerLog.info(
-                        `disconnected id=${ws.data.connectionId} remote=${ws.remoteAddress} subscriptions=[${ws.subscriptions.join(", ")}]`,
+                        `disconnected id=${ws.data.connectionId} guid=${ws.data.clientGuid} remote=${ws.remoteAddress} subscriptions=[${ws.subscriptions.join(", ")}]`,
                     );
                 },
                 message: (ws, message) => {
@@ -170,12 +177,12 @@ export class RelayServer {
 
         const payloadOffset = relayPayloadOffset(topicLength);
         const payload = message.subarray(payloadOffset);
-        const response = relayWriteMessage(RelayMessageType.TopicMessage, topic, payload);
+        const response = relayWriteTopicMessage(ws.data.clientGuid, topic, payload);
 
         const deliveredTo = ws.publish(topic, response);
 
         RelayServerLog.debug(
-            `published id=${ws.data.connectionId} topic=${topic} payloadBytes=${payload.byteLength} deliveredTo=${deliveredTo}`,
+            `published id=${ws.data.connectionId} guid=${ws.data.clientGuid} topic=${topic} payloadBytes=${payload.byteLength} deliveredTo=${deliveredTo}`,
         );
     }
 

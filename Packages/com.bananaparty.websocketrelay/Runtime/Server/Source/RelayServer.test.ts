@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { RelayServer } from "./RelayServer";
-import { RelayMessageType, relayPayloadOffset, relayReadTopic, relayReadTopicLength, relayWriteMessage } from "./RelayMessageType";
+import {
+    RelayMessageType,
+    RelayMessageTopicMessageTopicLengthOffset,
+    relayReadGuid,
+    relayReadTopic,
+    relayReadTopicLength,
+    relayTopicMessagePayloadOffset,
+    relayWriteMessage,
+} from "./RelayMessageType";
 
 const testPort = 23145;
 
@@ -14,16 +22,6 @@ function unsubscribe(ws: WebSocket, topic: string): void {
 
 function sendTopicMessage(ws: WebSocket, topic: string, payload: Uint8Array): void {
     ws.send(relayWriteMessage(RelayMessageType.Send, topic, payload));
-}
-
-async function openSocket(): Promise<WebSocket> {
-    const ws = new WebSocket(`ws://127.0.0.1:${testPort}`);
-    ws.binaryType = "arraybuffer";
-    await new Promise<void>((resolve, reject) => {
-        ws.onopen = () => resolve();
-        ws.onerror = () => reject(new Error("WebSocket connection failed"));
-    });
-    return ws;
 }
 
 async function toUint8Array(data: unknown): Promise<Uint8Array> {
@@ -44,6 +42,20 @@ async function receiveBinary(ws: WebSocket, timeoutMs = 2000): Promise<Uint8Arra
     });
 }
 
+async function openSocket(): Promise<{ ws: WebSocket; clientGuid: string }> {
+    const ws = new WebSocket(`ws://127.0.0.1:${testPort}`);
+    ws.binaryType = "arraybuffer";
+    await new Promise<void>((resolve, reject) => {
+        ws.onopen = () => resolve();
+        ws.onerror = () => reject(new Error("WebSocket connection failed"));
+    });
+
+    const connected = await receiveBinary(ws);
+    expect(connected[0]).toBe(RelayMessageType.Connected);
+    const clientGuid = relayReadGuid(connected);
+    return { ws, clientGuid };
+}
+
 describe("RelayServer", () => {
     const server = new RelayServer(testPort);
 
@@ -55,8 +67,14 @@ describe("RelayServer", () => {
         server.stop();
     });
 
+    test("connection sends CONNECTED with client guid", async () => {
+        const { ws, clientGuid } = await openSocket();
+        expect(clientGuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        ws.close();
+    });
+
     test("subscribe sends SUBSCRIBED confirmation", async () => {
-        const ws = await openSocket();
+        const { ws } = await openSocket();
         subscribe(ws, "lobby");
 
         const response = await receiveBinary(ws);
@@ -67,7 +85,7 @@ describe("RelayServer", () => {
     });
 
     test("duplicate subscribe does not send another confirmation", async () => {
-        const ws = await openSocket();
+        const { ws } = await openSocket();
         subscribe(ws, "events");
         await receiveBinary(ws);
 
@@ -87,75 +105,82 @@ describe("RelayServer", () => {
         const sender = await openSocket();
         const receiver = await openSocket();
 
-        subscribe(sender, "chat");
-        subscribe(receiver, "chat");
-        await receiveBinary(sender);
-        await receiveBinary(receiver);
+        subscribe(sender.ws, "chat");
+        subscribe(receiver.ws, "chat");
+        await receiveBinary(sender.ws);
+        await receiveBinary(receiver.ws);
 
-        sendTopicMessage(sender, "chat", new Uint8Array([0xaa, 0xbb]));
+        sendTopicMessage(sender.ws, "chat", new Uint8Array([0xaa, 0xbb]));
 
-        const response = await receiveBinary(receiver);
+        const response = await receiveBinary(receiver.ws);
         expect(response[0]).toBe(RelayMessageType.TopicMessage);
-        expect(relayReadTopic(response)).toBe("chat");
-        expect(Array.from(response.subarray(relayPayloadOffset(relayReadTopicLength(response))))).toEqual([
-            0xaa, 0xbb,
-        ]);
+        expect(relayReadGuid(response, 1)).toBe(sender.clientGuid);
+        expect(relayReadTopic(response, RelayMessageTopicMessageTopicLengthOffset)).toBe("chat");
+        expect(
+            Array.from(
+                response.subarray(
+                    relayTopicMessagePayloadOffset(
+                        relayReadTopicLength(response, RelayMessageTopicMessageTopicLengthOffset),
+                    ),
+                ),
+            ),
+        ).toEqual([0xaa, 0xbb]);
 
-        sender.close();
-        receiver.close();
+        sender.ws.close();
+        receiver.ws.close();
     });
 
     test("does not relay to clients on other topics", async () => {
         const sender = await openSocket();
         const otherTopicClient = await openSocket();
 
-        subscribe(sender, "alpha");
-        subscribe(otherTopicClient, "beta");
-        await receiveBinary(sender);
-        await receiveBinary(otherTopicClient);
+        subscribe(sender.ws, "alpha");
+        subscribe(otherTopicClient.ws, "beta");
+        await receiveBinary(sender.ws);
+        await receiveBinary(otherTopicClient.ws);
 
-        sendTopicMessage(sender, "alpha", new Uint8Array([0x01]));
+        sendTopicMessage(sender.ws, "alpha", new Uint8Array([0x01]));
 
         let unexpectedMessage = false;
-        otherTopicClient.onmessage = () => {
+        otherTopicClient.ws.onmessage = () => {
             unexpectedMessage = true;
         };
 
         await new Promise((resolve) => setTimeout(resolve, 100));
         expect(unexpectedMessage).toBe(false);
 
-        sender.close();
-        otherTopicClient.close();
+        sender.ws.close();
+        otherTopicClient.ws.close();
     });
 
     test("rejects send from client that unsubscribed", async () => {
         const sender = await openSocket();
         const receiver = await openSocket();
 
-        subscribe(sender, "game");
-        subscribe(receiver, "game");
-        await receiveBinary(sender);
-        await receiveBinary(receiver);
+        subscribe(sender.ws, "game");
+        subscribe(receiver.ws, "game");
+        await receiveBinary(sender.ws);
+        await receiveBinary(receiver.ws);
 
-        unsubscribe(sender, "game");
-        await receiveBinary(sender);
+        unsubscribe(sender.ws, "game");
+        await receiveBinary(sender.ws);
 
-        sendTopicMessage(sender, "game", new Uint8Array([0x99]));
+        sendTopicMessage(sender.ws, "game", new Uint8Array([0x99]));
 
         let unexpectedMessage = false;
-        receiver.onmessage = () => {
+        receiver.ws.onmessage = () => {
             unexpectedMessage = true;
         };
 
         await new Promise((resolve) => setTimeout(resolve, 100));
         expect(unexpectedMessage).toBe(false);
 
-        sender.close();
-        receiver.close();
+        sender.ws.close();
+        receiver.ws.close();
     });
 
     test("unsubscribe sends UNSUBSCRIBED only when client was subscribed", async () => {
-        const ws = await openSocket();
+        const { ws } = await openSocket();
 
         unsubscribe(ws, "missing");
 

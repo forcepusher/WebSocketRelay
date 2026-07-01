@@ -45,16 +45,10 @@ namespace BananaParty.WebSocketRelay.Tests
             await Gate.WaitAsync().ConfigureAwait(false);
             try
             {
-                if (await IsPortOpenAsync(TestParameters.RelayServerPort).ConfigureAwait(false))
-                {
-                    UnityEngine.Debug.Log(
-                        $"[RelayServer] Using existing relay server on port {TestParameters.RelayServerPort}. " +
-                        "Start the server from Unity to forward Bun logs to the Console.");
-                    return true;
-                }
-
                 if (_serverProcess != null && _serverProcess.IsRunning)
                     return await WaitForPortAsync(TestParameters.RelayServerPort, ServerStartupTimeoutMs).ConfigureAwait(false);
+
+                RelayServerProcess.KillAllRelayServers();
 
                 try
                 {
