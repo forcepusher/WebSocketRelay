@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class NetworkIdentity
+    public class NetworkIdentity : MonoBehaviour
     {
         [SerializeField]
         private List<MonoBehaviour> _synchronizedStateMonoBehaviours;
