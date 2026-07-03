@@ -16,6 +16,11 @@ namespace BananaParty.WebSocketRelay
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
 
+        private readonly List<Room> _rooms = new();
+
+        public readonly EventHub<EmptyEventPayload> ConnectedToRelayEventHub = new();
+        public readonly EventHub<EmptyEventPayload> DisconnectedFromRelayEventHub = new();
+
         public readonly EventHub<NetworkPlayer> NetworkPlayerAddedEventHub = new();
         public readonly EventHub<NetworkPlayer> NetworkPlayerRemovedEventHub = new();
 
@@ -80,6 +85,11 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
+        public void Send(string topic, byte[] data)
+        {
+            _relayClient.Send(topic, data);
+        }
+
         public void Dispose()
         {
             _relayServerProcess?.Stop();
@@ -88,6 +98,7 @@ namespace BananaParty.WebSocketRelay
 
         public void OnConnectedToRelay(Guid clientGuid)
         {
+            ConnectedToRelayEventHub.Broadcast(new EmptyEventPayload());
         }
 
         public void OnSubscribedToTopic(string topic)
