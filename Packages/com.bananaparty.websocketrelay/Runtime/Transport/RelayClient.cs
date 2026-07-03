@@ -141,7 +141,7 @@ namespace BananaParty.WebSocketRelay.Transport
             if (topicLength < 0)
                 throw new InvalidDataException("Incomplete topic control message.");
 
-            _relayListener.OnUnsubscribedFtomTopic(RelayMessageCodec.ReadTopic(data));
+            _relayListener.OnUnsubscribedFromTopic(RelayMessageCodec.ReadTopic(data));
             return RelayMessageCodec.GetPayloadOffset(topicLength);
         }
 

@@ -3,17 +3,17 @@ namespace BananaParty.WebSocketRelay
     public class Room
     {
         private readonly Network _network;
-        public string Topic { get; private set; }
+        public string RoomName { get; private set; }
 
-        public Room(string topic, Network network)
+        public Room(Network network, string roomName)
         {
-            Topic = topic;
+            RoomName = roomName;
             _network = network;
         }
 
         public void Send(byte[] data)
         {
-            _network.Send(Topic, data);
+            _network.Send(RoomName, data);
         }
     }
 }

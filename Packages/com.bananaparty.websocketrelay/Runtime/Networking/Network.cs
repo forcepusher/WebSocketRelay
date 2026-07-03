@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using BananaParty.WebSocketRelay.Events;
 using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
 
@@ -8,6 +7,7 @@ namespace BananaParty.WebSocketRelay
 {
     public class Network : IRelayListener, IDisposable
     {
+        private readonly INetworkListener _networkListener;
         private readonly string _serverAddress;
 
         private readonly List<NetworkPlayer> _networkPlayers = new();
@@ -18,16 +18,9 @@ namespace BananaParty.WebSocketRelay
 
         private readonly List<Room> _rooms = new();
 
-        public readonly EventHub<Guid> ConnectedToRelayEventHub = new();
-
-        public readonly EventHub<NetworkPlayer> NetworkPlayerAddedEventHub = new();
-        public readonly EventHub<NetworkPlayer> NetworkPlayerRemovedEventHub = new();
-
-        public readonly EventHub<Room> EnteredRoomEventHub = new();
-        public readonly EventHub<Room> LeftRoomEventHub = new();
-
-        public Network(string serverAddress)
+        public Network(INetworkListener networkListener, string serverAddress)
         {
+            _networkListener = networkListener;
             _serverAddress = serverAddress;
         }
 
@@ -100,17 +93,21 @@ namespace BananaParty.WebSocketRelay
 
         public void OnConnectedToRelay(Guid clientGuid)
         {
-            ConnectedToRelayEventHub.Broadcast(clientGuid);
+            _networkListener.OnConnectedToRelay(clientGuid);
         }
 
         public void OnSubscribedToTopic(string topic)
         {
-            _rooms.Add(new Room(topic, this));
+            var room = new Room(this, topic);
+            _rooms.Add(room);
+            _networkListener.OnConnectedToRoom(room);
         }
 
-        public void OnUnsubscribedFtomTopic(string topic)
+        public void OnUnsubscribedFromTopic(string topic)
         {
-            _rooms.RemoveAll(room => room.Topic == topic);
+            Room room = _rooms.Find(room => room.RoomName == topic);
+            _networkListener.OnDisconnectedFromRoom(room);
+            _rooms.Remove(room);
         }
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
@@ -131,14 +128,14 @@ namespace BananaParty.WebSocketRelay
         {
             _networkPlayers.Add(networkPlayer);
             _guidToNetworkPlayers[networkPlayer.Guid] = networkPlayer;
-            NetworkPlayerAddedEventHub.Broadcast(networkPlayer);
+            _networkListener.OnPlayerAdded(networkPlayer);
         }
 
         private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
         {
             _networkPlayers.Remove(networkPlayer);
             _guidToNetworkPlayers.Remove(networkPlayer.Guid);
-            NetworkPlayerRemovedEventHub.Broadcast(networkPlayer);
+            _networkListener.OnPlayerRemoved(networkPlayer);
         }
     }
 }

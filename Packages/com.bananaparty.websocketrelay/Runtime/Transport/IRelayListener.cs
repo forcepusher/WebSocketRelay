@@ -8,7 +8,7 @@ namespace BananaParty.WebSocketRelay.Transport
 
         void OnSubscribedToTopic(string topic);
 
-        void OnUnsubscribedFtomTopic(string topic);
+        void OnUnsubscribedFromTopic(string topic);
 
         void OnTopicMessage(Guid senderGuid, string topic, byte[] data);
     }

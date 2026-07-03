@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using BananaParty.WebSocketRelay.Events;
+using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
-    public class GameState : MonoBehaviour, IState
+    public class GameState : MonoBehaviour, IState, INetworkListener
     {
         [SerializeField]
         private PlayerCharacterSpawn _playerCharacterSpawn;
@@ -15,16 +15,16 @@ namespace BananaParty.WebSocketRelay.Samples
         private List<ItemSpawn> _itemSpawns;
         private StaticArrayState<ItemSpawn> _itemSpawnsState;
 
-        private Network _network = new("ws://127.0.0.1:23144");
+        private Network _network;
 
         private IntegerState _playTimeState = new(nameof(_playTimeState), 0);
 
         private List<IState> _states;
 
-        private EventQueue<Guid> _connectedToRelayEventQueue;
-
         private void Awake()
         {
+            _network = new(this, "ws://127.0.0.1:23144");
+
             _itemSpawnsState = new(nameof(_itemSpawns), _itemSpawns);
 
             _states = new List<IState>
@@ -34,8 +34,6 @@ namespace BananaParty.WebSocketRelay.Samples
                 _playTimeState,
                 _itemSpawnsState
             };
-
-            _connectedToRelayEventQueue = _network.ConnectedToRelayEventHub.Subscribe();
         }
 
         private void Start()
@@ -62,7 +60,27 @@ namespace BananaParty.WebSocketRelay.Samples
             readGraph.ReadObject(StateName, _states);
         }
 
-        private void OnConnectedToRelay()
+        public void OnConnectedToRelay(Guid clientGuid)
+        {
+
+        }
+
+        public void OnConnectedToRoom(Room room)
+        {
+
+        }
+
+        public void OnDisconnectedFromRoom(Room room)
+        {
+
+        }
+
+        public void OnPlayerAdded(NetworkPlayer networkPlayer)
+        {
+
+        }
+
+        public void OnPlayerRemoved(NetworkPlayer networkPlayer)
         {
 
         }

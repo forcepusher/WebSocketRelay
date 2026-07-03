@@ -16,7 +16,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public void OnSubscribedToTopic(string topic)
             => Subscribed?.Invoke(topic);
 
-        public void OnUnsubscribedFtomTopic(string topic)
+        public void OnUnsubscribedFromTopic(string topic)
             => Unsubscribed?.Invoke(topic);
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
