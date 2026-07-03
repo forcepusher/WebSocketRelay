@@ -8,6 +8,8 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField]
         NetworkContext _networkContext;
 
+        public bool HasAuthority { get; set; }
+
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float rotationSpeed = 10f;
         [SerializeField] private float jumpHeight = 2f;
@@ -19,6 +21,8 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private float _health = 100f;
         private Vector3 _position = Vector3.zero;
+
+        private Vector3 _lastReceivedPosition = Vector3.zero;
 
         private void Awake()
         {
@@ -53,37 +57,44 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void ReadState(IStateInput stateInput)
         {
-            float health = stateInput.ReadFloat(nameof(_health));
-            Vector3 position = stateInput.ReadVector3(nameof(_position));
+            _health = stateInput.ReadFloat(nameof(_health));
+            _lastReceivedPosition = stateInput.ReadVector3(nameof(_position));
         }
 
         private void Move()
         {
-            Vector3 moveDirection = new Vector3(_characterInput.MovementInput.x, 0, _characterInput.MovementInput.y).normalized;
-
-            if (moveDirection != Vector3.zero)
+            if (HasAuthority)
             {
-                _characteController.Move(moveDirection * moveSpeed * Time.deltaTime);
+                Vector3 moveDirection = new Vector3(_characterInput.MovementInput.x, 0, _characterInput.MovementInput.y).normalized;
 
-                Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
-            }
+                if (moveDirection != Vector3.zero)
+                {
+                    _characteController.Move(moveDirection * moveSpeed * Time.deltaTime);
 
-            if (_characterInput.JumpInput && _characteController.isGrounded)
-            {
-                _verticalVelocity = Mathf.Sqrt(jumpHeight * 2f * 9.81f);
-            }
+                    Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+                }
 
-            if (_characteController.isGrounded && _verticalVelocity < 0)
-            {
-                _verticalVelocity = -2f;
+                if (_characterInput.JumpInput && _characteController.isGrounded)
+                {
+                    _verticalVelocity = Mathf.Sqrt(jumpHeight * 2f * 9.81f);
+                }
+
+                if (_characteController.isGrounded && _verticalVelocity < 0)
+                {
+                    _verticalVelocity = -2f;
+                }
+                else
+                {
+                    _verticalVelocity -= 9.81f * Time.deltaTime;
+                }
+
+                _characteController.Move(Vector3.up * _verticalVelocity * Time.deltaTime);
             }
             else
             {
-                _verticalVelocity -= 9.81f * Time.deltaTime;
+                transform.position = Vector3.Lerp(transform.position, _lastReceivedPosition, 0.1f);
             }
-
-            _characteController.Move(Vector3.up * _verticalVelocity * Time.deltaTime);
         }
     }
 }
