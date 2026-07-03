@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
@@ -9,14 +9,12 @@ namespace BananaParty.WebSocketRelay
     {
         private readonly ReadOnlyMemory<byte> _data;
         private int _pos;
-        private readonly Stack<bool> _inArrayStack = new();
-
-        private bool InArray => _inArrayStack.Count > 0 && _inArrayStack.Peek();
 
         public BinaryStateInput(ReadOnlyMemory<byte> data)
         {
             _data = data;
         }
+
         public string ReadString(string name)
         {
             VerifyEntryName(name);
@@ -59,45 +57,45 @@ namespace BananaParty.WebSocketRelay
             return ReadBoolValue();
         }
 
+        public Vector2 ReadVector2(string name)
+        {
+            VerifyEntryName(name);
+            return new Vector2(ReadFloat32(), ReadFloat32());
+        }
+
+        public Vector3 ReadVector3(string name)
+        {
+            VerifyEntryName(name);
+            return new Vector3(ReadFloat32(), ReadFloat32(), ReadFloat32());
+        }
+
+        public Vector2Int ReadVector2Int(string name)
+        {
+            VerifyEntryName(name);
+            return new Vector2Int(ReadInt32(), ReadInt32());
+        }
+
+        public Vector3Int ReadVector3Int(string name)
+        {
+            VerifyEntryName(name);
+            return new Vector3Int(ReadInt32(), ReadInt32(), ReadInt32());
+        }
+
+        public Quaternion ReadQuaternion(string name)
+        {
+            VerifyEntryName(name);
+            return new Quaternion(ReadFloat32(), ReadFloat32(), ReadFloat32(), ReadFloat32());
+        }
+
         public Guid ReadGuid(string name)
         {
             VerifyEntryName(name);
             return ReadGuidValue();
         }
 
-        private void StartObject(string name)
-        {
-            VerifyNameHash(name);
-            _inArrayStack.Push(false);
-        }
-
-        private void EndObject()
-        {
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
-
-        private void StartArray(string name)
-        {
-            VerifyNameHash(name);
-            _inArrayStack.Push(true);
-        }
-
-        private void EndArray()
-        {
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
-
-        private int ReadIntArrayEntry()
-        {
-            VerifyEntryName(null);
-            return ReadInt32();
-        }
-
         private void VerifyEntryName(string expectedName)
         {
-            VerifyNameHash(InArray ? null : expectedName);
+            VerifyNameHash(expectedName);
         }
 
         private void VerifyNameHash(string expectedName)

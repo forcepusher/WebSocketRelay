@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
@@ -9,14 +9,11 @@ namespace BananaParty.WebSocketRelay
     {
         private readonly MemoryStream _stream = new();
         private readonly BinaryWriter _buffer;
-        private readonly Stack<bool> _inArrayStack = new();
 
         public BinaryStateOutput()
         {
             _buffer = new BinaryWriter(_stream, Encoding.UTF8, leaveOpen: true);
         }
-
-        private bool InArray => _inArrayStack.Count > 0 && _inArrayStack.Peek();
 
         public ReadOnlyMemory<byte> GetBuffer() => _stream.GetBuffer().AsMemory(0, (int)_stream.Length);
 
@@ -34,73 +31,88 @@ namespace BananaParty.WebSocketRelay
 
         public void WriteString(string name, string value) => WriteEntry(name, value);
 
+        public void WriteVector2(string name, Vector2 value)
+        {
+            WriteNameHash(name);
+            _buffer.Write(value.x);
+            _buffer.Write(value.y);
+        }
+
+        public void WriteVector3(string name, Vector3 value)
+        {
+            WriteNameHash(name);
+            _buffer.Write(value.x);
+            _buffer.Write(value.y);
+            _buffer.Write(value.z);
+        }
+
+        public void WriteVector2Int(string name, Vector2Int value)
+        {
+            WriteNameHash(name);
+            _buffer.Write(value.x);
+            _buffer.Write(value.y);
+        }
+
+        public void WriteVector3Int(string name, Vector3Int value)
+        {
+            WriteNameHash(name);
+            _buffer.Write(value.x);
+            _buffer.Write(value.y);
+            _buffer.Write(value.z);
+        }
+
+        public void WriteQuaternion(string name, Quaternion value)
+        {
+            WriteNameHash(name);
+            _buffer.Write(value.x);
+            _buffer.Write(value.y);
+            _buffer.Write(value.z);
+            _buffer.Write(value.w);
+        }
+
         public void WriteGuid(string name, Guid value) => WriteEntry(name, value);
 
         public byte[] ToArray() => _stream.ToArray();
 
-        private void StartObject(string name)
-        {
-            WriteNameHash(name);
-            _inArrayStack.Push(false);
-        }
-
-        private void EndObject()
-        {
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
-
-        private void StartArray(string name)
-        {
-            WriteNameHash(name);
-            _inArrayStack.Push(true);
-        }
-
-        private void EndArray()
-        {
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
-
         private void WriteEntry(string name, byte value)
         {
-            WriteNameHash(InArray ? null : name);
+            WriteNameHash(name);
             _buffer.Write(value);
         }
 
         private void WriteEntry(string name, int value)
         {
-            WriteNameHash(InArray ? null : name);
+            WriteNameHash(name);
             _buffer.Write(value);
         }
 
         private void WriteEntry(string name, long value)
         {
-            WriteNameHash(InArray ? null : name);
+            WriteNameHash(name);
             _buffer.Write(value);
         }
 
         private void WriteEntry(string name, float value)
         {
-            WriteNameHash(InArray ? null : name);
+            WriteNameHash(name);
             _buffer.Write(value);
         }
 
         private void WriteEntry(string name, double value)
         {
-            WriteNameHash(InArray ? null : name);
+            WriteNameHash(name);
             _buffer.Write(value);
         }
 
         private void WriteEntry(string name, bool value)
         {
-            WriteNameHash(InArray ? null : name);
+            WriteNameHash(name);
             _buffer.Write(value);
         }
 
         private void WriteEntry(string name, string value)
         {
-            WriteNameHash(InArray ? null : name);
+            WriteNameHash(name);
             byte[] stringBytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
             _buffer.Write((ushort)stringBytes.Length);
             _buffer.Write(stringBytes);
@@ -108,14 +120,8 @@ namespace BananaParty.WebSocketRelay
 
         private void WriteEntry(string name, Guid value)
         {
-            WriteNameHash(InArray ? null : name);
+            WriteNameHash(name);
             _buffer.Write(value.ToByteArray());
-        }
-
-        private void WriteEntry(int value)
-        {
-            WriteNameHash(null);
-            _buffer.Write(value);
         }
 
         private void WriteNameHash(string name)

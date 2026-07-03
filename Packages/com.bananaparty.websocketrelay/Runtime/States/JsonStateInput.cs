@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
@@ -8,14 +9,11 @@ namespace BananaParty.WebSocketRelay
     {
         private readonly string _jsonString;
         private int _position;
-        private readonly Stack<bool> _inArrayStack = new();
 
         public JsonStateInput(string json)
         {
             _jsonString = json ?? "{}";
         }
-
-        private bool InArray => _inArrayStack.Count > 0 && _inArrayStack.Peek();
 
         public string ReadString(string name)
         {
@@ -69,88 +67,125 @@ namespace BananaParty.WebSocketRelay
             return ReadBoolAtPosition();
         }
 
+        public Vector2 ReadVector2(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            float x = ReadObjectComponentFloat("x");
+            float y = ReadObjectComponentFloat("y");
+
+            ReadObjectClose();
+            return new Vector2(x, y);
+        }
+
+        public Vector3 ReadVector3(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            float x = ReadObjectComponentFloat("x");
+            float y = ReadObjectComponentFloat("y");
+            float z = ReadObjectComponentFloat("z");
+
+            ReadObjectClose();
+            return new Vector3(x, y, z);
+        }
+
+        public Vector2Int ReadVector2Int(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            int x = ReadObjectComponentInt("x");
+            int y = ReadObjectComponentInt("y");
+
+            ReadObjectClose();
+            return new Vector2Int(x, y);
+        }
+
+        public Vector3Int ReadVector3Int(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            int x = ReadObjectComponentInt("x");
+            int y = ReadObjectComponentInt("y");
+            int z = ReadObjectComponentInt("z");
+
+            ReadObjectClose();
+            return new Vector3Int(x, y, z);
+        }
+
+        public Quaternion ReadQuaternion(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            float x = ReadObjectComponentFloat("x");
+            float y = ReadObjectComponentFloat("y");
+            float z = ReadObjectComponentFloat("z");
+            float w = ReadObjectComponentFloat("w");
+
+            ReadObjectClose();
+            return new Quaternion(x, y, z, w);
+        }
+
         public Guid ReadGuid(string name)
         {
             string value = ReadString(name);
             return Guid.TryParse(value, out Guid result) ? result : Guid.Empty;
         }
 
-        private void StartObject(string name)
-        {
-            AdvanceIntoContainer('{', name);
-            _inArrayStack.Push(false);
-        }
-
-        private void EndObject()
-        {
-            ReadContainerClose('}');
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
-
-        private void StartArray(string name)
-        {
-            AdvanceIntoContainer('[', name);
-            _inArrayStack.Push(true);
-        }
-
-        private void EndArray()
-        {
-            ReadContainerClose(']');
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
-
-        private bool HasNextArrayElement()
-        {
-            SkipWhitespace();
-            return _position < _jsonString.Length && _jsonString[_position] != ']';
-        }
-
-        private void AdvanceIntoContainer(char open, string name)
-        {
-            if (!InArray && !string.IsNullOrEmpty(name))
-            {
-                SkipWhitespace();
-                if (_position < _jsonString.Length && _jsonString[_position] == open)
-                    _position++;
-
-                SkipItemSeparator();
-                ReadContainerName(name);
-                SkipColon();
-            }
-            else if (InArray)
-            {
-                SkipItemSeparator();
-            }
-
-            SkipWhitespace();
-            if (_position < _jsonString.Length && _jsonString[_position] == open)
-                _position++;
-        }
-
-        private void ReadContainerClose(char close)
-        {
-            SkipWhitespace();
-            if (_position < _jsonString.Length && _jsonString[_position] == close)
-                _position++;
-        }
-
-        private void ReadContainerName(string expectedName)
-        {
-            ReadQuotedString();
-        }
-
         private void AdvanceToEntry(string expectedName)
         {
             SkipItemSeparator();
-            if (InArray) return;
 
             string entryName = ReadQuotedString();
             if (!string.IsNullOrEmpty(expectedName) && entryName != expectedName)
                 throw new KeyNotFoundException($"Expected field '{expectedName}' but found '{entryName ?? "null"}' in JSON state.");
 
             SkipColon();
+        }
+
+        private void ReadObjectOpen()
+        {
+            SkipWhitespace();
+            if (_position >= _jsonString.Length || _jsonString[_position] != '{')
+                throw new InvalidOperationException("Expected JSON object value.");
+
+            _position++;
+        }
+
+        private void ReadObjectClose()
+        {
+            SkipWhitespace();
+            if (_position < _jsonString.Length && _jsonString[_position] == '}')
+                _position++;
+        }
+
+        private float ReadObjectComponentFloat(string componentName)
+        {
+            SkipItemSeparator();
+
+            string entryName = ReadQuotedString();
+            if (entryName != componentName)
+                throw new KeyNotFoundException($"Expected field '{componentName}' but found '{entryName ?? "null"}' in JSON object.");
+
+            SkipColon();
+            return ReadFloatAtPosition();
+        }
+
+        private int ReadObjectComponentInt(string componentName)
+        {
+            SkipItemSeparator();
+
+            string entryName = ReadQuotedString();
+            if (entryName != componentName)
+                throw new KeyNotFoundException($"Expected field '{componentName}' but found '{entryName ?? "null"}' in JSON object.");
+
+            SkipColon();
+            return ReadIntAtPosition();
         }
 
         private void SkipItemSeparator()

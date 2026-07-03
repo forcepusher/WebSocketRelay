@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
@@ -23,8 +24,6 @@ namespace BananaParty.WebSocketRelay
             _indentationCount = spaceIndentationCount;
         }
 
-        private bool InArray => _closers.Count > 0 && _closers.Peek() == ']';
-
         public void WriteByte(string name, byte value) => WriteEntry(name, value);
 
         public void WriteInt(string name, int value) => WriteEntry(name, value);
@@ -38,6 +37,40 @@ namespace BananaParty.WebSocketRelay
         public void WriteBool(string name, bool value) => WriteEntry(name, value);
 
         public void WriteString(string name, string value) => WriteEntry(name, value);
+
+        public void WriteVector2(string name, Vector2 value)
+        {
+            string x = value.x.ToString(CultureInfo.InvariantCulture);
+            string y = value.y.ToString(CultureInfo.InvariantCulture);
+            WriteObjectEntry(name, $"{{\"x\":{x},\"y\":{y}}}");
+        }
+
+        public void WriteVector3(string name, Vector3 value)
+        {
+            string x = value.x.ToString(CultureInfo.InvariantCulture);
+            string y = value.y.ToString(CultureInfo.InvariantCulture);
+            string z = value.z.ToString(CultureInfo.InvariantCulture);
+            WriteObjectEntry(name, $"{{\"x\":{x},\"y\":{y},\"z\":{z}}}");
+        }
+
+        public void WriteVector2Int(string name, Vector2Int value)
+        {
+            WriteObjectEntry(name, $"{{\"x\":{value.x},\"y\":{value.y}}}");
+        }
+
+        public void WriteVector3Int(string name, Vector3Int value)
+        {
+            WriteObjectEntry(name, $"{{\"x\":{value.x},\"y\":{value.y},\"z\":{value.z}}}");
+        }
+
+        public void WriteQuaternion(string name, Quaternion value)
+        {
+            string x = value.x.ToString(CultureInfo.InvariantCulture);
+            string y = value.y.ToString(CultureInfo.InvariantCulture);
+            string z = value.z.ToString(CultureInfo.InvariantCulture);
+            string w = value.w.ToString(CultureInfo.InvariantCulture);
+            WriteObjectEntry(name, $"{{\"x\":{x},\"y\":{y},\"z\":{z},\"w\":{w}}}");
+        }
 
         public void WriteGuid(string name, Guid value) => WriteEntry(name, value.ToString());
 
@@ -68,10 +101,6 @@ namespace BananaParty.WebSocketRelay
             return result.ToString();
         }
 
-        private void StartObject(string name) => StartContainer('{', '}', name);
-
-        private void StartArray(string name) => StartContainer('[', ']', name);
-
         private void WriteEntry(string name, byte value) => WritePrimitiveEntry(name, value.ToString(CultureInfo.InvariantCulture), false);
 
         private void WriteEntry(string name, int value) => WritePrimitiveEntry(name, value.ToString(CultureInfo.InvariantCulture), false);
@@ -86,59 +115,18 @@ namespace BananaParty.WebSocketRelay
 
         private void WriteEntry(string name, string value) => WritePrimitiveEntry(name, value ?? string.Empty, true);
 
-        private void EndObject() => EndContainer('}');
-
-        private void EndArray() => EndContainer(']');
+        private void WriteObjectEntry(string name, string serializedObject)
+        {
+            EnsureStarted('{', '}');
+            WriteItemSeparator();
+            _sb.Append($"\"{name}\":{serializedObject}");
+        }
 
         private void WritePrimitiveEntry(string name, string serializedValue, bool quoteValue)
         {
             EnsureStarted('{', '}');
             WriteItemSeparator();
-
-            if (InArray)
-                _sb.Append(quoteValue ? $"\"{serializedValue}\"" : serializedValue);
-            else
-                _sb.Append(quoteValue ? $"\"{name}\":\"{serializedValue}\"" : $"\"{name}\":{serializedValue}");
-        }
-
-        private void StartContainer(char open, char close, string name)
-        {
-            EnsureStarted(open, close);
-            WriteItemSeparator();
-            WriteNamedKeyPrefix(name);
-            OpenContainer(open, close);
-        }
-
-        private void WriteNamedKeyPrefix(string name)
-        {
-            if (!InArray && !string.IsNullOrEmpty(name))
-                _sb.Append($"\"{name}\":");
-
-            if (_prettyPrint && _bracesOnNewLine && !InArray)
-            {
-                _sb.Append('\n');
-                AppendIndent();
-            }
-        }
-
-        private void EndContainer(char close)
-        {
-            if (_depth <= 1) return;
-
-            if (_prettyPrint)
-            {
-                _sb.Append('\n');
-                _depth--;
-                AppendIndent();
-            }
-            else
-            {
-                _depth--;
-            }
-
-            _sb.Append(close);
-            _firstItemScopes.Pop();
-            _closers.Pop();
+            _sb.Append(quoteValue ? $"\"{name}\":\"{serializedValue}\"" : $"\"{name}\":{serializedValue}");
         }
 
         private void EnsureStarted(char open, char close)
@@ -174,20 +162,6 @@ namespace BananaParty.WebSocketRelay
                 }
             }
             _firstItemScopes.Push(false);
-        }
-
-        private void OpenContainer(char open, char close)
-        {
-            _sb.Append(open);
-            _depth++;
-            _firstItemScopes.Push(true);
-            _closers.Push(close);
-
-            if (_prettyPrint)
-            {
-                _sb.Append('\n');
-                AppendIndent();
-            }
         }
 
         private void AppendIndent()
