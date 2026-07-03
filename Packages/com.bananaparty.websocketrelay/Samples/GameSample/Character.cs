@@ -5,7 +5,7 @@ using UnityEngine;
 namespace BananaParty.WebSocketRelay.Samples
 {
     [RequireComponent(typeof(CharacterController))]
-    public class Character : MonoBehaviour, IKeyedState
+    public class Character : MonoBehaviour
     {
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float rotationSpeed = 10f;
