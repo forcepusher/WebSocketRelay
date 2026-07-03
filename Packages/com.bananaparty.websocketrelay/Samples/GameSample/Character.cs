@@ -22,9 +22,8 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private float _verticalVelocity;
 
-        private FloatState _health = new(nameof(_health), 100f);
+        private float _health = 100f;
         private Vector3State _position = new(nameof(_position), Vector3.zero);
-        private List<IState> _states;
 
         private void Awake()
         {
@@ -54,7 +53,9 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void WriteState(IStateOutput stateOutput)
         {
-            stateOutput.WriteObject(StateName, _states);
+            stateOutput.WriteFloat(nameof(_health), _health);
+            stateOutput.WriteObject(nameof(_position), _position);
+
         }
 
         public void ReadState(IStateInput stateInput)
