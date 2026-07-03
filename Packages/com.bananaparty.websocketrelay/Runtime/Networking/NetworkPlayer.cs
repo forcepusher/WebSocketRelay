@@ -7,7 +7,7 @@ namespace BananaParty.WebSocketRelay
         private const float ConnectionTimeoutSeconds = 15f;
 
         private float _timeSinceLastMessage = 0f;
-        public Guid Guid {  get; private set; }
+        public Guid Guid { get; private set; }
 
         public bool IsTimedOut => _timeSinceLastMessage > ConnectionTimeoutSeconds;
 
