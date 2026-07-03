@@ -85,6 +85,16 @@ namespace BananaParty.WebSocketRelay
             _relayClient.Send(topic, data);
         }
 
+        public void JoinRoom(string roomName)
+        {
+            _relayClient.Subscribe(roomName);
+        }
+
+        public void LeaveRoom(string roomName)
+        {
+            _relayClient.Unsubscribe(roomName);
+        }
+
         public void Dispose()
         {
             _relayServerProcess?.Stop();
@@ -121,6 +131,9 @@ namespace BananaParty.WebSocketRelay
                 NetworkPlayer networkPlayer = new NetworkPlayer(senderGuid);
                 AddNetworkPlayer(networkPlayer);
                 networkPlayer.OnTopicMessage(topic, data);
+
+                Room room = _rooms.Find(room => room.RoomName == topic);
+                room?.OnTopicMessage(topic, data);
             }
         }
         

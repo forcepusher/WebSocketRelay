@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
 
@@ -38,9 +39,9 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Start()
         {
-            var jsonStateOutput = new JsonStateOutput();
-            WriteState(jsonStateOutput);
-            Debug.Log(jsonStateOutput.ToString());
+            //var jsonStateOutput = new JsonStateOutput();
+            //WriteState(jsonStateOutput);
+            //Debug.Log(jsonStateOutput.ToString());
         }
 
         private void Update()
@@ -62,12 +63,16 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void OnConnectedToRelay(Guid clientGuid)
         {
-
+            _network.JoinRoom("game-room");
         }
 
         public void OnConnectedToRoom(Room room)
         {
+            var jsonStateOutput = new JsonStateOutput();
+            WriteState(jsonStateOutput);
+            Debug.Log(jsonStateOutput.ToString());
 
+            room.Send(UTF8Encoding.UTF8.GetBytes(jsonStateOutput.ToString()));
         }
 
         public void OnDisconnectedFromRoom(Room room)
