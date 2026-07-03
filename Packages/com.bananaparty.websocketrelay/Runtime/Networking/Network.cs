@@ -9,6 +9,7 @@ namespace BananaParty.WebSocketRelay
     {
         private readonly string _serverAddress;
 
+        private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _guidToNetworkPlayers = new();
 
         private RelayServerProcess _relayServerProcess;
@@ -63,8 +64,16 @@ namespace BananaParty.WebSocketRelay
         {
             _relayClient?.ProcessIncomingMessages();
 
-            foreach (var networkPlayer in _guidToNetworkPlayers.Values)
+            foreach (NetworkPlayer networkPlayer in _networkPlayers)
                 networkPlayer.ManualUpdate(deltaTime);
+
+            for (int networkPlayerIndex = _networkPlayers.Count - 1; networkPlayerIndex >= 0; networkPlayerIndex -= 1)
+            {
+                NetworkPlayer networkPlayer = _networkPlayers[networkPlayerIndex];
+
+                if (networkPlayer.IsTimedOut)
+                    RemoveNetworkPlayer(networkPlayer);
+            }
         }
 
         public void Dispose()
@@ -97,6 +106,18 @@ namespace BananaParty.WebSocketRelay
                 _guidToNetworkPlayers[senderGuid] = networkPlayer;
                 networkPlayer.OnTopicMessage(topic, data);
             }
+        }
+        
+        private void AddNetworkPlayer(NetworkPlayer networkPlayer)
+        {
+            _networkPlayers.Add(networkPlayer);
+            _guidToNetworkPlayers[networkPlayer.Guid] = networkPlayer;
+        }
+
+        private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
+        {
+            _networkPlayers.Remove(networkPlayer);
+            _guidToNetworkPlayers.Remove(networkPlayer.Guid);
         }
     }
 }

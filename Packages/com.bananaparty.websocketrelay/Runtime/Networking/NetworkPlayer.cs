@@ -7,11 +7,13 @@ namespace BananaParty.WebSocketRelay
         private const float ConnectionTimeoutSeconds = 15f;
 
         private float _timeSinceLastMessage = 0f;
-        private readonly Guid _playerGuid;
+        public Guid Guid {  get; private set; }
+
+        public bool IsTimedOut => _timeSinceLastMessage > ConnectionTimeoutSeconds;
 
         public NetworkPlayer(Guid playerGuid)
         {
-            _playerGuid = playerGuid;
+            Guid = playerGuid;
         }
 
         public void ManualUpdate(float deltaTime)
