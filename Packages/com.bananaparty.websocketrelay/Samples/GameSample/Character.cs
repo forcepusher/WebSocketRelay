@@ -55,7 +55,8 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void ReadState(IStateInput stateInput)
         {
-            stateInput.ReadObject(StateName, _states);
+            float health = stateInput.ReadFloat(nameof(_health));
+            Vector3 position = stateInput.ReadVector3(nameof(_position));
         }
 
         private void Move()
