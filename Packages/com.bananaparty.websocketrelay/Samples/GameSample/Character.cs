@@ -5,10 +5,10 @@ using UnityEngine;
 namespace BananaParty.WebSocketRelay.Samples
 {
     [RequireComponent(typeof(CharacterController))]
-    public class Character : MonoBehaviour
+    public class Character : MonoBehaviour, INetworkIdentity
     {
         [SerializeField]
-        private NetworkIdentity _networkIdentity;
+        NetworkContext _networkContext;
 
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float rotationSpeed = 10f;
@@ -35,6 +35,16 @@ namespace BananaParty.WebSocketRelay.Samples
             _states = new List<IState> { _health, _position };
         }
 
+        private void OnEnable()
+        {
+            _networkContext.RegisterNetworkIdentity(this);
+        }
+
+        private void OnDisable()
+        {
+            _networkContext.UnregisterNetworkIdentity(this);
+        }
+
         private void Update()
         {
             _characterInput.PollInput();
@@ -42,9 +52,15 @@ namespace BananaParty.WebSocketRelay.Samples
             Move();
         }
 
-        public void WriteState(IStateOutput stateOutput) => stateOutput.WriteObject(StateName, _states);
+        public void WriteState(IStateOutput stateOutput)
+        {
+            stateOutput.WriteObject(StateName, _states);
+        }
 
-        public void ReadState(IStateInput stateInput) => stateInput.ReadObject(StateName, _states);
+        public void ReadState(IStateInput stateInput)
+        {
+            stateInput.ReadObject(StateName, _states);
+        }
 
         private void Move()
         {

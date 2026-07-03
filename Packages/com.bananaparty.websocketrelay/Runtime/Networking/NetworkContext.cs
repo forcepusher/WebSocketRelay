@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
+    [CreateAssetMenu]
     public class NetworkContext : ScriptableObject, INetworkContext
     {
         private List<INetworkIdentity> _networkIdentities;
