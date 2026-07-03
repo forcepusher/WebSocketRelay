@@ -19,9 +19,9 @@ namespace BananaParty.WebSocketRelay.Events
                 hideFlags &= ~HideFlags.DontUnloadUnusedAsset;
         }
 
-        public void AddEvent(TEventPayload eventArgument)
+        public void Broadcast(TEventPayload eventArgument)
         {
-            _eventHub.AddEvent(eventArgument);
+            _eventHub.Broadcast(eventArgument);
         }
 
         public EventQueue<TEventPayload> Subscribe()

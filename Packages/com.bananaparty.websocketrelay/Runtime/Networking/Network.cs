@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using BananaParty.WebSocketRelay.Events;
 using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
 
@@ -14,6 +15,9 @@ namespace BananaParty.WebSocketRelay
 
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
+
+        public readonly EventHub<NetworkPlayer> NetworkPlayerAddedEventHub = new();
+        public readonly EventHub<NetworkPlayer> NetworkPlayerRemovedEventHub = new();
 
         public Network(string serverAddress)
         {
@@ -112,12 +116,14 @@ namespace BananaParty.WebSocketRelay
         {
             _networkPlayers.Add(networkPlayer);
             _guidToNetworkPlayers[networkPlayer.Guid] = networkPlayer;
+            NetworkPlayerAddedEventHub.Broadcast(networkPlayer);
         }
 
         private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
         {
             _networkPlayers.Remove(networkPlayer);
             _guidToNetworkPlayers.Remove(networkPlayer.Guid);
+            NetworkPlayerRemovedEventHub.Broadcast(networkPlayer);
         }
     }
 }
