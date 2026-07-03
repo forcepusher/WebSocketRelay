@@ -19,10 +19,12 @@ namespace BananaParty.WebSocketRelay
         private readonly List<Room> _rooms = new();
 
         public readonly EventHub<Guid> ConnectedToRelayEventHub = new();
-        public readonly EventHub<EmptyEventPayload> DisconnectedFromRelayEventHub = new();
 
         public readonly EventHub<NetworkPlayer> NetworkPlayerAddedEventHub = new();
         public readonly EventHub<NetworkPlayer> NetworkPlayerRemovedEventHub = new();
+
+        public readonly EventHub<Room> EnteredRoomEventHub = new();
+        public readonly EventHub<Room> LeftRoomEventHub = new();
 
         public Network(string serverAddress)
         {
@@ -103,10 +105,12 @@ namespace BananaParty.WebSocketRelay
 
         public void OnSubscribedToTopic(string topic)
         {
+            _rooms.Add(new Room(topic, this));
         }
 
         public void OnUnsubscribedFtomTopic(string topic)
         {
+            _rooms.RemoveAll(room => room.Topic == topic);
         }
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)

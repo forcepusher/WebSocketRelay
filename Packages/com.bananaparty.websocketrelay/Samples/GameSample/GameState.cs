@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using BananaParty.WebSocketRelay.Events;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
@@ -19,6 +21,8 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private List<IState> _states;
 
+        private EventQueue<Guid> _connectedToRelayEventQueue;
+
         private void Awake()
         {
             _itemSpawnsState = new(nameof(_itemSpawns), _itemSpawns);
@@ -30,6 +34,8 @@ namespace BananaParty.WebSocketRelay.Samples
                 _playTimeState,
                 _itemSpawnsState
             };
+
+            _connectedToRelayEventQueue = _network.ConnectedToRelayEventHub.Subscribe();
         }
 
         private void Start()
@@ -54,6 +60,11 @@ namespace BananaParty.WebSocketRelay.Samples
         public void ReadState(IStateInput readGraph)
         {
             readGraph.ReadObject(StateName, _states);
+        }
+
+        private void OnConnectedToRelay()
+        {
+
         }
     }
 }
