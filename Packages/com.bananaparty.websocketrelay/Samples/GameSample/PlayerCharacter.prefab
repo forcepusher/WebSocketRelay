@@ -9,6 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1896007682246360707}
+  - component: {fileID: 6244906119621675498}
   - component: {fileID: 3152618152874331923}
   - component: {fileID: 6874780850883058954}
   - component: {fileID: 3865023339077881690}
@@ -37,6 +38,19 @@ Transform:
   - {fileID: 4708601198620857832}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
+--- !u!114 &6244906119621675498
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4279236908898922413}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2d7c066b5544e5488e4b59aec5531ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.NetworkIdentity
+  _networkContext: {fileID: 0}
 --- !u!33 &3152618152874331923
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -57,7 +71,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: afcb542baf6bb5c4c85a47f7aeb6a989, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BananaParty.WebSocketRelay.Samples.Character
-  _netowrkIdentity: {fileID: 0}
+  _networkIdentity: {fileID: 6244906119621675498}
   moveSpeed: 5
   rotationSpeed: 10
   jumpHeight: 2
