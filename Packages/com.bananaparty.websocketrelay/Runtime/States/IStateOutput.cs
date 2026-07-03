@@ -1,13 +1,10 @@
 using System;
-using System.Collections.Generic;
+using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
     public interface IStateOutput
     {
-        void WriteObject(string name, List<IState> states);
-        void WriteStaticArray(string name, List<IState> states);
-        void WriteDynamicArray(string name, List<IState> states);
         void WriteByte(string name, byte value);
         void WriteInt(string name, int value);
         void WriteLong(string name, long value);
@@ -15,6 +12,11 @@ namespace BananaParty.WebSocketRelay
         void WriteDouble(string name, double value);
         void WriteBool(string name, bool value);
         void WriteString(string name, string value);
+        void WriteVector2(string name, Vector2 value);
+        void WriteVector3(string name, Vector3 value);
+        void WriteVector2Int(string name, Vector2Int value);
+        void WriteVector3Int(string name, Vector3Int value);
+        void WriteQuaternion(string name, Quaternion value);
         void WriteGuid(string name, Guid value);
     }
 }

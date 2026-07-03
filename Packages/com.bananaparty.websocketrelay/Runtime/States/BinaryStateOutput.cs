@@ -20,37 +20,6 @@ namespace BananaParty.WebSocketRelay
 
         public ReadOnlyMemory<byte> GetBuffer() => _stream.GetBuffer().AsMemory(0, (int)_stream.Length);
 
-        public void WriteObject(string name, List<IState> states)
-        {
-            StartObject(name);
-
-            foreach (IState state in states)
-                state.WriteState(this);
-
-            EndObject();
-        }
-
-        public void WriteStaticArray(string name, List<IState> states)
-        {
-            StartArray(name);
-
-            foreach (IState state in states)
-                state.WriteState(this);
-
-            EndArray();
-        }
-
-        public void WriteDynamicArray(string name, List<IState> states)
-        {
-            StartArray(name);
-            WriteEntry(states.Count);
-
-            foreach (IState state in states)
-                state.WriteState(this);
-
-            EndArray();
-        }
-
         public void WriteByte(string name, byte value) => WriteEntry(name, value);
 
         public void WriteInt(string name, int value) => WriteEntry(name, value);

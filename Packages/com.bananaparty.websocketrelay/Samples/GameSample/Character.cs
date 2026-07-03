@@ -14,24 +14,19 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField] private float rotationSpeed = 10f;
         [SerializeField] private float jumpHeight = 2f;
 
-        public string StateName => transform.name;
-        public GuidState StateKey { get; } = new(nameof(StateKey), Guid.Empty);
-
         private CharacterController _characteController;
         private IICharacterInput _characterInput;
 
         private float _verticalVelocity;
 
         private float _health = 100f;
-        private Vector3State _position = new(nameof(_position), Vector3.zero);
+        private Vector3 _position = Vector3.zero;
 
         private void Awake()
         {
             _characteController = GetComponent<CharacterController>();
 
             _characterInput = GetComponent<IICharacterInput>();
-
-            _states = new List<IState> { _health, _position };
         }
 
         private void OnEnable()
@@ -54,7 +49,7 @@ namespace BananaParty.WebSocketRelay.Samples
         public void WriteState(IStateOutput stateOutput)
         {
             stateOutput.WriteFloat(nameof(_health), _health);
-            stateOutput.WriteObject(nameof(_position), _position);
+            stateOutput.WriteVector3(nameof(_position), _position);
 
         }
 

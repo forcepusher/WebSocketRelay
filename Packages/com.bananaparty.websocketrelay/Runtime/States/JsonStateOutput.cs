@@ -25,28 +25,6 @@ namespace BananaParty.WebSocketRelay
 
         private bool InArray => _closers.Count > 0 && _closers.Peek() == ']';
 
-        public void WriteObject(string name, List<IState> states)
-        {
-            StartObject(name);
-
-            foreach (IState state in states)
-                state.WriteState(this);
-
-            EndObject();
-        }
-
-        public void WriteStaticArray(string name, List<IState> states)
-        {
-            StartArray(name);
-
-            foreach (IState state in states)
-                state.WriteState(this);
-
-            EndArray();
-        }
-
-        public void WriteDynamicArray(string name, List<IState> states) => WriteStaticArray(name, states);
-
         public void WriteByte(string name, byte value) => WriteEntry(name, value);
 
         public void WriteInt(string name, int value) => WriteEntry(name, value);
