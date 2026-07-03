@@ -10,8 +10,7 @@ namespace BananaParty.WebSocketRelay
         private readonly INetworkListener _networkListener;
         private readonly string _serverAddress;
 
-        private readonly List<NetworkPlayer> _networkPlayers = new();
-        private readonly Dictionary<Guid, NetworkPlayer> _guidToNetworkPlayers = new();
+        private Guid _localPlayerGuid;
 
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
@@ -68,16 +67,8 @@ namespace BananaParty.WebSocketRelay
         {
             _relayClient?.ProcessIncomingMessages();
 
-            foreach (NetworkPlayer networkPlayer in _networkPlayers)
-                networkPlayer.ManualUpdate(deltaTime);
-
-            for (int networkPlayerIndex = _networkPlayers.Count - 1; networkPlayerIndex >= 0; networkPlayerIndex -= 1)
-            {
-                NetworkPlayer networkPlayer = _networkPlayers[networkPlayerIndex];
-
-                if (networkPlayer.IsTimedOut)
-                    RemoveNetworkPlayer(networkPlayer);
-            }
+            foreach (Room room in _rooms)
+                room.ManualUpdate(deltaTime);
         }
 
         public void Send(string topic, byte[] data)
@@ -103,12 +94,13 @@ namespace BananaParty.WebSocketRelay
 
         public void OnConnectedToRelay(Guid clientGuid)
         {
+            _localPlayerGuid = clientGuid;
             _networkListener.OnConnectedToRelay(clientGuid);
         }
 
         public void OnSubscribedToTopic(string topic)
         {
-            var room = new Room(this, topic);
+            var room = new Room(this, topic, _localPlayerGuid);
             _rooms.Add(room);
             _networkListener.OnConnectedToRoom(room);
         }
@@ -122,32 +114,17 @@ namespace BananaParty.WebSocketRelay
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
         {
-            if (_guidToNetworkPlayers.ContainsKey(senderGuid))
-            {
-                _guidToNetworkPlayers[senderGuid].OnTopicMessage(topic, data);
-            }
-            else
-            {
-                NetworkPlayer networkPlayer = new NetworkPlayer(senderGuid);
-                AddNetworkPlayer(networkPlayer);
-                networkPlayer.OnTopicMessage(topic, data);
-
-                Room room = _rooms.Find(room => room.RoomName == topic);
-                room?.OnTopicMessage(topic, data);
-            }
+            Room room = _rooms.Find(room => room.RoomName == topic);
+            room?.OnTopicMessage(senderGuid, topic, data);
         }
-        
-        private void AddNetworkPlayer(NetworkPlayer networkPlayer)
+
+        internal void AddNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            _networkPlayers.Add(networkPlayer);
-            _guidToNetworkPlayers[networkPlayer.Guid] = networkPlayer;
             _networkListener.OnPlayerAdded(networkPlayer);
         }
 
-        private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
+        internal void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            _networkPlayers.Remove(networkPlayer);
-            _guidToNetworkPlayers.Remove(networkPlayer.Guid);
             _networkListener.OnPlayerRemoved(networkPlayer);
         }
     }
