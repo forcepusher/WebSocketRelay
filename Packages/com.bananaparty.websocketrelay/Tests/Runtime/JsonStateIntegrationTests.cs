@@ -1,6 +1,4 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Text;
 using NUnit.Framework;
 using UnityEngine;
@@ -85,43 +83,25 @@ namespace BananaParty.WebSocketRelay.Tests
             UnityEngine.Object.DestroyImmediate(clientBObj);
         }
 
-        private class MockGameState : MonoBehaviour, IState
+        private class MockGameState : MonoBehaviour, INetworkIdentity
         {
-            private IntegerState _playTimeState = new("PlayTime", 0);
-            private FloatState _healthState = new("Health", 0f);
-            private Vector3State _positionState = new("Position", Vector3.zero);
-            private List<IState> _states;
+            public int PlayTime { get; set; }
+            public float Health { get; set; }
+            public Vector3 Position { get; set; }
 
-            private List<IState> StatesList => _states ??= new List<IState>
+            public void WriteState(IStateOutput stateOutput)
             {
-                _playTimeState,
-                _healthState,
-                _positionState
-            };
-
-            public int PlayTime
-            {
-                get => _playTimeState.Value;
-                set => _playTimeState.Value = value;
+                stateOutput.WriteInt(nameof(PlayTime), PlayTime);
+                stateOutput.WriteFloat(nameof(Health), Health);
+                stateOutput.WriteVector3(nameof(Position), Position);
             }
 
-            public float Health
+            public void ReadState(IStateInput stateInput)
             {
-                get => _healthState.Value;
-                set => _healthState.Value = value;
+                PlayTime = stateInput.ReadInt(nameof(PlayTime));
+                Health = stateInput.ReadFloat(nameof(Health));
+                Position = stateInput.ReadVector3(nameof(Position));
             }
-
-            public Vector3 Position
-            {
-                get => _positionState.Value;
-                set => _positionState.Value = value;
-            }
-
-            public string StateName => "MockGameState";
-
-            public void WriteState(IStateOutput stateOutput) => stateOutput.WriteObject(StateName, StatesList);
-
-            public void ReadState(IStateInput stateInput) => stateInput.ReadObject(StateName, StatesList);
         }
     }
 }
