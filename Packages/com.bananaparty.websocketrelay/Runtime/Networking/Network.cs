@@ -103,7 +103,7 @@ namespace BananaParty.WebSocketRelay
             else
             {
                 NetworkPlayer networkPlayer = new NetworkPlayer(senderGuid);
-                _guidToNetworkPlayers[senderGuid] = networkPlayer;
+                AddNetworkPlayer(networkPlayer);
                 networkPlayer.OnTopicMessage(topic, data);
             }
         }
