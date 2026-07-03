@@ -31,6 +31,8 @@ namespace BananaParty.WebSocketRelay.Tests
             stateA.PlayTime = 10;
             stateA.Health = 80f;
             stateA.Position = new Vector3(1, 2, 3);
+            stateA.HasAuthority = true;
+            stateB.HasAuthority = false;
 
             TestRelayListener listenerA = new();
             TestRelayListener listenerB = new();
@@ -85,6 +87,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private class MockGameState : MonoBehaviour, INetworkIdentity
         {
+            public bool HasAuthority { get; set; }
             public int PlayTime { get; set; }
             public float Health { get; set; }
             public Vector3 Position { get; set; }
