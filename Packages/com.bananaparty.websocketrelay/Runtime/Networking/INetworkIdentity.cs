@@ -2,8 +2,8 @@ namespace BananaParty.WebSocketRelay
 {
     public interface INetworkIdentity
     {
-        public bool HasAuthority { get; set; }
-        public void WriteState(IStateOutput stateOutput);
-        public void ReadState(IStateInput stateInput);
+        bool HasAuthority { get; set; }
+        void WriteState(IStateOutput stateOutput);
+        void ReadState(IStateInput stateInput);
     }
 }

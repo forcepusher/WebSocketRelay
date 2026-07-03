@@ -52,7 +52,6 @@ namespace BananaParty.WebSocketRelay.Samples
         {
             stateOutput.WriteFloat(nameof(_health), _health);
             stateOutput.WriteVector3(nameof(_position), _position);
-
         }
 
         public void ReadState(IStateInput stateInput)
