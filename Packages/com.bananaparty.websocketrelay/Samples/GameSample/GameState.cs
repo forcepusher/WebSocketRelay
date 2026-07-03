@@ -17,6 +17,7 @@ namespace BananaParty.WebSocketRelay.Samples
         private StaticArrayState<ItemSpawn> _itemSpawnsState;
 
         private Network _network;
+        private Room _room;
 
         private IntegerState _playTimeState = new(nameof(_playTimeState), 0);
 
@@ -47,6 +48,16 @@ namespace BananaParty.WebSocketRelay.Samples
         private void Update()
         {
             _network.ManualUpdate(Time.unscaledDeltaTime);
+
+            if (_room != null)
+            {
+                if (_room.HasUnreadPayloadQueue)
+                {
+                    byte[] payload = _room.ReadPayloadQueue();
+                    string payloadString = UTF8Encoding.UTF8.GetString(payload);
+                    Debug.Log(payloadString);
+                }
+            }
         }
 
         public string StateName => transform.name;
@@ -68,16 +79,18 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void OnConnectedToRoom(Room room)
         {
+            _room = room;
+
             var jsonStateOutput = new JsonStateOutput();
             WriteState(jsonStateOutput);
-            Debug.Log(jsonStateOutput.ToString());
+            //Debug.Log(jsonStateOutput.ToString());
 
             room.Send(UTF8Encoding.UTF8.GetBytes(jsonStateOutput.ToString()));
         }
 
         public void OnDisconnectedFromRoom(Room room)
         {
-
+            _room = null;
         }
 
         public void OnPlayerAdded(NetworkPlayer networkPlayer)
@@ -89,5 +102,7 @@ namespace BananaParty.WebSocketRelay.Samples
         {
 
         }
+
+
     }
 }
