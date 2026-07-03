@@ -18,7 +18,7 @@ namespace BananaParty.WebSocketRelay
 
         private readonly List<Room> _rooms = new();
 
-        public readonly EventHub<EmptyEventPayload> ConnectedToRelayEventHub = new();
+        public readonly EventHub<Guid> ConnectedToRelayEventHub = new();
         public readonly EventHub<EmptyEventPayload> DisconnectedFromRelayEventHub = new();
 
         public readonly EventHub<NetworkPlayer> NetworkPlayerAddedEventHub = new();
@@ -98,7 +98,7 @@ namespace BananaParty.WebSocketRelay
 
         public void OnConnectedToRelay(Guid clientGuid)
         {
-            ConnectedToRelayEventHub.Broadcast(new EmptyEventPayload());
+            ConnectedToRelayEventHub.Broadcast(clientGuid);
         }
 
         public void OnSubscribedToTopic(string topic)
