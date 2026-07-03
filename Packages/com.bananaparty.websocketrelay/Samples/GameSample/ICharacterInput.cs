@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
-    public interface IICharacterInput
+    public interface ICharacterInput
     {
         void PollInput();
 

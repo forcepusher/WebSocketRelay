@@ -3,7 +3,7 @@ using UnityEngine.InputSystem;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
-    public class KeyboardCharacterInput : MonoBehaviour, IICharacterInput
+    public class KeyboardCharacterInput : MonoBehaviour, ICharacterInput
     {
         public Vector2 MovementInput { get; private set; } = Vector2.zero;
 

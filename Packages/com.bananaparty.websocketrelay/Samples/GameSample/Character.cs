@@ -15,7 +15,7 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField] private float jumpHeight = 2f;
 
         private CharacterController _characteController;
-        private IICharacterInput _characterInput;
+        private ICharacterInput _characterInput;
 
         private float _verticalVelocity;
 
@@ -28,7 +28,7 @@ namespace BananaParty.WebSocketRelay.Samples
         {
             _characteController = GetComponent<CharacterController>();
 
-            _characterInput = GetComponent<IICharacterInput>();
+            _characterInput = GetComponent<ICharacterInput>();
         }
 
         private void OnEnable()
