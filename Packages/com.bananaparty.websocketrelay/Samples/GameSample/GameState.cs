@@ -19,8 +19,6 @@ namespace BananaParty.WebSocketRelay.Samples
         private Network _network;
         private Room _room;
 
-        private IntegerState _playTimeState = new(nameof(_playTimeState), 0);
-
         private List<IState> _states;
 
         private void Awake()
