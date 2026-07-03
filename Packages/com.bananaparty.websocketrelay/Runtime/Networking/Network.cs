@@ -5,8 +5,11 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class Network : IRelayListener, IDisposable
+    public class Network : MonoBehaviour, IRelayListener, IDisposable
     {
+        [SerializeField]
+        private NetworkContext _networkContext;
+
         private readonly INetworkListener _networkListener;
         private readonly string _serverAddress;
 
@@ -63,12 +66,12 @@ namespace BananaParty.WebSocketRelay
             Debug.Log("Disconnected from relay server.");
         }
 
-        public void ManualUpdate(float deltaTime)
+        private void Update()
         {
             _relayClient?.ProcessIncomingMessages();
 
             foreach (Room room in _rooms)
-                room.ManualUpdate(deltaTime);
+                room.ManualUpdate(Time.unscaledDeltaTime);
         }
 
         public void Send(string topic, byte[] data)

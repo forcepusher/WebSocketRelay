@@ -8,6 +8,8 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField]
         NetworkContext _networkContext;
 
+        public string Name => nameof(Character);
+
         public bool HasAuthority { get; set; }
 
         [SerializeField] private float moveSpeed = 5f;

@@ -6,13 +6,10 @@ namespace BananaParty.WebSocketRelay.Samples
 {
     public class GameState : MonoBehaviour, INetworkListener
     {
+        [SerializeField]
         private Network _network;
-        private Room _room;
 
-        private void Awake()
-        {
-            _network = new(this, "ws://127.0.0.1:23144");
-        }
+        private Room _room;
 
         private void Start()
         {
