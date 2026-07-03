@@ -120,12 +120,12 @@ namespace BananaParty.WebSocketRelay
 
         internal void AddNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            _networkListener.OnPlayerAdded(networkPlayer);
+            _networkListener.OnRoomPlayerAdded(networkPlayer);
         }
 
         internal void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            _networkListener.OnPlayerRemoved(networkPlayer);
+            _networkListener.OnRoomPlayerRemoved(networkPlayer);
         }
     }
 }

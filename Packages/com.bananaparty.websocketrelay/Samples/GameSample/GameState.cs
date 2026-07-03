@@ -93,12 +93,12 @@ namespace BananaParty.WebSocketRelay.Samples
             _room = null;
         }
 
-        public void OnPlayerAdded(NetworkPlayer networkPlayer)
+        public void OnRoomPlayerAdded(NetworkPlayer networkPlayer)
         {
 
         }
 
-        public void OnPlayerRemoved(NetworkPlayer networkPlayer)
+        public void OnRoomPlayerRemoved(NetworkPlayer networkPlayer)
         {
 
         }

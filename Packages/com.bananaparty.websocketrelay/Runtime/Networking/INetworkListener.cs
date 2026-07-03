@@ -9,7 +9,7 @@ namespace BananaParty.WebSocketRelay.Transport
         void OnConnectedToRoom(Room room);
         void OnDisconnectedFromRoom(Room room);
 
-        void OnPlayerAdded(NetworkPlayer networkPlayer);
-        void OnPlayerRemoved(NetworkPlayer networkPlayer);
+        void OnRoomPlayerAdded(NetworkPlayer networkPlayer);
+        void OnRoomPlayerRemoved(NetworkPlayer networkPlayer);
     }
 }
