@@ -10,7 +10,7 @@ namespace BananaParty.WebSocketRelay.Transport
     public class RelayServerProcess
     {
         private const string ProcessMarker = "-relay-server";
-        private const string UnityPackageEntry = "com.bananaparty.websocketrelay/Runtime/Server/Source/index.ts";
+        private const string UnityPackageEntry = "com.bananaparty.websocketrelay/Runtime/Server~/Source/index.ts";
         private const string StandaloneEntry = "Source/index.ts";
 
         private Process _process;
