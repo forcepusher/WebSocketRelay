@@ -9,10 +9,57 @@ namespace BananaParty.WebSocketRelay
     {
         private readonly string _jsonString;
         private int _position;
+        private bool _hasStarted;
+        private readonly Stack<bool> _arrayFirstItemScopes = new();
 
         public JsonStateInput(string json)
         {
             _jsonString = json ?? "{}";
+        }
+
+        public void BeginArrayProperty(string name)
+        {
+            AdvanceToEntry(name);
+            ReadArrayOpen();
+            _arrayFirstItemScopes.Push(true);
+        }
+
+        public void BeginArrayElement()
+        {
+            SkipWhitespace();
+            if (!_hasStarted)
+            {
+                ExpectCharacter('[');
+                _hasStarted = true;
+            }
+
+            _arrayFirstItemScopes.Push(true);
+        }
+
+        public void EndArray()
+        {
+            SkipWhitespace();
+            ExpectCharacter(']');
+
+            if (_arrayFirstItemScopes.Count > 0)
+                _arrayFirstItemScopes.Pop();
+        }
+
+        public void BeginObjectProperty(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+        }
+
+        public void BeginObjectElement()
+        {
+            SkipArrayElementSeparator();
+            ReadObjectOpen();
+        }
+
+        public void EndObject()
+        {
+            ReadObjectClose();
         }
 
         public string ReadString(string name)
@@ -155,17 +202,45 @@ namespace BananaParty.WebSocketRelay
         private void ReadObjectOpen()
         {
             SkipWhitespace();
-            if (_position >= _jsonString.Length || _jsonString[_position] != '{')
-                throw new InvalidOperationException("Expected JSON object value.");
+            ExpectCharacter('{');
+        }
 
-            _position++;
+        private void ReadArrayOpen()
+        {
+            SkipWhitespace();
+            ExpectCharacter('[');
         }
 
         private void ReadObjectClose()
         {
             SkipWhitespace();
-            if (_position < _jsonString.Length && _jsonString[_position] == '}')
-                _position++;
+            ExpectCharacter('}');
+        }
+
+        private void SkipArrayElementSeparator()
+        {
+            if (_arrayFirstItemScopes.Count == 0)
+                return;
+
+            bool isFirst = _arrayFirstItemScopes.Pop();
+            if (!isFirst)
+            {
+                SkipWhitespace();
+                ExpectCharacter(',');
+                SkipWhitespace();
+            }
+
+            _arrayFirstItemScopes.Push(false);
+        }
+
+        private void ExpectCharacter(char expected)
+        {
+            SkipWhitespace();
+
+            if (_position >= _jsonString.Length || _jsonString[_position] != expected)
+                throw new InvalidOperationException($"Expected JSON '{expected}' at position {_position}.");
+
+            _position++;
         }
 
         private float ReadObjectComponentFloat(string componentName)

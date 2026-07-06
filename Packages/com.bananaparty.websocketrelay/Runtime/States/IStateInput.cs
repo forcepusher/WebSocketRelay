@@ -5,6 +5,12 @@ namespace BananaParty.WebSocketRelay
 {
     public interface IStateInput
     {
+        void BeginArrayProperty(string name);
+        void BeginArrayElement();
+        void EndArray();
+        void BeginObjectProperty(string name);
+        void BeginObjectElement();
+        void EndObject();
         byte ReadByte(string name);
         int ReadInt(string name);
         long ReadLong(string name);

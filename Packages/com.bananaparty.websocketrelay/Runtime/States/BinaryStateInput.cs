@@ -93,6 +93,13 @@ namespace BananaParty.WebSocketRelay
             return ReadGuidValue();
         }
 
+        public void BeginArrayProperty(string name) { }
+        public void BeginArrayElement() { }
+        public void EndArray() { }
+        public void BeginObjectProperty(string name) { }
+        public void BeginObjectElement() { }
+        public void EndObject() { }
+
         private void VerifyEntryName(string expectedName)
         {
             VerifyNameHash(expectedName);

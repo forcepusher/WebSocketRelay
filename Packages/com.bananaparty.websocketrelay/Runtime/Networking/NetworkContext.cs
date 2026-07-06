@@ -24,8 +24,14 @@ namespace BananaParty.WebSocketRelay
 
         public void ReadNetworkStates(IStateInput stateInput)
         {
-            foreach (var networkIdentity in _networkIdentities)
+            stateInput.BeginArrayElement();
+            foreach (INetworkIdentity networkIdentity in _networkIdentities)
+            {
+                stateInput.BeginObjectElement();
                 networkIdentity.ReadNetworkState(stateInput);
+                stateInput.EndObject();
+            }
+            stateInput.EndArray();
         }
 
         public void WriteNetworkStates(IStateOutput stateOutput)

@@ -38,8 +38,18 @@ namespace BananaParty.WebSocketRelay
             NetworkIdentifier = stateInput.ReadGuid(nameof(NetworkIdentifier));
             NetworkOwner = stateInput.ReadGuid(nameof(NetworkOwner));
 
-            foreach (var networkState in _networkStates)
+            stateInput.BeginArrayProperty("NetworkStates");
+            foreach (INetworkState networkState in _networkStates)
+            {
+                stateInput.BeginObjectElement();
+                string stateName = stateInput.ReadString("StateName");
+                if (stateName != networkState.NetworkStateName)
+                    throw new InvalidOperationException($"Expected network state '{networkState.NetworkStateName}' but found '{stateName}'.");
+
                 networkState.ReadNetworkState(stateInput);
+                stateInput.EndObject();
+            }
+            stateInput.EndArray();
         }
 
         public void WriteNetworkState(IStateOutput stateOutput)
