@@ -3,12 +3,9 @@ using UnityEngine;
 namespace BananaParty.WebSocketRelay.Samples
 {
     [RequireComponent(typeof(CharacterController))]
-    public class Character : MonoBehaviour, INetworkIdentity
+    public class Character : MonoBehaviour, INetworkState
     {
-        [SerializeField]
-        NetworkContext _networkContext;
-
-        public string Name => nameof(Character);
+        public string StateName => nameof(Character);
 
         public bool HasAuthority { get; set; }
 
@@ -31,16 +28,6 @@ namespace BananaParty.WebSocketRelay.Samples
             _characteController = GetComponent<CharacterController>();
 
             _characterInput = GetComponent<ICharacterInput>();
-        }
-
-        private void OnEnable()
-        {
-            _networkContext.RegisterNetworkIdentity(this);
-        }
-
-        private void OnDisable()
-        {
-            _networkContext.UnregisterNetworkIdentity(this);
         }
 
         private void Update()

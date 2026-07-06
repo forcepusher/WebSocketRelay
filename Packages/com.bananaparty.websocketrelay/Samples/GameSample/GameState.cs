@@ -18,11 +18,6 @@ namespace BananaParty.WebSocketRelay.Samples
             //Debug.Log(jsonStateOutput.ToString());
         }
 
-        private void Update()
-        {
-            _network.ManualUpdate(Time.unscaledDeltaTime);
-        }
-
         public void OnConnectedToRelay(Guid clientGuid)
         {
             _network.JoinRoom("game-room");

@@ -2,13 +2,10 @@ using System;
 
 namespace BananaParty.WebSocketRelay
 {
-    public interface INetworkIdentity
+    public interface INetworkIdentity : INetworkState
     {
-        string Name { get; }
-        Guid Identifier { get; set; }
-        Guid Owner { get; set; }
-        bool HasAuthority { get; set; }
-        void WriteState(IStateOutput stateOutput);
-        void ReadState(IStateInput stateInput);
+        Guid NetworkIdentifier { get; set; }
+        Guid NetworkOwner { get; set; }
+        bool NetworkHasAuthority { get; set; }
     }
 }
