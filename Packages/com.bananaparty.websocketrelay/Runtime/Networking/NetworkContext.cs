@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,6 +7,8 @@ namespace BananaParty.WebSocketRelay
     [CreateAssetMenu]
     public class NetworkContext : ScriptableObject, INetworkContext
     {
+        public Guid LocalClientIdentity { get; set; }
+
         private readonly List<INetworkIdentity> _networkIdentities = new();
 
         public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
