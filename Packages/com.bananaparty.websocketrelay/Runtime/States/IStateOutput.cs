@@ -10,8 +10,8 @@ namespace BananaParty.WebSocketRelay
     {
         public interface IStateOutput
         {
-            void WriteObject(ObjectStateNode node);
-            void WriteArray(ArrayStateNode node);
+            void WriteObject(string name, ObjectState state);
+            void WriteArray(string name, ArrayState node);
             void WriteByte(string name, byte value);
             void WriteInt(string name, int value);
             void WriteLong(string name, long value);
