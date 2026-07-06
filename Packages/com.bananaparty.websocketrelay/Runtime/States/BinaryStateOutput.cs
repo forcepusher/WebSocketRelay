@@ -34,10 +34,10 @@ namespace BananaParty.WebSocketRelay
 
         public void EndArray()
         {
-            if (_scopes.Count == 0 || _scopes.Peek() is not NetworkStatesWriteScope networkStatesScope)
+            if (_scopes.Count == 0)
                 throw new InvalidOperationException("EndArray called without matching BeginArrayProperty.");
 
-            networkStatesScope.WriteTo(_activeWriter);
+            _scopes.Peek().EndArray(this);
             _scopes.Pop();
         }
 
@@ -46,12 +46,7 @@ namespace BananaParty.WebSocketRelay
             if (!Guid.TryParse(name, out Guid identityId))
                 throw new NotSupportedException($"Binary object property '{name}' is not supported.");
 
-            if (_scopes.Peek() is not IdentityMapWriteScope parentIdentityMapScope)
-                throw new InvalidOperationException("Identity payload must be written inside an identity map.");
-
-            IdentityPayloadWriteScope identityScope = new(identityId, parentIdentityMapScope);
-            _scopes.Push(identityScope);
-            _activeWriter = identityScope.Writer;
+            _scopes.Peek().BeginIdentityPayload(this, identityId);
         }
 
         public void BeginObjectElement()
@@ -62,11 +57,7 @@ namespace BananaParty.WebSocketRelay
                 return;
             }
 
-            if (_scopes.Peek() is not NetworkStatesWriteScope networkStatesScope)
-                throw new InvalidOperationException("BeginObjectElement called outside of a network states array.");
-
-            networkStatesScope.BeginState();
-            _activeWriter = networkStatesScope.ActiveStateWriter;
+            _scopes.Peek().BeginObjectElement(this);
         }
 
         public void EndObject()
@@ -74,32 +65,7 @@ namespace BananaParty.WebSocketRelay
             if (_scopes.Count == 0)
                 throw new InvalidOperationException("EndObject called without matching BeginObjectElement.");
 
-            IBinaryWriteScope scope = _scopes.Peek();
-
-            if (scope is NetworkStatesWriteScope networkStatesScope && networkStatesScope.HasActiveState)
-            {
-                networkStatesScope.EndState();
-                _activeWriter = GetIdentityWriter();
-                return;
-            }
-
-            if (scope is IdentityPayloadWriteScope identityPayloadScope)
-            {
-                identityPayloadScope.ParentMap.AddIdentity(identityPayloadScope.IdentityId, identityPayloadScope.ToArray());
-                _scopes.Pop();
-                _activeWriter = _rootWriter;
-                return;
-            }
-
-            if (scope is IdentityMapWriteScope identityMapScope)
-            {
-                identityMapScope.WriteTo(_rootWriter);
-                _scopes.Pop();
-                _activeWriter = _rootWriter;
-                return;
-            }
-
-            throw new InvalidOperationException("EndObject called in an invalid binary write scope.");
+            _scopes.Peek().EndObject(this);
         }
 
         public void WriteByte(string name, byte value) => WriteEntry(name, value);
@@ -169,11 +135,198 @@ namespace BananaParty.WebSocketRelay
         {
             foreach (IBinaryWriteScope scope in _scopes)
             {
-                if (scope is IdentityPayloadWriteScope identityPayloadScope)
-                    return identityPayloadScope.Writer;
+                BinaryWriter identityWriter = scope.IdentityWriter;
+                if (identityWriter != null)
+                    return identityWriter;
             }
 
             return _rootWriter;
+        }
+
+        private void SetActiveWriter(BinaryWriter writer) => _activeWriter = writer;
+
+        private void PopScope() => _scopes.Pop();
+
+        private void PushScope(IBinaryWriteScope scope) => _scopes.Push(scope);
+
+        private interface IBinaryWriteScope
+        {
+            BinaryWriter IdentityWriter { get; }
+
+            void BeginIdentityPayload(BinaryStateOutput output, Guid identityId);
+
+            void BeginObjectElement(BinaryStateOutput output);
+
+            void EndObject(BinaryStateOutput output);
+
+            void EndArray(BinaryStateOutput output);
+        }
+
+        private sealed class IdentityMapWriteScope : IBinaryWriteScope
+        {
+            private readonly List<IdentityEntry> _entries = new();
+
+            public BinaryWriter IdentityWriter => null;
+
+            public void BeginIdentityPayload(BinaryStateOutput output, Guid identityId)
+            {
+                IdentityPayloadWriteScope identityScope = new(identityId, this);
+                output.PushScope(identityScope);
+                output.SetActiveWriter(identityScope.Writer);
+            }
+
+            public void BeginObjectElement(BinaryStateOutput output)
+            {
+                throw new InvalidOperationException("BeginObjectElement called outside of a network states array.");
+            }
+
+            public void EndObject(BinaryStateOutput output)
+            {
+                WriteTo(output._rootWriter);
+                output.PopScope();
+                output.SetActiveWriter(output._rootWriter);
+            }
+
+            public void EndArray(BinaryStateOutput output)
+            {
+                throw new InvalidOperationException("EndArray called without matching BeginArrayProperty.");
+            }
+
+            public void AddIdentity(Guid identityId, byte[] payload)
+            {
+                _entries.Add(new IdentityEntry(identityId, payload));
+            }
+
+            private void WriteTo(BinaryWriter writer)
+            {
+                writer.Write(_entries.Count);
+                foreach (IdentityEntry entry in _entries)
+                {
+                    writer.Write(entry.IdentityId.ToByteArray());
+                    writer.Write(entry.Payload.Length);
+                    writer.Write(entry.Payload);
+                }
+            }
+
+            private readonly struct IdentityEntry
+            {
+                public IdentityEntry(Guid identityId, byte[] payload)
+                {
+                    IdentityId = identityId;
+                    Payload = payload;
+                }
+
+                public Guid IdentityId { get; }
+                public byte[] Payload { get; }
+            }
+        }
+
+        private sealed class IdentityPayloadWriteScope : IBinaryWriteScope
+        {
+            private readonly MemoryStream _stream = new();
+            private readonly BinaryWriter _writer;
+
+            public IdentityPayloadWriteScope(Guid identityId, IdentityMapWriteScope parentMap)
+            {
+                IdentityId = identityId;
+                ParentMap = parentMap;
+                _writer = new BinaryWriter(_stream, Encoding.UTF8, leaveOpen: true);
+            }
+
+            public Guid IdentityId { get; }
+            public IdentityMapWriteScope ParentMap { get; }
+            public BinaryWriter Writer => _writer;
+            public BinaryWriter IdentityWriter => Writer;
+
+            public void BeginIdentityPayload(BinaryStateOutput output, Guid identityId)
+            {
+                throw new InvalidOperationException("Identity payload must be written inside an identity map.");
+            }
+
+            public void BeginObjectElement(BinaryStateOutput output)
+            {
+                throw new InvalidOperationException("BeginObjectElement called outside of a network states array.");
+            }
+
+            public void EndObject(BinaryStateOutput output)
+            {
+                ParentMap.AddIdentity(IdentityId, ToArray());
+                output.PopScope();
+                output.SetActiveWriter(output._rootWriter);
+            }
+
+            public void EndArray(BinaryStateOutput output)
+            {
+                throw new InvalidOperationException("EndArray called without matching BeginArrayProperty.");
+            }
+
+            private byte[] ToArray() => _stream.ToArray();
+        }
+
+        private sealed class NetworkStatesWriteScope : IBinaryWriteScope
+        {
+            private readonly int _propertyHash;
+            private readonly List<byte[]> _statePayloads = new();
+            private MemoryStream _activeStateStream;
+            private BinaryWriter _activeStateWriter;
+
+            public NetworkStatesWriteScope(int propertyHash)
+            {
+                _propertyHash = propertyHash;
+            }
+
+            public BinaryWriter IdentityWriter => null;
+
+            public void BeginIdentityPayload(BinaryStateOutput output, Guid identityId)
+            {
+                throw new InvalidOperationException("Identity payload must be written inside an identity map.");
+            }
+
+            public void BeginObjectElement(BinaryStateOutput output)
+            {
+                BeginState();
+                output.SetActiveWriter(_activeStateWriter);
+            }
+
+            public void EndObject(BinaryStateOutput output)
+            {
+                if (_activeStateStream == null)
+                    throw new InvalidOperationException("EndObject called in an invalid binary write scope.");
+
+                EndState();
+                output.SetActiveWriter(output.GetIdentityWriter());
+            }
+
+            public void EndArray(BinaryStateOutput output)
+            {
+                WriteTo(output._activeWriter);
+            }
+
+            private void BeginState()
+            {
+                _activeStateStream = new MemoryStream();
+                _activeStateWriter = new BinaryWriter(_activeStateStream, Encoding.UTF8, leaveOpen: true);
+            }
+
+            private void EndState()
+            {
+                _activeStateWriter.Dispose();
+                _statePayloads.Add(_activeStateStream.ToArray());
+                _activeStateStream.Dispose();
+                _activeStateStream = null;
+                _activeStateWriter = null;
+            }
+
+            private void WriteTo(BinaryWriter writer)
+            {
+                writer.Write(_propertyHash);
+                writer.Write(_statePayloads.Count);
+                foreach (byte[] statePayload in _statePayloads)
+                {
+                    writer.Write(statePayload.Length);
+                    writer.Write(statePayload);
+                }
+            }
         }
 
         private void WriteEntry(string name, byte value)
@@ -229,103 +382,6 @@ namespace BananaParty.WebSocketRelay
         private void WriteNameHash(string name)
         {
             _activeWriter.Write(Hash.StringToInt(name));
-        }
-
-        private interface IBinaryWriteScope { }
-
-        private sealed class IdentityMapWriteScope : IBinaryWriteScope
-        {
-            private readonly List<IdentityEntry> _entries = new();
-
-            public void AddIdentity(Guid identityId, byte[] payload)
-            {
-                _entries.Add(new IdentityEntry(identityId, payload));
-            }
-
-            public void WriteTo(BinaryWriter writer)
-            {
-                writer.Write(_entries.Count);
-                foreach (IdentityEntry entry in _entries)
-                {
-                    writer.Write(entry.IdentityId.ToByteArray());
-                    writer.Write(entry.Payload.Length);
-                    writer.Write(entry.Payload);
-                }
-            }
-
-            private readonly struct IdentityEntry
-            {
-                public IdentityEntry(Guid identityId, byte[] payload)
-                {
-                    IdentityId = identityId;
-                    Payload = payload;
-                }
-
-                public Guid IdentityId { get; }
-                public byte[] Payload { get; }
-            }
-        }
-
-        private sealed class IdentityPayloadWriteScope : IBinaryWriteScope
-        {
-            private readonly MemoryStream _stream = new();
-            private readonly BinaryWriter _writer;
-
-            public IdentityPayloadWriteScope(Guid identityId, IdentityMapWriteScope parentMap)
-            {
-                IdentityId = identityId;
-                ParentMap = parentMap;
-                _writer = new BinaryWriter(_stream, Encoding.UTF8, leaveOpen: true);
-            }
-
-            public Guid IdentityId { get; }
-            public IdentityMapWriteScope ParentMap { get; }
-            public BinaryWriter Writer => _writer;
-
-            public byte[] ToArray() => _stream.ToArray();
-        }
-
-        private sealed class NetworkStatesWriteScope : IBinaryWriteScope
-        {
-            private readonly int _propertyHash;
-            private readonly List<byte[]> _statePayloads = new();
-            private MemoryStream _activeStateStream;
-            private BinaryWriter _activeStateWriter;
-
-            public NetworkStatesWriteScope(int propertyHash)
-            {
-                _propertyHash = propertyHash;
-            }
-
-            public bool HasActiveState => _activeStateStream != null;
-
-            public BinaryWriter ActiveStateWriter => _activeStateWriter;
-
-            public void BeginState()
-            {
-                _activeStateStream = new MemoryStream();
-                _activeStateWriter = new BinaryWriter(_activeStateStream, Encoding.UTF8, leaveOpen: true);
-            }
-
-            public void EndState()
-            {
-                _activeStateWriter.Dispose();
-                _statePayloads.Add(_activeStateStream.ToArray());
-                _activeStateStream.Dispose();
-                _activeStateStream = null;
-                _activeStateWriter = null;
-            }
-
-            public void WriteTo(BinaryWriter writer)
-            {
-                writer.Write(_propertyHash);
-                writer.Write(_statePayloads.Count);
-                foreach (byte[] statePayload in _statePayloads)
-                {
-                    writer.Write(statePayload.Length);
-                    writer.Write(statePayload);
-                }
-            }
         }
     }
 }
