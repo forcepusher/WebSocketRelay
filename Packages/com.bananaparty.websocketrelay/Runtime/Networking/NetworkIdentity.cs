@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
@@ -8,12 +9,11 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         NetworkContext _networkContext;
 
-        public Guid NetworkIdentifier { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        public Guid NetworkOwner { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        public bool NetworkHasAuthority { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        private List<INetworkState> _networkStates = new();
 
-        public void ReadState(IStateInput stateInput) => throw new NotImplementedException();
-        public void WriteState(IStateOutput stateOutput) => throw new NotImplementedException();
+        public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
+        public Guid NetworkOwner { get; set; } = Guid.NewGuid();
+        public bool NetworkHasAuthority { get; set; } = false;
 
         private void OnEnable()
         {
@@ -24,5 +24,20 @@ namespace BananaParty.WebSocketRelay
         {
             _networkContext.UnregisterNetworkIdentity(this);
         }
+
+        private void Awake()
+        {
+            _networkStates.AddRange(GetComponents<INetworkState>());
+
+            foreach (var networkState in _networkStates)
+            {
+                Debug.Log(networkState.StateName);
+            }
+        }
+
+        public string StateName => nameof(NetworkIdentity);
+
+        public void ReadState(IStateInput stateInput) => throw new NotImplementedException();
+        public void WriteState(IStateOutput stateOutput) => throw new NotImplementedException();
     }
 }

@@ -86,8 +86,9 @@ namespace BananaParty.WebSocketRelay.Tests
             UnityEngine.Object.DestroyImmediate(clientBObj);
         }
 
-        private class MockGameState : MonoBehaviour, INetworkIdentity
+        private class MockGameState : MonoBehaviour, INetworkIdentity, INetworkState
         {
+            public string StateName => nameof(MockGameState);
             public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
             public Guid NetworkOwner { get; set; } = Guid.NewGuid();
             public bool NetworkHasAuthority { get; set; }
