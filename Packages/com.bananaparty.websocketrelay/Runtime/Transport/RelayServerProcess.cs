@@ -24,7 +24,7 @@ namespace BananaParty.WebSocketRelay.Transport
                 "Packages",
                 "com.bananaparty.websocketrelay",
                 "Runtime",
-                "Server"));
+                "Server~"));
 
         public static void KillAllRelayServers() => KillAll();
 
