@@ -141,6 +141,9 @@ namespace BananaParty.WebSocketRelay
         {
             SkipItemSeparator();
 
+            if (_position < _jsonString.Length && _jsonString[_position] == '{')
+                _position++;
+
             string entryName = ReadQuotedString();
             if (!string.IsNullOrEmpty(expectedName) && entryName != expectedName)
                 throw new KeyNotFoundException($"Expected field '{expectedName}' but found '{entryName ?? "null"}' in JSON state.");

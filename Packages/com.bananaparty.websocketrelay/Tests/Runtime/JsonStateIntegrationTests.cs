@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Text;
 using NUnit.Framework;
@@ -87,6 +88,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private class MockGameState : MonoBehaviour, INetworkIdentity
         {
+            public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
+            public Guid NetworkOwner { get; set; } = Guid.NewGuid();
             public bool NetworkHasAuthority { get; set; }
             public int PlayTime { get; set; }
             public float Health { get; set; }
