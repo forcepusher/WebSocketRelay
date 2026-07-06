@@ -10,6 +10,7 @@ namespace BananaParty.WebSocketRelay
 
         public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
         {
+            Debug.Log("Added " + networkIdentity.NetworkStateName + " to network context");
             _networkIdentities.Add(networkIdentity);
         }
 
@@ -18,10 +19,19 @@ namespace BananaParty.WebSocketRelay
             _networkIdentities.Remove(networkIdentity);
         }
 
+        public void ReadStates(IStateInput stateInput)
+        {
+            foreach (var networkIdentity in _networkIdentities)
+                networkIdentity.ReadNetworkState(stateInput);
+        }
+
         public void WriteStates(IStateOutput stateOutput)
         {
             foreach (var networkIdentity in _networkIdentities)
+            {
+                Debug.Log("Writing state for " + networkIdentity.NetworkStateName + " to network context");
                 networkIdentity.WriteNetworkState(stateOutput);
+            }
         }
     }
 }

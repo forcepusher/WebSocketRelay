@@ -39,7 +39,7 @@ namespace BananaParty.WebSocketRelay
 
         public void ReadNetworkState(IStateInput stateInput)
         {
-
+            
         }
 
         public void WriteNetworkState(IStateOutput stateOutput)

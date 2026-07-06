@@ -6,6 +6,8 @@ namespace BananaParty.WebSocketRelay
 
         void UnregisterNetworkIdentity(INetworkIdentity networkIdentity);
 
+        void ReadStates(IStateInput stateInput);
+
         void WriteStates(IStateOutput stateOutput);
     }
 }
