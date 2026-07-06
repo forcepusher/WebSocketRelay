@@ -72,9 +72,18 @@ namespace BananaParty.WebSocketRelay
             WriteObjectEntry(name, $"{{\"x\":{x},\"y\":{y},\"z\":{z},\"w\":{w}}}");
         }
 
-        public void BeginArray()
+        public void BeginArray(string name = null)
         {
             EnsureStarted('[', ']');
+            WriteItemSeparator();
+            if (!string.IsNullOrEmpty(name))
+            {
+                _sb.Append($"\"{name}\":[");
+            }
+            else
+            {
+                _sb.Append("[");
+            }
             _depth++;
             _closers.Push(']');
             _firstItemScopes.Push(true);

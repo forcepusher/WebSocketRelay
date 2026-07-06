@@ -5,7 +5,7 @@ namespace BananaParty.WebSocketRelay
 {
     public interface IStateOutput
     {
-        void BeginArray();
+        void BeginArray(string name = null);
         void EndArray();
         void BeginObject(string name = null);
         void EndObject();
