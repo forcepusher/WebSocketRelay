@@ -65,12 +65,12 @@ namespace BananaParty.WebSocketRelay
             Debug.Log("Disconnected from relay server.");
         }
 
-        public void Update(float deltaTime)
+        public void ManualUpdate(float unscaledDeltaTime)
         {
             _relayClient?.ProcessIncomingMessages();
 
             foreach (Room room in _rooms)
-                room.ManualUpdate(deltaTime);
+                room.ManualUpdate(unscaledDeltaTime);
 
             var jsonStateOutput = new JsonStateOutput();
             _networkContext.WriteStates(jsonStateOutput);

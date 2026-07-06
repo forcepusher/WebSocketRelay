@@ -33,13 +33,13 @@ namespace BananaParty.WebSocketRelay
             _network.Send(RoomName, data);
         }
 
-        public void ManualUpdate(float deltaTime)
+        public void ManualUpdate(float unscaledDeltaTime)
         {
             for (int networkPlayerIndex = _networkPlayers.Count - 1; networkPlayerIndex >= 0; networkPlayerIndex -= 1)
             {
                 NetworkPlayer networkPlayer = _networkPlayers[networkPlayerIndex];
                 Guid playerGuid = networkPlayer.Guid;
-                float timeSinceLastMessage = _timeSinceLastMessageByPlayer[playerGuid] + deltaTime;
+                float timeSinceLastMessage = _timeSinceLastMessageByPlayer[playerGuid] + unscaledDeltaTime;
                 _timeSinceLastMessageByPlayer[playerGuid] = timeSinceLastMessage;
 
                 if (timeSinceLastMessage > ConnectionTimeoutSeconds)

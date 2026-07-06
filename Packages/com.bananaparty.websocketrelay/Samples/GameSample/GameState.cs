@@ -25,7 +25,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Update()
         {
-            _network?.Update(Time.unscaledDeltaTime);
+            _network?.ManualUpdate(Time.unscaledDeltaTime);
         }
 
         public void OnConnectedToRelay(Guid clientGuid)
