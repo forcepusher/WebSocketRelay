@@ -7,7 +7,7 @@ namespace BananaParty.WebSocketRelay
     public class NetworkIdentity : MonoBehaviour, INetworkIdentity
     {
         [SerializeField]
-        NetworkContext _networkContext;
+        private NetworkContext _networkContext;
 
         private List<INetworkState> _networkStates = new();
 
