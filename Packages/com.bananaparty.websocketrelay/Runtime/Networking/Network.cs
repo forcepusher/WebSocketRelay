@@ -14,7 +14,7 @@ namespace BananaParty.WebSocketRelay
         private readonly string _serverAddress = "ws://127.0.0.1:23144";
         private Guid _localPlayerGuid;
 
-        public UnityEvent<Guid> OnConnectedToRelayEvent = new();
+        public UnityEvent OnConnectedToRelayEvent = new();
         public UnityEvent<Room> OnConnectedToRoomEvent = new();
         public UnityEvent<Room> OnDisconnectedFromRoomEvent = new();
         public UnityEvent<NetworkPlayer> OnRoomPlayerAddedEvent = new();
@@ -97,7 +97,7 @@ namespace BananaParty.WebSocketRelay
         public void OnConnectedToRelay(Guid clientGuid)
         {
             _localPlayerGuid = clientGuid;
-            OnConnectedToRelayEvent.Invoke(clientGuid);
+            OnConnectedToRelayEvent.Invoke();
         }
 
         public void OnSubscribedToTopic(string topic)
