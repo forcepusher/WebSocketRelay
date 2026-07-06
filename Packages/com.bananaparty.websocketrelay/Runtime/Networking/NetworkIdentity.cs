@@ -35,37 +35,32 @@ namespace BananaParty.WebSocketRelay
 
         public void ReadNetworkState(IStateInput stateInput)
         {
-            NetworkIdentifier = stateInput.ReadGuid(nameof(NetworkIdentifier));
             NetworkOwner = stateInput.ReadGuid(nameof(NetworkOwner));
 
-            stateInput.BeginArrayProperty("NetworkStates");
+            stateInput.BeginObjectProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
             {
-                stateInput.BeginObjectElement();
-                string stateName = stateInput.ReadString("StateName");
-                if (stateName != networkState.NetworkStateName)
-                    throw new InvalidOperationException($"Expected network state '{networkState.NetworkStateName}' but found '{stateName}'.");
+                if (!stateInput.TryBeginObjectProperty(networkState.NetworkStateName))
+                    continue;
 
                 networkState.ReadNetworkState(stateInput);
                 stateInput.EndObject();
             }
-            stateInput.EndArray();
+            stateInput.EndObject();
         }
 
         public void WriteNetworkState(IStateOutput stateOutput)
         {
-            stateOutput.WriteGuid(nameof(NetworkIdentifier), NetworkIdentifier);
             stateOutput.WriteGuid(nameof(NetworkOwner), NetworkOwner);
 
-            stateOutput.BeginArrayProperty("NetworkStates");
-            foreach (var networkState in _networkStates)
+            stateOutput.BeginObjectProperty("NetworkStates");
+            foreach (INetworkState networkState in _networkStates)
             {
-                stateOutput.BeginObjectElement();
-                stateOutput.WriteString("StateName", networkState.NetworkStateName);
+                stateOutput.BeginObjectProperty(networkState.NetworkStateName);
                 networkState.WriteNetworkState(stateOutput);
                 stateOutput.EndObject();
             }
-            stateOutput.EndArray();
+            stateOutput.EndObject();
         }
     }
 }

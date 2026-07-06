@@ -11,6 +11,7 @@ namespace BananaParty.WebSocketRelay
         void BeginObjectProperty(string name);
         void BeginObjectElement();
         void EndObject();
+        bool TryBeginObjectProperty(string key);
         byte ReadByte(string name);
         int ReadInt(string name);
         long ReadLong(string name);

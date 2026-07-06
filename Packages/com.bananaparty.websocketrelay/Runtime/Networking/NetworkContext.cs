@@ -10,40 +10,46 @@ namespace BananaParty.WebSocketRelay
         public Guid LocalClientIdentity { get; set; }
 
         private readonly List<INetworkIdentity> _networkIdentities = new();
+        private readonly Dictionary<Guid, INetworkIdentity> _networkIdentitiesByGuid = new();
 
         public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
         {
             Debug.Log("Added " + networkIdentity.NetworkStateName + " to network context");
             _networkIdentities.Add(networkIdentity);
+            _networkIdentitiesByGuid[networkIdentity.NetworkIdentifier] = networkIdentity;
         }
 
         public void UnregisterNetworkIdentity(INetworkIdentity networkIdentity)
         {
             _networkIdentities.Remove(networkIdentity);
+            _networkIdentitiesByGuid.Remove(networkIdentity.NetworkIdentifier);
         }
 
         public void ReadNetworkStates(IStateInput stateInput)
         {
-            stateInput.BeginArrayElement();
+            stateInput.BeginObjectElement();
             foreach (INetworkIdentity networkIdentity in _networkIdentities)
             {
-                stateInput.BeginObjectElement();
+                string identityKey = networkIdentity.NetworkIdentifier.ToString();
+                if (!stateInput.TryBeginObjectProperty(identityKey))
+                    continue;
+
                 networkIdentity.ReadNetworkState(stateInput);
                 stateInput.EndObject();
             }
-            stateInput.EndArray();
+            stateInput.EndObject();
         }
 
         public void WriteNetworkStates(IStateOutput stateOutput)
         {
-            stateOutput.BeginArrayElement();
-            foreach (var networkIdentity in _networkIdentities)
+            stateOutput.BeginObjectElement();
+            foreach (INetworkIdentity networkIdentity in _networkIdentities)
             {
-                stateOutput.BeginObjectElement();
+                stateOutput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
                 networkIdentity.WriteNetworkState(stateOutput);
                 stateOutput.EndObject();
             }
-            stateOutput.EndArray();
+            stateOutput.EndObject();
         }
     }
 }

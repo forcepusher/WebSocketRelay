@@ -99,6 +99,7 @@ namespace BananaParty.WebSocketRelay
         public void BeginObjectProperty(string name) { }
         public void BeginObjectElement() { }
         public void EndObject() { }
+        public bool TryBeginObjectProperty(string key) => false;
 
         private void VerifyEntryName(string expectedName)
         {

@@ -11,6 +11,7 @@ namespace BananaParty.WebSocketRelay
         private int _position;
         private bool _hasStarted;
         private readonly Stack<bool> _arrayFirstItemScopes = new();
+        private readonly Stack<int> _objectContentStarts = new();
 
         public JsonStateInput(string json)
         {
@@ -53,6 +54,15 @@ namespace BananaParty.WebSocketRelay
 
         public void BeginObjectElement()
         {
+            SkipWhitespace();
+            if (!_hasStarted)
+            {
+                ExpectCharacter('{');
+                _hasStarted = true;
+                _objectContentStarts.Push(_position);
+                return;
+            }
+
             SkipArrayElementSeparator();
             ReadObjectOpen();
         }
@@ -60,6 +70,51 @@ namespace BananaParty.WebSocketRelay
         public void EndObject()
         {
             ReadObjectClose();
+
+            if (_objectContentStarts.Count > 0)
+                _objectContentStarts.Pop();
+        }
+
+        public bool TryBeginObjectProperty(string key)
+        {
+            if (_objectContentStarts.Count == 0)
+                throw new InvalidOperationException("Cannot read keyed object property outside of a JSON object.");
+
+            int searchPosition = _objectContentStarts.Peek();
+            _position = searchPosition;
+
+            while (TryReadPropertyKey(out string propertyKey))
+            {
+                if (string.Equals(propertyKey, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    SkipWhitespace();
+                    ExpectCharacter('{');
+                    _objectContentStarts.Push(_position);
+                    return true;
+                }
+
+                SkipValue();
+            }
+
+            return false;
+        }
+
+        private bool TryReadPropertyKey(out string propertyKey)
+        {
+            propertyKey = null;
+            SkipWhitespace();
+
+            if (_position >= _jsonString.Length || _jsonString[_position] == '}')
+                return false;
+
+            SkipItemSeparator();
+            propertyKey = ReadQuotedString();
+
+            if (propertyKey == null)
+                throw new InvalidOperationException($"Expected quoted property key at position {_position}.");
+
+            SkipColon();
+            return true;
         }
 
         public string ReadString(string name)
@@ -203,6 +258,7 @@ namespace BananaParty.WebSocketRelay
         {
             SkipWhitespace();
             ExpectCharacter('{');
+            _objectContentStarts.Push(_position);
         }
 
         private void ReadArrayOpen()
@@ -265,6 +321,76 @@ namespace BananaParty.WebSocketRelay
 
             SkipColon();
             return ReadIntAtPosition();
+        }
+
+        private void SkipValue()
+        {
+            SkipWhitespace();
+
+            if (_position >= _jsonString.Length)
+                return;
+
+            char current = _jsonString[_position];
+            if (current == '"')
+            {
+                ReadQuotedString();
+                return;
+            }
+
+            if (current == '{')
+            {
+                ReadObjectOpen();
+                SkipObjectContent();
+                ReadObjectClose();
+
+                if (_objectContentStarts.Count > 0)
+                    _objectContentStarts.Pop();
+
+                return;
+            }
+
+            if (current == '[')
+            {
+                ReadArrayOpen();
+                SkipArrayContent();
+                SkipWhitespace();
+                ExpectCharacter(']');
+                return;
+            }
+
+            ReadValueAsString();
+        }
+
+        private void SkipObjectContent()
+        {
+            SkipWhitespace();
+
+            while (_position < _jsonString.Length && _jsonString[_position] != '}')
+            {
+                SkipItemSeparator();
+                ReadQuotedString();
+                SkipColon();
+                SkipValue();
+            }
+        }
+
+        private void SkipArrayContent()
+        {
+            SkipWhitespace();
+            bool isFirst = true;
+
+            while (_position < _jsonString.Length && _jsonString[_position] != ']')
+            {
+                if (!isFirst)
+                {
+                    SkipWhitespace();
+                    ExpectCharacter(',');
+                    SkipWhitespace();
+                }
+
+                isFirst = false;
+                SkipValue();
+            }
         }
 
         private void SkipItemSeparator()

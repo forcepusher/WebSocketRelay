@@ -136,7 +136,12 @@ namespace BananaParty.WebSocketRelay
 
         public void BeginObjectElement()
         {
-            EnsureStarted('{', '}');
+            if (!_hasStarted)
+            {
+                EnsureStarted('{', '}');
+                return;
+            }
+
             WriteItemSeparator();
             _sb.Append('{');
             _depth++;
