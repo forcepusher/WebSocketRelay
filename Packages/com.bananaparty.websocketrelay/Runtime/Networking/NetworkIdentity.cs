@@ -13,7 +13,7 @@ namespace BananaParty.WebSocketRelay
 
         public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
         public Guid NetworkOwner { get; set; } = Guid.NewGuid();
-        public bool NetworkAuthority => false;
+        public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
 
         private void OnEnable()
         {

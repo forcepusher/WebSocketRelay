@@ -101,6 +101,7 @@ namespace BananaParty.WebSocketRelay
         public void OnConnectedToRelay(Guid clientGuid)
         {
             _localPlayerGuid = clientGuid;
+            _networkContext.LocalClientIdentity = clientGuid;
             _networkListener.OnConnectedToRelay(clientGuid);
         }
 
