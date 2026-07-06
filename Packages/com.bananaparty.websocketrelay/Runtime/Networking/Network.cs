@@ -73,7 +73,7 @@ namespace BananaParty.WebSocketRelay
                 room.ManualUpdate(unscaledDeltaTime);
 
             var jsonStateOutput = new JsonStateOutput();
-            _networkContext.WriteStates(jsonStateOutput);
+            _networkContext.WriteNetworkStates(jsonStateOutput);
             Debug.Log(jsonStateOutput.ToString());
         }
 

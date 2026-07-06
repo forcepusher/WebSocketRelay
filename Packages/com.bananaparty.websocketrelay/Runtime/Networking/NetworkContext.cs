@@ -22,19 +22,22 @@ namespace BananaParty.WebSocketRelay
             _networkIdentities.Remove(networkIdentity);
         }
 
-        public void ReadStates(IStateInput stateInput)
+        public void ReadNetworkStates(IStateInput stateInput)
         {
             foreach (var networkIdentity in _networkIdentities)
                 networkIdentity.ReadNetworkState(stateInput);
         }
 
-        public void WriteStates(IStateOutput stateOutput)
+        public void WriteNetworkStates(IStateOutput stateOutput)
         {
+            stateOutput.BeginArray();
             foreach (var networkIdentity in _networkIdentities)
             {
-                Debug.Log("Writing state for " + networkIdentity.NetworkStateName + " to network context");
+                stateOutput.BeginObject();
                 networkIdentity.WriteNetworkState(stateOutput);
+                stateOutput.EndObject();
             }
+            stateOutput.EndArray();
         }
     }
 }
