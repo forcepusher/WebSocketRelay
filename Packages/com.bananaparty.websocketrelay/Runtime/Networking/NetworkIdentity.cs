@@ -46,7 +46,6 @@ namespace BananaParty.WebSocketRelay
         {
             stateOutput.WriteGuid(nameof(NetworkIdentifier), NetworkIdentifier);
             stateOutput.WriteGuid(nameof(NetworkOwner), NetworkOwner);
-            stateOutput.WriteBool(nameof(NetworkAuthority), NetworkAuthority);
 
             stateOutput.BeginArrayProperty("NetworkStates");
             foreach (var networkState in _networkStates)
