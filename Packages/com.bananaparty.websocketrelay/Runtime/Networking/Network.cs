@@ -2,28 +2,28 @@ using System;
 using System.Collections.Generic;
 using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
-using UnityEngine.Events;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class Network : MonoBehaviour, IRelayListener, IDisposable
+    public class Network : IRelayListener, IDisposable
     {
-        [SerializeField]
-        private NetworkContext _networkContext;
+        private readonly NetworkContext _networkContext;
+        private readonly string _serverAddress;
+        private readonly INetworkListener _networkListener;
 
-        private readonly string _serverAddress = "ws://127.0.0.1:23144";
         private Guid _localPlayerGuid;
-
-        public UnityEvent OnConnectedToRelayEvent = new();
-        public UnityEvent<Room> OnConnectedToRoomEvent = new();
-        public UnityEvent<Room> OnDisconnectedFromRoomEvent = new();
-        public UnityEvent<NetworkPlayer> OnRoomPlayerAddedEvent = new();
-        public UnityEvent<NetworkPlayer> OnRoomPlayerRemovedEvent = new();
 
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
 
         private readonly List<Room> _rooms = new();
+
+        public Network(string address, NetworkContext context, INetworkListener listener)
+        {
+            _serverAddress = address;
+            _networkContext = context;
+            _networkListener = listener;
+        }
 
         public void StartServer()
         {
@@ -65,12 +65,12 @@ namespace BananaParty.WebSocketRelay
             Debug.Log("Disconnected from relay server.");
         }
 
-        private void Update()
+        public void Update(float deltaTime)
         {
             _relayClient?.ProcessIncomingMessages();
 
             foreach (Room room in _rooms)
-                room.ManualUpdate(Time.unscaledDeltaTime);
+                room.ManualUpdate(deltaTime);
 
             var jsonStateOutput = new JsonStateOutput();
             _networkContext.WriteStates(jsonStateOutput);
@@ -101,20 +101,20 @@ namespace BananaParty.WebSocketRelay
         public void OnConnectedToRelay(Guid clientGuid)
         {
             _localPlayerGuid = clientGuid;
-            OnConnectedToRelayEvent.Invoke();
+            _networkListener.OnConnectedToRelay(clientGuid);
         }
 
         public void OnSubscribedToTopic(string topic)
         {
             var room = new Room(this, topic, _localPlayerGuid);
             _rooms.Add(room);
-            OnConnectedToRoomEvent.Invoke(room);
+            _networkListener.OnConnectedToRoom(room);
         }
 
         public void OnUnsubscribedFromTopic(string topic)
         {
             Room room = _rooms.Find(room => room.RoomName == topic);
-            OnDisconnectedFromRoomEvent.Invoke(room);
+            _networkListener.OnDisconnectedFromRoom(room);
             _rooms.Remove(room);
         }
 
@@ -126,12 +126,12 @@ namespace BananaParty.WebSocketRelay
 
         internal void AddNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            OnRoomPlayerAddedEvent.Invoke(networkPlayer);
+            _networkListener.OnRoomPlayerAdded(networkPlayer);
         }
 
         internal void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            OnRoomPlayerRemovedEvent.Invoke(networkPlayer);
+            _networkListener.OnRoomPlayerRemoved(networkPlayer);
         }
     }
 }

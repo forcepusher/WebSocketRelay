@@ -4,27 +4,31 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
-    public class GameState : MonoBehaviour
+    public class GameState : MonoBehaviour, INetworkListener
     {
-        [SerializeField]
         private Network _network;
 
         private Room _room;
 
+        [SerializeField]
+        private NetworkContext _networkContext;
+
         private void Start()
         {
-            _network.OnConnectedToRelayEvent.AddListener(OnConnectedToRelay);
-            _network.OnConnectedToRoomEvent.AddListener(OnConnectedToRoom);
-            _network.OnDisconnectedFromRoomEvent.AddListener(OnDisconnectedFromRoom);
-            _network.OnRoomPlayerAddedEvent.AddListener(OnRoomPlayerAdded);
-            _network.OnRoomPlayerRemovedEvent.AddListener(OnRoomPlayerRemoved);
+            _network = new Network("ws://127.0.0.1:23144", _networkContext, this);
+            _network.Connect();
 
             //var jsonStateOutput = new JsonStateOutput();
             //WriteState(jsonStateOutput);
             //Debug.Log(jsonStateOutput.ToString());
         }
 
-        public void OnConnectedToRelay()
+        private void Update()
+        {
+            _network?.Update(Time.unscaledDeltaTime);
+        }
+
+        public void OnConnectedToRelay(Guid clientGuid)
         {
             _network.JoinRoom("game-room");
         }
