@@ -29,10 +29,10 @@ namespace BananaParty.WebSocketRelay
         {
             _networkStates.AddRange(GetComponents<INetworkState>());
 
-            foreach (var networkState in _networkStates)
-            {
-                Debug.Log(networkState.StateName);
-            }
+            //foreach (var networkState in _networkStates)
+            //{
+            //    Debug.Log(networkState.StateName);
+            //}
         }
 
         public string StateName => nameof(NetworkIdentity);
