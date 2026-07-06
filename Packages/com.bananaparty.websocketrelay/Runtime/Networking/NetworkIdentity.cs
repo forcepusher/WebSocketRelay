@@ -13,7 +13,7 @@ namespace BananaParty.WebSocketRelay
 
         public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
         public Guid NetworkOwner { get; set; } = Guid.NewGuid();
-        public bool NetworkHasAuthority { get; set; } = false;
+        public bool NetworkAuthority { get; set; } = false;
 
         private void OnEnable()
         {
@@ -39,12 +39,22 @@ namespace BananaParty.WebSocketRelay
 
         public void ReadNetworkState(IStateInput stateInput)
         {
-            
+            NetworkIdentifier = stateInput.ReadGuid(nameof(NetworkIdentifier));
+            NetworkOwner = stateInput.ReadGuid(nameof(NetworkOwner));
+            NetworkAuthority = stateInput.ReadBool(nameof(NetworkAuthority));
+
+            foreach (var networkState in _networkStates)
+                networkState.ReadNetworkState(stateInput);
         }
 
         public void WriteNetworkState(IStateOutput stateOutput)
         {
+            stateOutput.WriteGuid(nameof(NetworkIdentifier), NetworkIdentifier);
+            stateOutput.WriteGuid(nameof(NetworkOwner), NetworkOwner);
+            stateOutput.WriteBool(nameof(NetworkAuthority), NetworkAuthority);
 
+            foreach (var networkState in _networkStates)
+                networkState.WriteNetworkState(stateOutput);
         }
     }
 }

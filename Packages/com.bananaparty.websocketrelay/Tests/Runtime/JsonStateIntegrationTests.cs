@@ -32,8 +32,8 @@ namespace BananaParty.WebSocketRelay.Tests
             stateA.PlayTime = 10;
             stateA.Health = 80f;
             stateA.Position = new Vector3(1, 2, 3);
-            stateA.NetworkHasAuthority = true;
-            stateB.NetworkHasAuthority = false;
+            stateA.NetworkAuthority = true;
+            stateB.NetworkAuthority = false;
 
             TestRelayListener listenerA = new();
             TestRelayListener listenerB = new();
@@ -91,7 +91,7 @@ namespace BananaParty.WebSocketRelay.Tests
             public string NetworkStateName => nameof(MockGameState);
             public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
             public Guid NetworkOwner { get; set; } = Guid.NewGuid();
-            public bool NetworkHasAuthority { get; set; }
+            public bool NetworkAuthority { get; set; }
             public int PlayTime { get; set; }
             public float Health { get; set; }
             public Vector3 Position { get; set; }

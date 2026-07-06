@@ -6,6 +6,6 @@ namespace BananaParty.WebSocketRelay
     {
         Guid NetworkIdentifier { get; set; }
         Guid NetworkOwner { get; set; }
-        bool NetworkHasAuthority { get; set; }
+        bool NetworkAuthority { get; set; }
     }
 }
