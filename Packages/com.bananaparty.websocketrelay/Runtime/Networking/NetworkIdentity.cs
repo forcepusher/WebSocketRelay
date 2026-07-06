@@ -48,10 +48,10 @@ namespace BananaParty.WebSocketRelay
             stateOutput.WriteGuid(nameof(NetworkOwner), NetworkOwner);
             stateOutput.WriteBool(nameof(NetworkAuthority), NetworkAuthority);
 
-            stateOutput.BeginArray("NetworkStates");
+            stateOutput.BeginArrayProperty("NetworkStates");
             foreach (var networkState in _networkStates)
             {
-                stateOutput.BeginObject();
+                stateOutput.BeginObjectElement();
                 stateOutput.WriteString("StateName", networkState.NetworkStateName);
                 networkState.WriteNetworkState(stateOutput);
                 stateOutput.EndObject();

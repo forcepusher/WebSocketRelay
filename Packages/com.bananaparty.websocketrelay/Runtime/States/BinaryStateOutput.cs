@@ -17,6 +17,13 @@ namespace BananaParty.WebSocketRelay
 
         public ReadOnlyMemory<byte> GetBuffer() => _stream.GetBuffer().AsMemory(0, (int)_stream.Length);
 
+        public void BeginArrayProperty(string name) { }
+        public void BeginArrayElement() { }
+        public void EndArray() { }
+        public void BeginObjectProperty(string name) { }
+        public void BeginObjectElement() { }
+        public void EndObject() { }
+
         public void WriteByte(string name, byte value) => WriteEntry(name, value);
 
         public void WriteInt(string name, int value) => WriteEntry(name, value);

@@ -72,18 +72,25 @@ namespace BananaParty.WebSocketRelay
             WriteObjectEntry(name, $"{{\"x\":{x},\"y\":{y},\"z\":{z},\"w\":{w}}}");
         }
 
-        public void BeginArray(string name = null)
+        public void BeginArrayProperty(string name)
         {
             EnsureStarted('[', ']');
             WriteItemSeparator();
-            if (!string.IsNullOrEmpty(name))
+            _sb.Append($"\"{name}\":[");
+            _depth++;
+            _closers.Push(']');
+            _firstItemScopes.Push(true);
+
+            if (_prettyPrint)
             {
-                _sb.Append($"\"{name}\":[");
+                _sb.Append('\n');
+                AppendIndent();
             }
-            else
-            {
-                _sb.Append("[");
-            }
+        }
+
+        public void BeginArrayElement()
+        {
+            EnsureStarted('[', ']');
             _depth++;
             _closers.Push(']');
             _firstItemScopes.Push(true);
@@ -110,18 +117,27 @@ namespace BananaParty.WebSocketRelay
             _sb.Append(closer);
         }
 
-        public void BeginObject(string name = null)
+        public void BeginObjectProperty(string name)
         {
             EnsureStarted('{', '}');
             WriteItemSeparator();
-            if (!string.IsNullOrEmpty(name))
+            _sb.Append($"\"{name}\":{{");
+            _depth++;
+            _closers.Push('}');
+            _firstItemScopes.Push(true);
+
+            if (_prettyPrint)
             {
-                _sb.Append($"\"{name}\":{{");
+                _sb.Append('\n');
+                AppendIndent();
             }
-            else
-            {
-                _sb.Append("{");
-            }
+        }
+
+        public void BeginObjectElement()
+        {
+            EnsureStarted('{', '}');
+            WriteItemSeparator();
+            _sb.Append("{");
             _depth++;
             _closers.Push('}');
             _firstItemScopes.Push(true);

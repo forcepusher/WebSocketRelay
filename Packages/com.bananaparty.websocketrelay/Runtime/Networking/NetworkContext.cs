@@ -30,10 +30,10 @@ namespace BananaParty.WebSocketRelay
 
         public void WriteNetworkStates(IStateOutput stateOutput)
         {
-            stateOutput.BeginArray();
+            stateOutput.BeginArrayElement();
             foreach (var networkIdentity in _networkIdentities)
             {
-                stateOutput.BeginObject();
+                stateOutput.BeginObjectElement();
                 networkIdentity.WriteNetworkState(stateOutput);
                 stateOutput.EndObject();
             }
