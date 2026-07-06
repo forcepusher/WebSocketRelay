@@ -28,11 +28,7 @@ namespace BananaParty.WebSocketRelay
         private void Awake()
         {
             _networkStates.AddRange(GetComponents<INetworkState>());
-
-            //foreach (var networkState in _networkStates)
-            //{
-            //    Debug.Log(networkState.StateName);
-            //}
+            _networkStates.Remove(this);
         }
 
         public string NetworkStateName => nameof(NetworkIdentity);
