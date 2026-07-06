@@ -37,30 +37,28 @@ namespace BananaParty.WebSocketRelay
         {
             NetworkOwner = stateInput.ReadGuid(nameof(NetworkOwner));
 
-            stateInput.BeginObjectProperty("NetworkStates");
+            stateInput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
             {
-                if (!stateInput.TryBeginObjectProperty(networkState.NetworkStateName))
-                    continue;
-
+                stateInput.BeginObjectElement();
                 networkState.ReadNetworkState(stateInput);
                 stateInput.EndObject();
             }
-            stateInput.EndObject();
+            stateInput.EndArray();
         }
 
         public void WriteNetworkState(IStateOutput stateOutput)
         {
             stateOutput.WriteGuid(nameof(NetworkOwner), NetworkOwner);
 
-            stateOutput.BeginObjectProperty("NetworkStates");
+            stateOutput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
             {
-                stateOutput.BeginObjectProperty(networkState.NetworkStateName);
+                stateOutput.BeginObjectElement();
                 networkState.WriteNetworkState(stateOutput);
                 stateOutput.EndObject();
             }
-            stateOutput.EndObject();
+            stateOutput.EndArray();
         }
     }
 }

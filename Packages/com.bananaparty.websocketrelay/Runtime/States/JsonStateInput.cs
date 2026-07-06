@@ -376,19 +376,14 @@ namespace BananaParty.WebSocketRelay
 
         private void SkipArrayContent()
         {
-            SkipWhitespace();
-            bool isFirst = true;
-
-            while (_position < _jsonString.Length && _jsonString[_position] != ']')
+            while (true)
             {
-                if (!isFirst)
-                {
-                    SkipWhitespace();
-                    ExpectCharacter(',');
-                    SkipWhitespace();
-                }
+                SkipWhitespace();
 
-                isFirst = false;
+                if (_position >= _jsonString.Length || _jsonString[_position] == ']')
+                    return;
+
+                SkipItemSeparator();
                 SkipValue();
             }
         }

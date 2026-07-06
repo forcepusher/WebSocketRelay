@@ -53,12 +53,12 @@ namespace BananaParty.WebSocketRelay.Tests
             output.BeginObjectElement();
             output.BeginObjectProperty(networkId.ToString());
             output.WriteGuid("NetworkOwner", networkOwner);
-            output.BeginObjectProperty("NetworkStates");
-            output.BeginObjectProperty(nameof(MockCharacterState));
+            output.BeginArrayProperty("NetworkStates");
+            output.BeginObjectElement();
             output.WriteInt("_health", 100);
             output.WriteVector3("_position", Vector3.zero);
             output.EndObject();
-            output.EndObject();
+            output.EndArray();
             output.EndObject();
             output.EndObject();
 
@@ -68,7 +68,8 @@ namespace BananaParty.WebSocketRelay.Tests
             Assert.IsTrue(json.TrimEnd().EndsWith("}"));
             Assert.IsTrue(json.Contains($"\"{networkId}\":"));
             Assert.IsTrue(json.Contains("\"NetworkStates\":"));
-            Assert.IsTrue(json.Contains($"\"{nameof(MockCharacterState)}\":"));
+            Assert.IsTrue(json.Contains("["));
+            Assert.IsFalse(json.Contains($"\"{nameof(MockCharacterState)}\":"));
             Assert.IsFalse(json.Contains("\"StateName\""));
             Assert.IsFalse(json.Contains("\"NetworkIdentifier\""));
             Assert.IsTrue(json.Contains("\"_position\":{\"x\":0,\"y\":0,\"z\":0}"));
@@ -109,12 +110,12 @@ namespace BananaParty.WebSocketRelay.Tests
             output.BeginObjectElement();
             output.BeginObjectProperty(networkId.ToString());
             output.WriteGuid("NetworkOwner", networkOwner);
-            output.BeginObjectProperty("NetworkStates");
-            output.BeginObjectProperty(nameof(MockCharacterState));
+            output.BeginArrayProperty("NetworkStates");
+            output.BeginObjectElement();
             output.WriteInt("_health", 5);
             output.WriteVector3("_position", new Vector3(1f, 2f, 3f));
             output.EndObject();
-            output.EndObject();
+            output.EndArray();
             output.EndObject();
             output.EndObject();
 
@@ -123,11 +124,12 @@ namespace BananaParty.WebSocketRelay.Tests
             input.BeginObjectElement();
             Assert.IsTrue(input.TryBeginObjectProperty(networkId.ToString()), json);
             Assert.AreEqual(networkOwner, input.ReadGuid("NetworkOwner"));
-            input.BeginObjectProperty("NetworkStates");
-            Assert.IsTrue(input.TryBeginObjectProperty(nameof(MockCharacterState)), json);
+            input.BeginArrayProperty("NetworkStates");
+            input.BeginObjectElement();
             Assert.AreEqual(5, input.ReadInt("_health"));
             Assert.AreEqual(new Vector3(1f, 2f, 3f), input.ReadVector3("_position"));
             input.EndObject();
+            input.EndArray();
             input.EndObject();
             input.EndObject();
         }
@@ -233,11 +235,11 @@ namespace BananaParty.WebSocketRelay.Tests
         {
             stateOutput.BeginObjectProperty(networkIdentifier.ToString());
             stateOutput.WriteGuid("NetworkOwner", networkOwner);
-            stateOutput.BeginObjectProperty("NetworkStates");
-            stateOutput.BeginObjectProperty(characterState.NetworkStateName);
+            stateOutput.BeginArrayProperty("NetworkStates");
+            stateOutput.BeginObjectElement();
             characterState.WriteNetworkState(stateOutput);
             stateOutput.EndObject();
-            stateOutput.EndObject();
+            stateOutput.EndArray();
             stateOutput.EndObject();
         }
 
@@ -251,12 +253,12 @@ namespace BananaParty.WebSocketRelay.Tests
                 stateInput.TryBeginObjectProperty(networkIdentifier.ToString()),
                 string.IsNullOrEmpty(json) ? networkIdentifier.ToString() : json);
             networkOwner = stateInput.ReadGuid("NetworkOwner");
-            stateInput.BeginObjectProperty("NetworkStates");
-            Assert.IsTrue(stateInput.TryBeginObjectProperty(nameof(MockCharacterState)), json);
+            stateInput.BeginArrayProperty("NetworkStates");
+            stateInput.BeginObjectElement();
             var characterState = new MockCharacterState();
             characterState.ReadNetworkState(stateInput);
             stateInput.EndObject();
-            stateInput.EndObject();
+            stateInput.EndArray();
             stateInput.EndObject();
             return characterState;
         }
@@ -278,6 +280,34 @@ namespace BananaParty.WebSocketRelay.Tests
                 Health = stateInput.ReadInt("_health");
                 Position = stateInput.ReadVector3("_position");
             }
+        }
+
+        [Test]
+        public void ShouldRoundTripBinaryNetworkStatesWithGuidLookup()
+        {
+            Guid networkId1 = Guid.Parse("bf0c3839-ff9c-4ef4-9442-482648647d53");
+            Guid networkOwner1 = Guid.Parse("bea8ee69-bdcf-4eda-8755-bf4c4a886c29");
+            Guid networkId2 = Guid.Parse("5640008b-7dd5-4056-a15e-2c18d65e9018");
+            Guid networkOwner2 = Guid.Parse("dcf6650b-88cb-42d7-8bda-1875e41a75fa");
+            Guid unknownId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+
+            var characterState1 = new MockCharacterState { Health = 100, Position = new Vector3(1f, 2f, 3f) };
+            var characterState2 = new MockCharacterState { Health = 75, Position = new Vector3(4f, 5f, 6f) };
+
+            using var output = new BinaryStateOutput();
+            output.BeginObjectElement();
+            WriteIdentity(output, networkId2, networkOwner2, characterState2);
+            WriteIdentity(output, networkId1, networkOwner1, characterState1);
+            output.EndObject();
+
+            var input = new BinaryStateInput(output.GetBuffer());
+            input.BeginObjectElement();
+            Assert.IsFalse(input.TryBeginObjectProperty(unknownId.ToString()));
+            MockCharacterState readCharacterState1 = ReadIdentity(input, networkId1, out Guid readNetworkOwner1);
+            Assert.AreEqual(networkOwner1, readNetworkOwner1);
+            Assert.AreEqual(100, readCharacterState1.Health);
+            Assert.AreEqual(new Vector3(1f, 2f, 3f), readCharacterState1.Position);
+            input.EndObject();
         }
 
         [Test]
