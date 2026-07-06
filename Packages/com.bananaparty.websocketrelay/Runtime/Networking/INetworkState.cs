@@ -2,7 +2,7 @@ using BananaParty.WebSocketRelay;
 
 public interface INetworkState
 {
-    string StateName { get; }
-    void WriteState(IStateOutput stateOutput);
-    void ReadState(IStateInput stateInput);
+    string NetworkStateName { get; }
+    void WriteNetworkState(IStateOutput stateOutput);
+    void ReadNetworkState(IStateInput stateInput);
 }

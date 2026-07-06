@@ -35,14 +35,14 @@ namespace BananaParty.WebSocketRelay
             //}
         }
 
-        public string StateName => nameof(NetworkIdentity);
+        public string NetworkStateName => nameof(NetworkIdentity);
 
-        public void ReadState(IStateInput stateInput)
+        public void ReadNetworkState(IStateInput stateInput)
         {
 
         }
 
-        public void WriteState(IStateOutput stateOutput)
+        public void WriteNetworkState(IStateOutput stateOutput)
         {
 
         }

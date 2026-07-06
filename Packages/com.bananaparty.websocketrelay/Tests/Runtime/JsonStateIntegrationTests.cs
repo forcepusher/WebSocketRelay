@@ -54,7 +54,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             // Act: Client A serializes and sends state via topic
             JsonStateOutput writeGraph = new();
-            stateA.WriteState(writeGraph);
+            stateA.WriteNetworkState(writeGraph);
             byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
             bool captured = false;
@@ -64,7 +64,7 @@ namespace BananaParty.WebSocketRelay.Tests
                     return;
 
                 JsonStateInput readGraph = new(Encoding.UTF8.GetString(data));
-                stateB.ReadState(readGraph);
+                stateB.ReadNetworkState(readGraph);
                 captured = true;
             };
 
@@ -88,7 +88,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private class MockGameState : MonoBehaviour, INetworkIdentity, INetworkState
         {
-            public string StateName => nameof(MockGameState);
+            public string NetworkStateName => nameof(MockGameState);
             public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
             public Guid NetworkOwner { get; set; } = Guid.NewGuid();
             public bool NetworkHasAuthority { get; set; }
@@ -96,14 +96,14 @@ namespace BananaParty.WebSocketRelay.Tests
             public float Health { get; set; }
             public Vector3 Position { get; set; }
 
-            public void WriteState(IStateOutput stateOutput)
+            public void WriteNetworkState(IStateOutput stateOutput)
             {
                 stateOutput.WriteInt(nameof(PlayTime), PlayTime);
                 stateOutput.WriteFloat(nameof(Health), Health);
                 stateOutput.WriteVector3(nameof(Position), Position);
             }
 
-            public void ReadState(IStateInput stateInput)
+            public void ReadNetworkState(IStateInput stateInput)
             {
                 PlayTime = stateInput.ReadInt(nameof(PlayTime));
                 Health = stateInput.ReadFloat(nameof(Health));

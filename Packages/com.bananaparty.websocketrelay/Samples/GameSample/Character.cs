@@ -5,7 +5,7 @@ namespace BananaParty.WebSocketRelay.Samples
     [RequireComponent(typeof(CharacterController))]
     public class Character : MonoBehaviour, INetworkState
     {
-        public string StateName => nameof(Character);
+        public string NetworkStateName => nameof(Character);
 
         public bool HasAuthority { get; set; }
 
@@ -37,13 +37,13 @@ namespace BananaParty.WebSocketRelay.Samples
             Move();
         }
 
-        public void WriteState(IStateOutput stateOutput)
+        public void WriteNetworkState(IStateOutput stateOutput)
         {
             stateOutput.WriteFloat(nameof(_health), _health);
             stateOutput.WriteVector3(nameof(_position), _position);
         }
 
-        public void ReadState(IStateInput stateInput)
+        public void ReadNetworkState(IStateInput stateInput)
         {
             _health = stateInput.ReadFloat(nameof(_health));
             _lastReceivedPosition = stateInput.ReadVector3(nameof(_position));

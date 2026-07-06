@@ -21,7 +21,7 @@ namespace BananaParty.WebSocketRelay
         public void WriteStates(IStateOutput stateOutput)
         {
             foreach (var networkIdentity in _networkIdentities)
-                networkIdentity.WriteState(stateOutput);
+                networkIdentity.WriteNetworkState(stateOutput);
         }
     }
 }
