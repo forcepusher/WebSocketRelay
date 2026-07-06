@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace BananaParty.WebSocketRelay
 {
@@ -13,7 +14,11 @@ namespace BananaParty.WebSocketRelay
         private readonly string _serverAddress = "ws://127.0.0.1:23144";
         private Guid _localPlayerGuid;
 
-        private INetworkListener _networkListener;
+        public UnityEvent<Guid> OnConnectedToRelayEvent = new();
+        public UnityEvent<Room> OnConnectedToRoomEvent = new();
+        public UnityEvent<Room> OnDisconnectedFromRoomEvent = new();
+        public UnityEvent<NetworkPlayer> OnRoomPlayerAddedEvent = new();
+        public UnityEvent<NetworkPlayer> OnRoomPlayerRemovedEvent = new();
 
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
@@ -92,20 +97,20 @@ namespace BananaParty.WebSocketRelay
         public void OnConnectedToRelay(Guid clientGuid)
         {
             _localPlayerGuid = clientGuid;
-            _networkListener.OnConnectedToRelay(clientGuid);
+            OnConnectedToRelayEvent.Invoke(clientGuid);
         }
 
         public void OnSubscribedToTopic(string topic)
         {
             var room = new Room(this, topic, _localPlayerGuid);
             _rooms.Add(room);
-            _networkListener.OnConnectedToRoom(room);
+            OnConnectedToRoomEvent.Invoke(room);
         }
 
         public void OnUnsubscribedFromTopic(string topic)
         {
             Room room = _rooms.Find(room => room.RoomName == topic);
-            _networkListener.OnDisconnectedFromRoom(room);
+            OnDisconnectedFromRoomEvent.Invoke(room);
             _rooms.Remove(room);
         }
 
@@ -117,12 +122,12 @@ namespace BananaParty.WebSocketRelay
 
         internal void AddNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            _networkListener.OnRoomPlayerAdded(networkPlayer);
+            OnRoomPlayerAddedEvent.Invoke(networkPlayer);
         }
 
         internal void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            _networkListener.OnRoomPlayerRemoved(networkPlayer);
+            OnRoomPlayerRemovedEvent.Invoke(networkPlayer);
         }
     }
 }

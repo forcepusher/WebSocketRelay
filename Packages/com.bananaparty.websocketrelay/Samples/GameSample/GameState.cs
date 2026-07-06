@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
-    public class GameState : MonoBehaviour, INetworkListener
+    public class GameState : MonoBehaviour
     {
         [SerializeField]
         private Network _network;
@@ -13,11 +13,17 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Start()
         {
+            _network.OnConnectedToRelayEvent.AddListener(OnConnectedToRelay);
+            _network.OnConnectedToRoomEvent.AddListener(OnConnectedToRoom);
+            _network.OnDisconnectedFromRoomEvent.AddListener(OnDisconnectedFromRoom);
+            _network.OnRoomPlayerAddedEvent.AddListener(OnRoomPlayerAdded);
+            _network.OnRoomPlayerRemovedEvent.AddListener(OnRoomPlayerRemoved);
+
             //var jsonStateOutput = new JsonStateOutput();
             //WriteState(jsonStateOutput);
             //Debug.Log(jsonStateOutput.ToString());
         }
-         
+
         public void OnConnectedToRelay(Guid clientGuid)
         {
             _network.JoinRoom("game-room");
