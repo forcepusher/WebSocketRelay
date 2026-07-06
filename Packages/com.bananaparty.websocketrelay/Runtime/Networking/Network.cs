@@ -68,9 +68,13 @@ namespace BananaParty.WebSocketRelay
         private void Update()
         {
             _relayClient?.ProcessIncomingMessages();
-            //Debug.Log(_rooms);
+
             foreach (Room room in _rooms)
                 room.ManualUpdate(Time.unscaledDeltaTime);
+
+            var jsonStateOutput = new JsonStateOutput();
+            _networkContext.WriteStates(jsonStateOutput);
+            Debug.Log(jsonStateOutput.ToString());
         }
 
         public void Send(string topic, byte[] data)

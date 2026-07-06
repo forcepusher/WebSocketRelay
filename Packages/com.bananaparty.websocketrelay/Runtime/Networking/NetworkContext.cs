@@ -18,20 +18,10 @@ namespace BananaParty.WebSocketRelay
             _networkIdentities.Remove(networkIdentity);
         }
 
-        public void WriteStatesToJson(IStateOutput stateOutput)
+        public void WriteStates(IStateOutput stateOutput)
         {
-            var jsonStateOutput = new JsonStateOutput();
-
             foreach (var networkIdentity in _networkIdentities)
-                networkIdentity.WriteState(jsonStateOutput);
-        }
-
-        public void WriteStatesToBinary(IStateOutput stateOutput)
-        {
-            var binaryStateOutput = new BinaryStateOutput();
-
-            foreach (var networkIdentity in _networkIdentities)
-                networkIdentity.WriteState(binaryStateOutput);
+                networkIdentity.WriteState(stateOutput);
         }
     }
 }
