@@ -37,7 +37,14 @@ namespace BananaParty.WebSocketRelay
 
         public string StateName => nameof(NetworkIdentity);
 
-        public void ReadState(IStateInput stateInput) => throw new NotImplementedException();
-        public void WriteState(IStateOutput stateOutput) => throw new NotImplementedException();
+        public void ReadState(IStateInput stateInput)
+        {
+
+        }
+
+        public void WriteState(IStateOutput stateOutput)
+        {
+
+        }
     }
 }
