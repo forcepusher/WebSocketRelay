@@ -17,7 +17,7 @@ namespace BananaParty.WebSocketRelay.Samples
             //WriteState(jsonStateOutput);
             //Debug.Log(jsonStateOutput.ToString());
         }
-
+         
         public void OnConnectedToRelay(Guid clientGuid)
         {
             _network.JoinRoom("game-room");

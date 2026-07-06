@@ -10,21 +10,15 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private NetworkContext _networkContext;
 
-        private readonly INetworkListener _networkListener;
-        private readonly string _serverAddress;
-
+        private readonly string _serverAddress = "ws://127.0.0.1:23144";
         private Guid _localPlayerGuid;
+
+        private INetworkListener _networkListener;
 
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
 
         private readonly List<Room> _rooms = new();
-
-        public Network(INetworkListener networkListener, string serverAddress)
-        {
-            _networkListener = networkListener;
-            _serverAddress = serverAddress;
-        }
 
         public void StartServer()
         {
@@ -69,7 +63,7 @@ namespace BananaParty.WebSocketRelay
         private void Update()
         {
             _relayClient?.ProcessIncomingMessages();
-
+            //Debug.Log(_rooms);
             foreach (Room room in _rooms)
                 room.ManualUpdate(Time.unscaledDeltaTime);
         }
