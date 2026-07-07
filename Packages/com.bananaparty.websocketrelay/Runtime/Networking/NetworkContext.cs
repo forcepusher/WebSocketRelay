@@ -8,12 +8,18 @@ namespace BananaParty.WebSocketRelay
     public class NetworkContext : ScriptableObject, INetworkContext
     {
         [SerializeField]
+        private float _playerTimeoutSeconds = 15f;
+
+        [SerializeField]
         private List<NetworkIdentity> _networkPrefabs;
 
         public Guid LocalClientIdentity { get; set; }
 
         private readonly List<INetworkIdentity> _networkIdentities = new();
         private readonly Dictionary<Guid, INetworkIdentity> _networkIdentitiesByGuid = new();
+
+        private readonly List<NetworkPlayer> _networkPlayers = new();
+        private readonly Dictionary<Guid, NetworkPlayer> _guidToNetworkPlayers = new();
 
         public void Instantiate(NetworkIdentity networkIdentityPrefab, Guid ownerGuid)
         {
@@ -56,6 +62,42 @@ namespace BananaParty.WebSocketRelay
                 stateOutput.EndObject();
             }
             stateOutput.EndObject();
+        }
+
+        public void ManualUpdate(float unscaledDeltaTime)
+        {
+            for (int networkPlayerIndex = _networkPlayers.Count - 1; networkPlayerIndex >= 0; networkPlayerIndex -= 1)
+            {
+                NetworkPlayer networkPlayer = _networkPlayers[networkPlayerIndex];
+
+                if (networkPlayer.TimeSinceLastMessage > _playerTimeoutSeconds)
+                    RemoveNetworkPlayer(networkPlayer);
+            }
+        }
+
+        public void ProcessTopicMessage(Guid senderGuid)
+        {
+            if (_guidToNetworkPlayers.ContainsKey(senderGuid))
+            {
+                _guidToNetworkPlayers[senderGuid].TimeSinceLastMessage = 0f;
+            }
+            else
+            {
+                NetworkPlayer networkPlayer = new NetworkPlayer(senderGuid);
+                AddNetworkPlayer(networkPlayer);
+            }
+        }
+
+        private void AddNetworkPlayer(NetworkPlayer networkPlayer)
+        {
+            _networkPlayers.Add(networkPlayer);
+            _guidToNetworkPlayers[networkPlayer.Guid] = networkPlayer;
+        }
+
+        private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
+        {
+            _networkPlayers.Remove(networkPlayer);
+            _guidToNetworkPlayers.Remove(networkPlayer.Guid);
         }
     }
 }
