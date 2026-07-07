@@ -22,16 +22,24 @@ namespace BananaParty.WebSocketRelay
         private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
 
-        public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, Guid ownerGuid)
+        public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, Guid networkOwner)
         {
-            if (!_networkPrefabs.Contains(networkIdentityPrefab))
-                throw new InvalidOperationException($"Network prefab is not registered in {nameof(_networkPrefabs)}");
+            return Instantiate(networkIdentityPrefab.PrefabName, Guid.NewGuid(), networkOwner);
+        }
 
-            NetworkIdentity networkIdentity = GameObject.Instantiate(networkIdentityPrefab);
-            networkIdentity.NetworkOwner = ownerGuid;
-            networkIdentity.NetworkIdentifier = Guid.NewGuid();
+        private NetworkIdentity Instantiate(string prefabName, Guid networkIdentifier, Guid networkOwner)
+        {
+            NetworkIdentity prefab = _networkPrefabs.Find(networkPrefab => networkPrefab.PrefabName == prefabName);
+            if (prefab == null)
+                throw new InvalidOperationException($"No network prefab registered with name {prefabName}");
+
+            NetworkIdentity networkIdentity = GameObject.Instantiate(prefab);
+            networkIdentity.NetworkIdentifier = networkIdentifier;
+            networkIdentity.NetworkOwner = networkOwner;
 
             RegisterNetworkIdentity(networkIdentity);
+
+            Debug.Log($"Spawned remote network identity '{prefabName}' ({networkIdentifier}) for player {networkOwner}");
 
             return networkIdentity;
         }
@@ -47,6 +55,18 @@ namespace BananaParty.WebSocketRelay
         {
             _networkIdentities.Remove(networkIdentity);
             _networkIdentitiesByGuid.Remove(networkIdentity.NetworkIdentifier);
+        }
+
+        private void AddNetworkPlayer(NetworkPlayer networkPlayer)
+        {
+            _networkPlayers.Add(networkPlayer);
+            _networkPlayersByGuid[networkPlayer.Guid] = networkPlayer;
+        }
+
+        private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
+        {
+            _networkPlayers.Remove(networkPlayer);
+            _networkPlayersByGuid.Remove(networkPlayer.Guid);
         }
 
         public void ReadNetworkStates(IStateInput stateInput)
@@ -121,9 +141,13 @@ namespace BananaParty.WebSocketRelay
                 stateInput.BeginObjectProperty(networkIdentifier.ToString());
 
                 if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
+                {
                     networkIdentity.ReadNetworkState(stateInput);
+                }
                 else
+                {
                     ReadAndSpawnNetworkIdentity(stateInput, networkIdentifier);
+                }
 
                 stateInput.EndObject();
             }
@@ -152,38 +176,9 @@ namespace BananaParty.WebSocketRelay
             string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
             Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
 
-            NetworkIdentity networkIdentity = SpawnNetworkIdentity(prefabName, networkIdentifier, networkOwner);
+            NetworkIdentity networkIdentity = Instantiate(prefabName, networkIdentifier, networkOwner);
             networkIdentity.ReadNetworkStateBody(stateInput);
         }
-
-        private NetworkIdentity SpawnNetworkIdentity(string prefabName, Guid networkIdentifier, Guid networkOwner)
-        {
-            NetworkIdentity prefab = _networkPrefabs.Find(networkPrefab => networkPrefab.PrefabName == prefabName);
-            if (prefab == null)
-                throw new InvalidOperationException($"No network prefab registered with name {prefabName}");
-
-            NetworkIdentity networkIdentity = GameObject.Instantiate(prefab);
-            networkIdentity.NetworkIdentifier = networkIdentifier;
-            networkIdentity.NetworkOwner = networkOwner;
-
-            UnregisterNetworkIdentity(networkIdentity);
-            RegisterNetworkIdentity(networkIdentity);
-
-            Debug.Log($"Spawned remote network identity '{prefabName}' ({networkIdentifier}) for player {networkOwner}");
-            return networkIdentity;
-        }
 #endregion SLOP
-
-        private void AddNetworkPlayer(NetworkPlayer networkPlayer)
-        {
-            _networkPlayers.Add(networkPlayer);
-            _networkPlayersByGuid[networkPlayer.Guid] = networkPlayer;
-        }
-
-        private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
-        {
-            _networkPlayers.Remove(networkPlayer);
-            _networkPlayersByGuid.Remove(networkPlayer.Guid);
-        }
     }
 }
