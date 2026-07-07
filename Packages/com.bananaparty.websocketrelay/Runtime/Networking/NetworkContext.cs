@@ -123,21 +123,21 @@ namespace BananaParty.WebSocketRelay
             ApplyIncomingTopicState(data);
         }
 
-        public byte[] SerializeNetworkStates()
-        {
-            if (_useBinary)
-            {
-                using BinaryStateOutput stateOutput = new();
-                WriteNetworkStates(stateOutput);
-                return stateOutput.GetBuffer().ToArray();
-            }
-            else
-            {
-                JsonStateOutput jsonStateOutput = new(prettyPrint: false, bracesOnNewLine: false);
-                WriteNetworkStates(jsonStateOutput);
-                return Encoding.UTF8.GetBytes(jsonStateOutput.ToString());
-            }
-        }
+        // public byte[] SerializeNetworkStates()
+        // {
+        //     if (_useBinary)
+        //     {
+        //         using BinaryStateOutput stateOutput = new();
+        //         WriteNetworkStates(stateOutput);
+        //         return stateOutput.GetBuffer().ToArray();
+        //     }
+        //     else
+        //     {
+        //         JsonStateOutput jsonStateOutput = new(prettyPrint: false, bracesOnNewLine: false);
+        //         WriteNetworkStates(jsonStateOutput);
+        //         return Encoding.UTF8.GetBytes(jsonStateOutput.ToString());
+        //     }
+        // }
 
         #region SLOP
         private void ApplyIncomingTopicState(byte[] data)
