@@ -139,7 +139,6 @@ namespace BananaParty.WebSocketRelay
         //     }
         // }
 
-        #region SLOP
         private void ApplyIncomingTopicState(byte[] data)
         {
             ReadOnlyMemory<byte> payload = StripMessageHeader(data);
@@ -184,7 +183,5 @@ namespace BananaParty.WebSocketRelay
 
             return data.AsMemory();
         }
-
-#endregion SLOP
     }
 }
