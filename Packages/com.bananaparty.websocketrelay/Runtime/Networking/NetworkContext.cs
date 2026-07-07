@@ -70,7 +70,7 @@ namespace BananaParty.WebSocketRelay
             {
                 NetworkPlayer networkPlayer = _networkPlayers[networkPlayerIndex];
 
-                if (networkPlayer.TimeSinceLastMessage > _playerTimeoutSeconds)
+                if (networkPlayer.TimeSinceLastMessage >= _playerTimeoutSeconds)
                     RemoveNetworkPlayer(networkPlayer);
             }
         }
