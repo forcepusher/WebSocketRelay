@@ -28,6 +28,26 @@ namespace BananaParty.WebSocketRelay.Samples
             _network?.ManualUpdate(Time.unscaledDeltaTime);
         }
 
+        public void OnStartServerButtonClick()
+        {
+            _network.StartServer();
+        }
+
+        public void OnStopServerButtonClick()
+        {
+            _network.StopServer();
+        }
+
+        public void OnConnectButtonClick()
+        {
+            _network.Connect();
+        }
+
+        public void OnDisconnectButtonClick()
+        {
+            _network.Disconnect();
+        }
+
         public void OnConnectedToRelay(Guid clientGuid)
         {
             _network.JoinRoom("game-room");
