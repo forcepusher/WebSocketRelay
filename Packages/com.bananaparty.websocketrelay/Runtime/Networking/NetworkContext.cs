@@ -123,8 +123,6 @@ namespace BananaParty.WebSocketRelay
             ApplyIncomingTopicState(data);
         }
 
-#region SLOP
-
         public byte[] SerializeNetworkStates()
         {
             if (_useBinary)
@@ -133,12 +131,15 @@ namespace BananaParty.WebSocketRelay
                 WriteNetworkStates(stateOutput);
                 return stateOutput.GetBuffer().ToArray();
             }
-
-            JsonStateOutput jsonStateOutput = new(prettyPrint: false, bracesOnNewLine: false);
-            WriteNetworkStates(jsonStateOutput);
-            return Encoding.UTF8.GetBytes(jsonStateOutput.ToString());
+            else
+            {
+                JsonStateOutput jsonStateOutput = new(prettyPrint: false, bracesOnNewLine: false);
+                WriteNetworkStates(jsonStateOutput);
+                return Encoding.UTF8.GetBytes(jsonStateOutput.ToString());
+            }
         }
 
+        #region SLOP
         private void ApplyIncomingTopicState(byte[] data)
         {
             ReadOnlyMemory<byte> payload = StripMessageHeader(data);
