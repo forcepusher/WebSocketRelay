@@ -164,7 +164,11 @@ namespace BananaParty.WebSocketRelay
                 }
                 else
                 {
-                    ReadAndSpawnNetworkIdentity(stateInput, networkIdentifier);
+                    string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
+                    Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
+
+                    NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, networkIdentifier, networkOwner);
+                    spawnedNetworkIdentity.ReadNetworkStateBody(stateInput);
                 }
 
                 stateInput.EndObject();
@@ -181,14 +185,6 @@ namespace BananaParty.WebSocketRelay
             return data.AsMemory();
         }
 
-        private void ReadAndSpawnNetworkIdentity(IStateInput stateInput, Guid networkIdentifier)
-        {
-            string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
-            Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
-
-            NetworkIdentity networkIdentity = Instantiate(prefabName, networkIdentifier, networkOwner);
-            networkIdentity.ReadNetworkStateBody(stateInput);
-        }
 #endregion SLOP
     }
 }
