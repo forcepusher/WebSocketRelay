@@ -15,6 +15,8 @@ namespace BananaParty.WebSocketRelay
         private readonly Dictionary<Guid, NetworkPlayer> _guidToNetworkPlayers = new();
         private readonly Dictionary<Guid, float> _timeSinceLastMessageByPlayer = new();
 
+        private readonly List<NetworkIdentity> _spawnedNetworkIdentities = new();
+
         public string RoomName { get; private set; }
 
         public Room(Network network, string roomName, Guid localPlayerGuid)
@@ -47,6 +49,8 @@ namespace BananaParty.WebSocketRelay
         {        
             NetworkIdentity networkIdentity = GameObject.Instantiate<NetworkIdentity>(networkIdentityPrefab);
             networkIdentity.NetworkOwner = ownerGuid;
+
+            _spawnedNetworkIdentities.Add(networkIdentity);
         }
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)

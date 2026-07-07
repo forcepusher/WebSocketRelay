@@ -8,11 +8,14 @@ namespace BananaParty.WebSocketRelay
     {
         [SerializeField]
         private NetworkContext _networkContext;
+        [SerializeField]
+        public string _prefabName;
 
         private List<INetworkState> _networkStates = new();
 
-        public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
-        public Guid NetworkOwner { get; set; } = Guid.NewGuid();
+        public string PrefabName => _prefabName;
+        public Guid NetworkIdentifier { get; set; }
+        public Guid NetworkOwner { get; set; }
         public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
 
         private void OnEnable()
@@ -35,6 +38,10 @@ namespace BananaParty.WebSocketRelay
 
         public void ReadNetworkState(IStateInput stateInput)
         {
+            string prefabName = stateInput.ReadString(nameof(PrefabName));
+            if (prefabName != PrefabName)
+                throw new InvalidOperationException($"Prefab name mismatch. Expected: {PrefabName}, Received: {prefabName}");
+
             NetworkOwner = stateInput.ReadGuid(nameof(NetworkOwner));
 
             stateInput.BeginArrayProperty("NetworkStates");
@@ -49,6 +56,7 @@ namespace BananaParty.WebSocketRelay
 
         public void WriteNetworkState(IStateOutput stateOutput)
         {
+            stateOutput.WriteString(nameof(PrefabName), PrefabName);
             stateOutput.WriteGuid(nameof(NetworkOwner), NetworkOwner);
 
             stateOutput.BeginArrayProperty("NetworkStates");

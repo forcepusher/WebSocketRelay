@@ -89,6 +89,7 @@ namespace BananaParty.WebSocketRelay.Tests
         private class MockGameState : MonoBehaviour, INetworkIdentity, INetworkState
         {
             public string NetworkStateName => nameof(MockGameState);
+            public string PrefabName => nameof(MockGameState);
             public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
             public Guid NetworkOwner { get; set; } = Guid.NewGuid();
             public bool NetworkAuthority { get; set; }

@@ -7,6 +7,9 @@ namespace BananaParty.WebSocketRelay
     [CreateAssetMenu]
     public class NetworkContext : ScriptableObject, INetworkContext
     {
+        [SerializeField]
+        private List<NetworkIdentity> _networkPrefabs;
+
         public Guid LocalClientIdentity { get; set; }
 
         private readonly List<INetworkIdentity> _networkIdentities = new();
