@@ -43,7 +43,11 @@ namespace BananaParty.WebSocketRelay
                 throw new InvalidOperationException($"Prefab name mismatch. Expected: {PrefabName}, Received: {prefabName}");
 
             NetworkOwner = stateInput.ReadGuid(nameof(NetworkOwner));
+            ReadNetworkStateBody(stateInput);
+        }
 
+        public void ReadNetworkStateBody(IStateInput stateInput)
+        {
             stateInput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
             {

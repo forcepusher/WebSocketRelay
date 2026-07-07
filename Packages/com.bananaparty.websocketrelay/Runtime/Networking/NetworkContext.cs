@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
@@ -19,12 +20,17 @@ namespace BananaParty.WebSocketRelay
         private readonly Dictionary<Guid, INetworkIdentity> _networkIdentitiesByGuid = new();
 
         private readonly List<NetworkPlayer> _networkPlayers = new();
-        private readonly Dictionary<Guid, NetworkPlayer> _guidToNetworkPlayers = new();
+        private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
 
-        public void Instantiate(NetworkIdentity networkIdentityPrefab, Guid ownerGuid)
+        private Dictionary<string, NetworkIdentity> _prefabsByName;
+
+        public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, Guid ownerGuid)
         {
-            NetworkIdentity networkIdentity = GameObject.Instantiate<NetworkIdentity>(networkIdentityPrefab);
-            networkIdentity.NetworkOwner = ownerGuid;
+            NetworkIdentity networkIdentity = GameObject.Instantiate(networkIdentityPrefab);
+            networkIdentityPrefab.NetworkOwner = ownerGuid;
+            networkIdentityPrefab.NetworkIdentifier = Guid.NewGuid();
+
+            return networkIdentity;
         }
 
         public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
@@ -75,24 +81,129 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        public void ProcessTopicMessage(Guid senderGuid)
+        public void ProcessTopicMessage(Guid senderGuid, string topic, byte[] data)
         {
-            if (_guidToNetworkPlayers.TryGetValue(senderGuid, out NetworkPlayer networkPlayer))
+            if (senderGuid == LocalClientIdentity)
+                return;
+
+            if (_networkPlayersByGuid.TryGetValue(senderGuid, out NetworkPlayer networkPlayer))
                 networkPlayer.TimeSinceLastMessage = 0f;
             else
                 AddNetworkPlayer(new NetworkPlayer(senderGuid));
+
+            if (data == null || data.Length == 0)
+                throw new InvalidOperationException("Topic message data is null or empty");
+
+            ApplyIncomingTopicState(data);
         }
+
+#region SLOP
+        private void ApplyIncomingTopicState(byte[] data)
+        {
+            ReadOnlyMemory<byte> payload = StripMessageHeader(data);
+            bool isJson = IsJsonPayload(payload);
+
+            IReadOnlyList<Guid> identityIds = isJson
+                ? JsonStateInput.GetRootIdentityIds(Encoding.UTF8.GetString(payload.Span))
+                : BinaryStateInput.GetRootIdentityIds(payload);
+
+            IStateInput stateInput = isJson
+                ? new JsonStateInput(Encoding.UTF8.GetString(payload.Span))
+                : new BinaryStateInput(payload);
+
+            stateInput.BeginObjectElement();
+
+            foreach (Guid networkIdentifier in identityIds)
+            {
+                stateInput.BeginObjectProperty(networkIdentifier.ToString());
+
+                if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
+                    networkIdentity.ReadNetworkState(stateInput);
+                else
+                    ReadAndSpawnNetworkIdentity(stateInput, networkIdentifier);
+
+                stateInput.EndObject();
+            }
+
+            stateInput.EndObject();
+        }
+
+        private static ReadOnlyMemory<byte> StripMessageHeader(byte[] data)
+        {
+            if (data[0] == NetworkMessage.SyncIdentities)
+                return data.AsMemory(1);
+
+            return data.AsMemory();
+        }
+
+        private static bool IsJsonPayload(ReadOnlyMemory<byte> payload)
+        {
+            if (payload.Length == 0)
+                return false;
+
+            return payload.Span[0] == '{' || char.IsWhiteSpace((char)payload.Span[0]);
+        }
+
+        private void ReadAndSpawnNetworkIdentity(IStateInput stateInput, Guid networkIdentifier)
+        {
+            string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
+            Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
+
+            NetworkIdentity networkIdentity = SpawnNetworkIdentity(prefabName, networkIdentifier, networkOwner);
+            networkIdentity.ReadNetworkStateBody(stateInput);
+        }
+
+        private NetworkIdentity SpawnNetworkIdentity(string prefabName, Guid networkIdentifier, Guid networkOwner)
+        {
+            NetworkIdentity prefab = GetPrefab(prefabName);
+            NetworkIdentity networkIdentity = GameObject.Instantiate(prefab);
+            networkIdentity.NetworkIdentifier = networkIdentifier;
+            networkIdentity.NetworkOwner = networkOwner;
+
+            UnregisterNetworkIdentity(networkIdentity);
+            RegisterNetworkIdentity(networkIdentity);
+
+            Debug.Log($"Spawned remote network identity '{prefabName}' ({networkIdentifier}) for player {networkOwner}");
+            return networkIdentity;
+        }
+
+        private NetworkIdentity GetPrefab(string prefabName)
+        {
+            EnsurePrefabLookup();
+
+            if (!_prefabsByName.TryGetValue(prefabName, out NetworkIdentity prefab))
+                throw new InvalidOperationException($"No network prefab registered with name '{prefabName}'.");
+
+            return prefab;
+        }
+
+        private void EnsurePrefabLookup()
+        {
+            if (_prefabsByName != null)
+                return;
+
+            _prefabsByName = new Dictionary<string, NetworkIdentity>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (NetworkIdentity prefab in _networkPrefabs)
+            {
+                if (prefab == null)
+                    continue;
+
+                _prefabsByName[prefab.PrefabName] = prefab;
+            }
+        }
+#endregion SLOP
 
         private void AddNetworkPlayer(NetworkPlayer networkPlayer)
         {
             _networkPlayers.Add(networkPlayer);
-            _guidToNetworkPlayers[networkPlayer.Guid] = networkPlayer;
+            _networkPlayersByGuid[networkPlayer.Guid] = networkPlayer;
         }
 
         private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
         {
             _networkPlayers.Remove(networkPlayer);
-            _guidToNetworkPlayers.Remove(networkPlayer.Guid);
+            _networkPlayersByGuid.Remove(networkPlayer.Guid);
         }
     }
 }

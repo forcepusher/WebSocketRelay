@@ -113,7 +113,7 @@ namespace BananaParty.WebSocketRelay
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
         {
-            _networkContext.ProcessTopicMessage(senderGuid);
+            _networkContext.ProcessTopicMessage(senderGuid, topic, data);
         }
     }
 }

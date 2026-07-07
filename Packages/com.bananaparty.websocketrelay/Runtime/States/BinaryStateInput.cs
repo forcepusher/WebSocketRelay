@@ -84,6 +84,22 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
+        internal static IReadOnlyList<Guid> GetRootIdentityIds(ReadOnlyMemory<byte> data)
+        {
+            BinaryFieldReader reader = new(data);
+            int identityCount = reader.ReadInt32();
+            List<Guid> identityIds = new(identityCount);
+
+            for (int identityIndex = 0; identityIndex < identityCount; identityIndex++)
+            {
+                identityIds.Add(reader.ReadGuidValue());
+                int payloadLength = reader.ReadInt32();
+                reader.ReadBytes(payloadLength);
+            }
+
+            return identityIds;
+        }
+
         public string ReadString(string name)
         {
             _reader.VerifyEntryName(name);

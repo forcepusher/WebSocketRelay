@@ -89,6 +89,26 @@ namespace BananaParty.WebSocketRelay
             ReadObjectOpen();
         }
 
+        internal static IReadOnlyList<Guid> GetRootIdentityIds(string json)
+        {
+            JsonStateInput stateInput = new(json);
+            stateInput.BeginObjectElement();
+
+            List<Guid> identityIds = new();
+            stateInput._position = stateInput._objectContentStarts.Peek();
+
+            while (stateInput.ReadNextPropertyKey(out string propertyKey))
+            {
+                if (!Guid.TryParse(propertyKey, out Guid identityId))
+                    throw new InvalidOperationException($"Invalid network identity key '{propertyKey}'.");
+
+                identityIds.Add(identityId);
+                stateInput.SkipValue();
+            }
+
+            return identityIds;
+        }
+
         public void EndObject()
         {
             ReadObjectClose();
