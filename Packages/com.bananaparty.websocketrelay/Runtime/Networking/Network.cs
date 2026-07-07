@@ -7,6 +7,8 @@ namespace BananaParty.WebSocketRelay
 {
     public class Network : IRelayListener, IDisposable
     {
+        private const float PlayerConnectionTimeoutSeconds = 15f;
+
         private readonly NetworkContext _networkContext;
         private readonly string _serverAddress;
         private readonly INetworkListener _networkListener;
@@ -17,6 +19,7 @@ namespace BananaParty.WebSocketRelay
         private RelayClient _relayClient;
 
         private readonly List<NetworkPlayer> _networkPlayers = new();
+        private readonly Dictionary<Guid, NetworkPlayer> _guidToNetworkPlayers = new();
 
         public Network(string address, NetworkContext context, INetworkListener listener)
         {
@@ -70,6 +73,15 @@ namespace BananaParty.WebSocketRelay
             _relayClient?.ProcessIncomingMessages();
 
 
+            for (int networkPlayerIndex = _networkPlayers.Count - 1; networkPlayerIndex >= 0; networkPlayerIndex -= 1)
+            {
+                NetworkPlayer networkPlayer = _networkPlayers[networkPlayerIndex];
+                Guid playerGuid = networkPlayer.Guid;
+
+                if (networkPlayer.TimeSinceLastMessage > PlayerConnectionTimeoutSeconds)
+                    RemoveNetworkPlayer(networkPlayer);
+            }
+
             //var jsonStateOutput = new JsonStateOutput();
             //_networkContext.WriteNetworkStates(jsonStateOutput);
             //Debug.Log(jsonStateOutput.ToString());
@@ -116,16 +128,32 @@ namespace BananaParty.WebSocketRelay
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
         {
             _networkListener.OnTopicMessage(senderGuid, topic, data);
+
+
+
+            if (_guidToNetworkPlayers.ContainsKey(senderGuid))
+            {
+                _guidToNetworkPlayers[senderGuid].TimeSinceLastMessage = 0f;
+            }
+            else
+            {
+                NetworkPlayer networkPlayer = new NetworkPlayer(senderGuid);
+                AddNetworkPlayer(networkPlayer);
+            }
         }
 
         private void AddNetworkPlayer(NetworkPlayer networkPlayer)
         {
+            _networkPlayers.Add(networkPlayer);
             _networkListener.OnPlayerAdded(networkPlayer);
+            _guidToNetworkPlayers[networkPlayer.Guid] = networkPlayer;
         }
 
         private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
         {
+            _networkPlayers.Remove(networkPlayer);
             _networkListener.OnPlayerRemoved(networkPlayer);
+            _guidToNetworkPlayers.Remove(networkPlayer.Guid);
         }
     }
 }

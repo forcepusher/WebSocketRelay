@@ -52,12 +52,12 @@ namespace BananaParty.WebSocketRelay.Samples
             _network.SubscribeToTopic("game-room");
         }
 
-        public void OnSubscribedToTopic(Room room)
+        public void OnSubscribedToTopic(string topic)
         {
-            room.Instantiate(_playerCharacterPrefab, room.LocalPlayerGuid);
+            _networkContext.Instantiate(_playerCharacterPrefab, _network.LocalPlayerGuid);
         }
 
-        public void OnDisconnectedFromRoom(Room room)
+        public void OnUnsubscribedFromTopic(string topic)
         {
 
         }
@@ -72,9 +72,14 @@ namespace BananaParty.WebSocketRelay.Samples
 
         }
 
-        public void OnConnectedToRelay(Guid clientGuid) => throw new NotImplementedException();
-        public void OnSubscribedToTopic(string topic) => throw new NotImplementedException();
-        public void OnUnsubscribedFromTopic(string topic) => throw new NotImplementedException();
-        public void OnTopicMessage(Guid senderGuid, string topic, byte[] data) => throw new NotImplementedException();
+        public void OnConnectedToRelay(Guid clientGuid)
+        {
+
+        }
+
+        public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
+        {
+
+        }
     }
 }
