@@ -50,17 +50,34 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private IEnumerator ConnectCoroutine(float connectionTimeout)
         {
+            float elapsed = 0;
             _network.Connect();
 
             while (!_network.IsConnected)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                if (elapsed > connectionTimeout)
+                {
+                    Debug.LogError($"Connection timed out after {connectionTimeout}s");
+                    yield break;
+                }
                 yield return null;
+            }
 
             Debug.Log("Connected to relay");
 
             _network.SubscribeToTopic("game-room");
 
             while (!_network.SubscribedTopics.Contains("game-room"))
+            {
+                elapsed += Time.unscaledDeltaTime;
+                if (elapsed > connectionTimeout)
+                {
+                    Debug.LogError($"Subscription timed out after {connectionTimeout}s");
+                    yield break;
+                }
                 yield return null;
+            }
 
             Debug.Log("Subscribed to game-room");
 
