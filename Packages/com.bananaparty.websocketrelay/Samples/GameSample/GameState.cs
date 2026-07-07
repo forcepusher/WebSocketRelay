@@ -16,7 +16,6 @@ namespace BananaParty.WebSocketRelay.Samples
         private void Start()
         {
             _network = new Network("ws://127.0.0.1:23144", _networkContext, this);
-            _network.Connect();
 
             //var jsonStateOutput = new JsonStateOutput();
             //WriteState(jsonStateOutput);
