@@ -18,16 +18,6 @@ namespace BananaParty.WebSocketRelay
         public Guid NetworkOwner { get; set; }
         public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
 
-        private void OnEnable()
-        {
-            _networkContext.RegisterNetworkIdentity(this);
-        }
-
-        private void OnDisable()
-        {
-            _networkContext.UnregisterNetworkIdentity(this);
-        }
-
         private void Awake()
         {
             _networkStates.AddRange(GetComponents<INetworkState>());

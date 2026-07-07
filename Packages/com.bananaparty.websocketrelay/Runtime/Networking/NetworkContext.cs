@@ -30,6 +30,8 @@ namespace BananaParty.WebSocketRelay
             networkIdentityPrefab.NetworkOwner = ownerGuid;
             networkIdentityPrefab.NetworkIdentifier = Guid.NewGuid();
 
+            RegisterNetworkIdentity(networkIdentity);
+
             return networkIdentity;
         }
 
