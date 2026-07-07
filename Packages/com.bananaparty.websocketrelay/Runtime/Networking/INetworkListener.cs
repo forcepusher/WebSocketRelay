@@ -1,13 +1,10 @@
+using BananaParty.WebSocketRelay.Transport;
+
 namespace BananaParty.WebSocketRelay
 {
-    public interface INetworkListener
+    public interface INetworkListener : IRelayListener
     {
-        void OnConnectedToRelay();
-
-        void OnConnectedToRoom(Room room);
-        void OnDisconnectedFromRoom(Room room);
-
-        void OnRoomPlayerAdded(NetworkPlayer networkPlayer);
-        void OnRoomPlayerRemoved(NetworkPlayer networkPlayer);
+        void OnPlayerAdded(NetworkPlayer networkPlayer);
+        void OnPlayerRemoved(NetworkPlayer networkPlayer);
     }
 }

@@ -6,6 +6,8 @@ namespace BananaParty.WebSocketRelay
     {
         public Guid Guid { get; private set; }
 
+        public float TimeSinceLastMessage { get; private set; } = 0f;
+
         public NetworkPlayer(Guid playerGuid)
         {
             Guid = playerGuid;

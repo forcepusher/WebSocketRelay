@@ -16,7 +16,7 @@ namespace BananaParty.WebSocketRelay
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
 
-        private readonly List<Room> _rooms = new();
+        private readonly List<NetworkPlayer> _networkPlayers = new();
 
         public Network(string address, NetworkContext context, INetworkListener listener)
         {
@@ -69,8 +69,6 @@ namespace BananaParty.WebSocketRelay
         {
             _relayClient?.ProcessIncomingMessages();
 
-            foreach (Room room in _rooms)
-                room.ManualUpdate(unscaledDeltaTime);
 
             //var jsonStateOutput = new JsonStateOutput();
             //_networkContext.WriteNetworkStates(jsonStateOutput);
@@ -82,14 +80,14 @@ namespace BananaParty.WebSocketRelay
             _relayClient.Send(topic, data);
         }
 
-        public void JoinRoom(string roomName)
+        public void SubscribeToTopic(string topic)
         {
-            _relayClient.Subscribe(roomName);
+            _relayClient.SubscribeToTopic(topic);
         }
 
-        public void LeaveRoom(string roomName)
+        public void UnsubscribeFromTopic(string topic)
         {
-            _relayClient.Unsubscribe(roomName);
+            _relayClient.UnsubscribeToTopic(topic);
         }
 
         public void Dispose()
@@ -102,37 +100,32 @@ namespace BananaParty.WebSocketRelay
         {
             LocalPlayerGuid = clientGuid;
             _networkContext.LocalClientIdentity = clientGuid;
-            _networkListener.OnConnectedToRelay();
+            _networkListener.OnConnectedToRelay(clientGuid);
         }
 
         public void OnSubscribedToTopic(string topic)
         {
-            var room = new Room(this, topic, LocalPlayerGuid);
-            _rooms.Add(room);
-            _networkListener.OnConnectedToRoom(room);
+            _networkListener.OnSubscribedToTopic(topic);
         }
 
         public void OnUnsubscribedFromTopic(string topic)
         {
-            Room room = _rooms.Find(room => room.RoomName == topic);
-            _networkListener.OnDisconnectedFromRoom(room);
-            _rooms.Remove(room);
+            _networkListener.OnUnsubscribedFromTopic(topic);
         }
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
         {
-            Room room = _rooms.Find(room => room.RoomName == topic);
-            room?.OnTopicMessage(senderGuid, topic, data);
+            _networkListener.OnTopicMessage(senderGuid, topic, data);
         }
 
-        internal void AddNetworkPlayer(NetworkPlayer networkPlayer)
+        private void AddNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            _networkListener.OnRoomPlayerAdded(networkPlayer);
+            _networkListener.OnPlayerAdded(networkPlayer);
         }
 
-        internal void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
+        private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
         {
-            _networkListener.OnRoomPlayerRemoved(networkPlayer);
+            _networkListener.OnPlayerRemoved(networkPlayer);
         }
     }
 }

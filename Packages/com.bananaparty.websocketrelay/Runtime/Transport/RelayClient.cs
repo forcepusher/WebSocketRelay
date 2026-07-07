@@ -41,7 +41,7 @@ namespace BananaParty.WebSocketRelay.Transport
             }
         }
 
-        public void Subscribe(string topic)
+        public void SubscribeToTopic(string topic)
         {
             if (!_subscriptions.Add(topic))
                 return;
@@ -49,7 +49,7 @@ namespace BananaParty.WebSocketRelay.Transport
             _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Subscribe, topic));
         }
 
-        public void Unsubscribe(string topic)
+        public void UnsubscribeToTopic(string topic)
         {
             if (!_subscriptions.Remove(topic))
                 throw new KeyNotFoundException($"Not subscribed to topic '{topic}'.");
