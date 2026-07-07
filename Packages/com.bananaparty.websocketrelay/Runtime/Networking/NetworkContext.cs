@@ -22,8 +22,6 @@ namespace BananaParty.WebSocketRelay
         private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
 
-        private Dictionary<string, NetworkIdentity> _prefabsByName;
-
         public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, Guid ownerGuid)
         {
             if (!_networkPrefabs.Contains(networkIdentityPrefab))
@@ -160,7 +158,10 @@ namespace BananaParty.WebSocketRelay
 
         private NetworkIdentity SpawnNetworkIdentity(string prefabName, Guid networkIdentifier, Guid networkOwner)
         {
-            NetworkIdentity prefab = GetPrefab(prefabName);
+            NetworkIdentity prefab = _networkPrefabs.Find(networkPrefab => networkPrefab.PrefabName == prefabName);
+            if (prefab == null)
+                throw new InvalidOperationException($"No network prefab registered with name {prefabName}");
+
             NetworkIdentity networkIdentity = GameObject.Instantiate(prefab);
             networkIdentity.NetworkIdentifier = networkIdentifier;
             networkIdentity.NetworkOwner = networkOwner;
@@ -170,32 +171,6 @@ namespace BananaParty.WebSocketRelay
 
             Debug.Log($"Spawned remote network identity '{prefabName}' ({networkIdentifier}) for player {networkOwner}");
             return networkIdentity;
-        }
-
-        private NetworkIdentity GetPrefab(string prefabName)
-        {
-            EnsurePrefabLookup();
-
-            if (!_prefabsByName.TryGetValue(prefabName, out NetworkIdentity prefab))
-                throw new InvalidOperationException($"No network prefab registered with name '{prefabName}'.");
-
-            return prefab;
-        }
-
-        private void EnsurePrefabLookup()
-        {
-            if (_prefabsByName != null)
-                return;
-
-            _prefabsByName = new Dictionary<string, NetworkIdentity>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (NetworkIdentity prefab in _networkPrefabs)
-            {
-                if (prefab == null)
-                    continue;
-
-                _prefabsByName[prefab.PrefabName] = prefab;
-            }
         }
 #endregion SLOP
 
