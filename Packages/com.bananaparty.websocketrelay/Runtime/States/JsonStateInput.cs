@@ -58,7 +58,7 @@ namespace BananaParty.WebSocketRelay
             int searchPosition = _objectContentStarts.Peek();
             _position = searchPosition;
 
-            while (TryReadPropertyKey(out string propertyKey))
+            while (ReadNextPropertyKey(out string propertyKey))
             {
                 if (string.Equals(propertyKey, name, StringComparison.OrdinalIgnoreCase))
                 {
@@ -97,7 +97,7 @@ namespace BananaParty.WebSocketRelay
                 _objectContentStarts.Pop();
         }
 
-        private bool TryReadPropertyKey(out string propertyKey)
+        private bool ReadNextPropertyKey(out string propertyKey)
         {
             propertyKey = null;
             SkipWhitespace();
