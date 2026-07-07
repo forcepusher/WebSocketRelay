@@ -15,6 +15,12 @@ namespace BananaParty.WebSocketRelay
         private readonly List<INetworkIdentity> _networkIdentities = new();
         private readonly Dictionary<Guid, INetworkIdentity> _networkIdentitiesByGuid = new();
 
+        public void Instantiate(NetworkIdentity networkIdentityPrefab, Guid ownerGuid)
+        {
+            NetworkIdentity networkIdentity = GameObject.Instantiate<NetworkIdentity>(networkIdentityPrefab);
+            networkIdentity.NetworkOwner = ownerGuid;
+        }
+
         public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
         {
             Debug.Log("Added " + networkIdentity.NetworkStateName + " to network context");
