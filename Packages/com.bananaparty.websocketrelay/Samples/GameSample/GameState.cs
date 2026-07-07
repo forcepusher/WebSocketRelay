@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
@@ -39,7 +40,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void OnConnectButtonClick()
         {
-            _network.Connect();
+            StartCoroutine(ConnectCoroutine());
         }
 
         public void OnDisconnectButtonClick()
@@ -47,39 +48,23 @@ namespace BananaParty.WebSocketRelay.Samples
             _network.Disconnect();
         }
 
-        public void OnConnectedToRelay()
+        private IEnumerator ConnectCoroutine()
         {
+            _network.Connect();
+
+            while (!_network.IsConnected)
+                yield return null;
+
+            Debug.Log("Connected to relay");
+
             _network.SubscribeToTopic("game-room");
-        }
 
-        public void OnSubscribedToTopic(string topic)
-        {
+            while (!_network.SubscribedTopics.Contains("game-room"))
+                yield return null;
+
+            Debug.Log("Subscribed to game-room");
+
             _networkContext.Instantiate(_playerCharacterPrefab, _network.LocalPlayerGuid);
-        }
-
-        public void OnUnsubscribedFromTopic(string topic)
-        {
-
-        }
-
-        public void OnPlayerAdded(NetworkPlayer networkPlayer)
-        {
-
-        }
-
-        public void OnPlayerRemoved(NetworkPlayer networkPlayer)
-        {
-
-        }
-
-        public void OnConnectedToRelay(Guid clientGuid)
-        {
-
-        }
-
-        public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
-        {
-
         }
     }
 }
