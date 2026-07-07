@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
-    public class GameState : MonoBehaviour, INetworkListener
+    public class GameState : MonoBehaviour
     {
         private Network _network;
 
@@ -15,7 +15,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Start()
         {
-            _network = new Network("ws://127.0.0.1:23144", _networkContext, this);
+            _network = new Network("ws://127.0.0.1:23144", _networkContext);
 
             //var jsonStateOutput = new JsonStateOutput();
             //WriteState(jsonStateOutput);

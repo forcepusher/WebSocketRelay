@@ -7,13 +7,14 @@ namespace BananaParty.WebSocketRelay.Transport
     public class RelayClient : IDisposable
     {
         private readonly Socket _socket;
-        private readonly HashSet<string> _subscriptions = new();
+        private readonly HashSet<string> _subscribedTopics = new();
 
         public bool IsConnected => _socket.IsConnected;
 
         public bool HasUnreadPayloadQueue => _socket.HasUnreadPayloadQueue;
 
         public Guid ClientId { get; private set; }
+        public HashSet<string> SubscribedTopics => _subscribedTopics;
 
         private IRelayListener _relayListener;
 
@@ -43,7 +44,7 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public void SubscribeToTopic(string topic)
         {
-            if (!_subscriptions.Add(topic))
+            if (!_subscribedTopics.Add(topic))
                 return;
 
             _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Subscribe, topic));
@@ -51,7 +52,7 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public void UnsubscribeToTopic(string topic)
         {
-            if (!_subscriptions.Remove(topic))
+            if (!_subscribedTopics.Remove(topic))
                 throw new KeyNotFoundException($"Not subscribed to topic '{topic}'.");
 
             _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Unsubscribe, topic));
@@ -59,7 +60,7 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public void Send(string topic, byte[] data)
         {
-            if (!_subscriptions.Contains(topic))
+            if (!_subscribedTopics.Contains(topic))
                 throw new KeyNotFoundException($"Not subscribed to topic '{topic}'.");
 
             _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Send, topic, data));
@@ -67,7 +68,7 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public void Dispose()
         {
-            _subscriptions.Clear();
+            _subscribedTopics.Clear();
 
             try
             {
@@ -158,7 +159,7 @@ namespace BananaParty.WebSocketRelay.Transport
             if (data.Length < payloadOffset)
                 throw new InvalidDataException("Incomplete topic message.");
 
-            if (!_subscriptions.Contains(topic))
+            if (!_subscribedTopics.Contains(topic))
                 return data.Length;
 
             byte[] messageData = new byte[data.Length - payloadOffset];
