@@ -22,8 +22,8 @@ Key priorities:
 Yes, it actually serializes your game state to JSON so you can easily spot bugs.  
 That is the core difference for improving your debugging experience.  
   
-Architecture is stupid-simple. There are rooms, in a room everyone receive same messages.  
-User can be connected to multiple rooms at the same time, so seamless world is possible when connected to 4 rooms.  
+Architecture is stupid-simple. It's a just a pub/sub, where each topic can represent a room or an area.  
+User can be listening to topics (rooms) at the same time, so seamless world is possible when listening to 4 topics.  
   
 Future plans:  
 1. Sample projects to use as a template for kickstarting development of your games.  
