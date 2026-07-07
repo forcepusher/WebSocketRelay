@@ -40,7 +40,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void OnConnectButtonClick()
         {
-            StartCoroutine(ConnectCoroutine());
+            StartCoroutine(ConnectCoroutine(5f));
         }
 
         public void OnDisconnectButtonClick()
@@ -48,7 +48,7 @@ namespace BananaParty.WebSocketRelay.Samples
             _network.Disconnect();
         }
 
-        private IEnumerator ConnectCoroutine()
+        private IEnumerator ConnectCoroutine(float connectionTimeout)
         {
             _network.Connect();
 
