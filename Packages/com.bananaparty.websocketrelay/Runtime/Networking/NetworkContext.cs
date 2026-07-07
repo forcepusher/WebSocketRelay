@@ -12,6 +12,10 @@ namespace BananaParty.WebSocketRelay
         private float _playerTimeoutSeconds = 15f;
 
         [SerializeField]
+        private bool _useBinary = false;
+        public bool UseBinary => _useBinary;
+
+        [SerializeField]
         private List<NetworkIdentity> _networkPrefabs;
 
         public Guid LocalClientIdentity { get; set; }
@@ -121,18 +125,32 @@ namespace BananaParty.WebSocketRelay
         }
 
 #region SLOP
+
+        public byte[] SerializeNetworkStates()
+        {
+            if (_useBinary)
+            {
+                using BinaryStateOutput stateOutput = new();
+                WriteNetworkStates(stateOutput);
+                return stateOutput.GetBuffer().ToArray();
+            }
+
+            JsonStateOutput jsonStateOutput = new(prettyPrint: false, bracesOnNewLine: false);
+            WriteNetworkStates(jsonStateOutput);
+            return Encoding.UTF8.GetBytes(jsonStateOutput.ToString());
+        }
+
         private void ApplyIncomingTopicState(byte[] data)
         {
             ReadOnlyMemory<byte> payload = StripMessageHeader(data);
-            bool isJson = IsJsonPayload(payload);
 
-            IReadOnlyList<Guid> identityIds = isJson
-                ? JsonStateInput.GetRootIdentityIds(Encoding.UTF8.GetString(payload.Span))
-                : BinaryStateInput.GetRootIdentityIds(payload);
+            IReadOnlyList<Guid> identityIds = _useBinary
+                ? BinaryStateInput.GetRootIdentityIds(payload)
+                : JsonStateInput.GetRootIdentityIds(Encoding.UTF8.GetString(payload.Span));
 
-            IStateInput stateInput = isJson
-                ? new JsonStateInput(Encoding.UTF8.GetString(payload.Span))
-                : new BinaryStateInput(payload);
+            IStateInput stateInput = _useBinary
+                ? new BinaryStateInput(payload)
+                : new JsonStateInput(Encoding.UTF8.GetString(payload.Span));
 
             stateInput.BeginObjectElement();
 
@@ -161,14 +179,6 @@ namespace BananaParty.WebSocketRelay
                 return data.AsMemory(1);
 
             return data.AsMemory();
-        }
-
-        private static bool IsJsonPayload(ReadOnlyMemory<byte> payload)
-        {
-            if (payload.Length == 0)
-                return false;
-
-            return payload.Span[0] == '{' || char.IsWhiteSpace((char)payload.Span[0]);
         }
 
         private void ReadAndSpawnNetworkIdentity(IStateInput stateInput, Guid networkIdentifier)
