@@ -27,8 +27,8 @@ namespace BananaParty.WebSocketRelay
         public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, Guid ownerGuid)
         {
             NetworkIdentity networkIdentity = GameObject.Instantiate(networkIdentityPrefab);
-            networkIdentityPrefab.NetworkOwner = ownerGuid;
-            networkIdentityPrefab.NetworkIdentifier = Guid.NewGuid();
+            networkIdentity.NetworkOwner = ownerGuid;
+            networkIdentity.NetworkIdentifier = Guid.NewGuid();
 
             RegisterNetworkIdentity(networkIdentity);
 
