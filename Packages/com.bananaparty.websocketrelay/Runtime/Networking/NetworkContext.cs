@@ -13,7 +13,6 @@ namespace BananaParty.WebSocketRelay
 
         [SerializeField]
         private bool _useBinary = false;
-        public bool UseBinary => _useBinary;
 
         [SerializeField]
         private List<NetworkIdentity> _networkPrefabs;
