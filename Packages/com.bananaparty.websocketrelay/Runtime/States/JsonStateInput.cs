@@ -48,8 +48,30 @@ namespace BananaParty.WebSocketRelay
 
         public void BeginObjectProperty(string name)
         {
-            AdvanceToEntry(name);
-            ReadObjectOpen();
+            if (_objectContentStarts.Count == 0)
+            {
+                AdvanceToEntry(name);
+                ReadObjectOpen();
+                return;
+            }
+
+            int searchPosition = _objectContentStarts.Peek();
+            _position = searchPosition;
+
+            while (TryReadPropertyKey(out string propertyKey))
+            {
+                if (string.Equals(propertyKey, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    SkipWhitespace();
+                    ExpectCharacter('{');
+                    _objectContentStarts.Push(_position);
+                    return;
+                }
+
+                SkipValue();
+            }
+
+            throw new KeyNotFoundException($"Network identity '{name}' was not found in JSON state.");
         }
 
         public void BeginObjectElement()
@@ -73,30 +95,6 @@ namespace BananaParty.WebSocketRelay
 
             if (_objectContentStarts.Count > 0)
                 _objectContentStarts.Pop();
-        }
-
-        public bool TryBeginObjectProperty(string key)
-        {
-            if (_objectContentStarts.Count == 0)
-                throw new InvalidOperationException("Cannot read keyed object property outside of a JSON object.");
-
-            int searchPosition = _objectContentStarts.Peek();
-            _position = searchPosition;
-
-            while (TryReadPropertyKey(out string propertyKey))
-            {
-                if (string.Equals(propertyKey, key, StringComparison.OrdinalIgnoreCase))
-                {
-                    SkipWhitespace();
-                    ExpectCharacter('{');
-                    _objectContentStarts.Push(_position);
-                    return true;
-                }
-
-                SkipValue();
-            }
-
-            return false;
         }
 
         private bool TryReadPropertyKey(out string propertyKey)

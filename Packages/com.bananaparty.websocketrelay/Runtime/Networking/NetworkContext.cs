@@ -39,10 +39,7 @@ namespace BananaParty.WebSocketRelay
             stateInput.BeginObjectElement();
             foreach (INetworkIdentity networkIdentity in _networkIdentities)
             {
-                string identityKey = networkIdentity.NetworkIdentifier.ToString();
-                if (!stateInput.TryBeginObjectProperty(identityKey))
-                    continue;
-
+                stateInput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
                 networkIdentity.ReadNetworkState(stateInput);
                 stateInput.EndObject();
             }

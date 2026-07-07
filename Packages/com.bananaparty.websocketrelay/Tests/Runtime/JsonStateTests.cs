@@ -91,10 +91,7 @@ namespace BananaParty.WebSocketRelay.Tests
             string json = output.ToString();
             var input = new JsonStateInput(json);
             input.BeginObjectElement();
-
-            Assert.IsTrue(
-                input.TryBeginObjectProperty(networkId.ToString()),
-                $"Expected keyed identity in JSON: {json}");
+            input.BeginObjectProperty(networkId.ToString());
             Assert.AreEqual(networkOwner, input.ReadGuid("NetworkOwner"));
             input.EndObject();
             input.EndObject();
@@ -122,7 +119,7 @@ namespace BananaParty.WebSocketRelay.Tests
             string json = output.ToString();
             var input = new JsonStateInput(json);
             input.BeginObjectElement();
-            Assert.IsTrue(input.TryBeginObjectProperty(networkId.ToString()), json);
+            input.BeginObjectProperty(networkId.ToString());
             Assert.AreEqual(networkOwner, input.ReadGuid("NetworkOwner"));
             input.BeginArrayProperty("NetworkStates");
             input.BeginObjectElement();
@@ -160,11 +157,11 @@ namespace BananaParty.WebSocketRelay.Tests
 
             var inputForIdentity2 = new JsonStateInput(json);
             inputForIdentity2.BeginObjectElement();
-            MockCharacterState readCharacterState2 = ReadIdentity(inputForIdentity2, networkId2, out Guid readNetworkOwner2, json);
+            MockCharacterState readCharacterState2 = ReadIdentity(inputForIdentity2, networkId2, out Guid readNetworkOwner2);
 
             var inputForIdentity1 = new JsonStateInput(json);
             inputForIdentity1.BeginObjectElement();
-            MockCharacterState readCharacterState1 = ReadIdentity(inputForIdentity1, networkId1, out Guid readNetworkOwner1, json);
+            MockCharacterState readCharacterState1 = ReadIdentity(inputForIdentity1, networkId1, out Guid readNetworkOwner1);
 
             Assert.AreEqual(networkOwner1, readNetworkOwner1);
             Assert.AreEqual(100, readCharacterState1.Health);
@@ -201,11 +198,11 @@ namespace BananaParty.WebSocketRelay.Tests
 
             var inputForIdentity1 = new JsonStateInput(json);
             inputForIdentity1.BeginObjectElement();
-            MockCharacterState readCharacterState1 = ReadIdentity(inputForIdentity1, networkId1, out Guid readNetworkOwner1, json);
+            MockCharacterState readCharacterState1 = ReadIdentity(inputForIdentity1, networkId1, out Guid readNetworkOwner1);
 
             var inputForIdentity2 = new JsonStateInput(json);
             inputForIdentity2.BeginObjectElement();
-            MockCharacterState readCharacterState2 = ReadIdentity(inputForIdentity2, networkId2, out Guid readNetworkOwner2, json);
+            MockCharacterState readCharacterState2 = ReadIdentity(inputForIdentity2, networkId2, out Guid readNetworkOwner2);
 
             Assert.AreEqual(networkOwner1, readNetworkOwner1);
             Assert.AreEqual(100, readCharacterState1.Health);
@@ -246,12 +243,9 @@ namespace BananaParty.WebSocketRelay.Tests
         private static MockCharacterState ReadIdentity(
             IStateInput stateInput,
             Guid networkIdentifier,
-            out Guid networkOwner,
-            string json = null)
+            out Guid networkOwner)
         {
-            Assert.IsTrue(
-                stateInput.TryBeginObjectProperty(networkIdentifier.ToString()),
-                string.IsNullOrEmpty(json) ? networkIdentifier.ToString() : json);
+            stateInput.BeginObjectProperty(networkIdentifier.ToString());
             networkOwner = stateInput.ReadGuid("NetworkOwner");
             stateInput.BeginArrayProperty("NetworkStates");
             stateInput.BeginObjectElement();
@@ -302,7 +296,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             var input = new BinaryStateInput(output.GetBuffer());
             input.BeginObjectElement();
-            Assert.IsFalse(input.TryBeginObjectProperty(unknownId.ToString()));
+            Assert.Throws<KeyNotFoundException>(() => input.BeginObjectProperty(unknownId.ToString()));
             MockCharacterState readCharacterState1 = ReadIdentity(input, networkId1, out Guid readNetworkOwner1);
             Assert.AreEqual(networkOwner1, readNetworkOwner1);
             Assert.AreEqual(100, readCharacterState1.Health);

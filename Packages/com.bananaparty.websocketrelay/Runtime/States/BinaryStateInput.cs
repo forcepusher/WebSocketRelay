@@ -38,8 +38,17 @@ namespace BananaParty.WebSocketRelay
 
         public void BeginObjectProperty(string name)
         {
-            if (!TryBeginObjectProperty(name))
+            if (!Guid.TryParse(name, out Guid identityId))
                 throw new KeyNotFoundException($"Network identity '{name}' was not found in binary state.");
+
+            if (_layers.Count == 0 || _layers.Peek() is not IdentityMapReadLayer identityMapLayer)
+                throw new InvalidOperationException("Cannot read keyed object property outside of a network states object.");
+
+            if (!identityMapLayer.TryGetPayload(identityId, out ReadOnlyMemory<byte> payload))
+                throw new KeyNotFoundException($"Network identity '{name}' was not found in binary state.");
+
+            _layers.Push(new IdentityPayloadReadLayer());
+            _reader = new BinaryFieldReader(payload);
         }
 
         public void BeginObjectElement()
@@ -73,22 +82,6 @@ namespace BananaParty.WebSocketRelay
                 _layers.Pop();
                 _reader = new BinaryFieldReader(_rootData);
             }
-        }
-
-        public bool TryBeginObjectProperty(string key)
-        {
-            if (!Guid.TryParse(key, out Guid identityId))
-                return false;
-
-            if (_layers.Count == 0 || _layers.Peek() is not IdentityMapReadLayer identityMapLayer)
-                return false;
-
-            if (!identityMapLayer.TryGetPayload(identityId, out ReadOnlyMemory<byte> payload))
-                return false;
-
-            _layers.Push(new IdentityPayloadReadLayer());
-            _reader = new BinaryFieldReader(payload);
-            return true;
         }
 
         public string ReadString(string name)
