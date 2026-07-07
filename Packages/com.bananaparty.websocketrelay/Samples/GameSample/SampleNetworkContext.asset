@@ -12,3 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7b9633602a882f4c86dcec01455acde, type: 3}
   m_Name: SampleNetworkContext
   m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.NetworkContext
+  _networkPrefabs:
+  - {fileID: 4763608854326616019, guid: e0b504692cc65ab448036b1fc974dd2d, type: 3}

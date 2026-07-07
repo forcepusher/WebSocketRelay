@@ -68,5 +68,10 @@ namespace BananaParty.WebSocketRelay
             }
             stateOutput.EndArray();
         }
+
+        private void OnValidate()
+        {
+            _prefabName = transform.name;
+        }
     }
 }
