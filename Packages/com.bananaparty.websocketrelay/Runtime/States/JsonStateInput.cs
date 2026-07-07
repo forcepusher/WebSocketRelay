@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
@@ -8,109 +9,130 @@ namespace BananaParty.WebSocketRelay
     {
         private readonly string _jsonString;
         private int _position;
-        private readonly Stack<bool> _inArrayStack = new();
+        private bool _hasStarted;
+        private readonly Stack<bool> _arrayFirstItemScopes = new();
+        private readonly Stack<int> _objectContentStarts = new();
 
         public JsonStateInput(string json)
         {
             _jsonString = json ?? "{}";
         }
 
-        private bool InArray => _inArrayStack.Count > 0 && _inArrayStack.Peek();
-
-        public void ReadObject(string name, List<IState> states)
+        public void BeginArrayProperty(string name)
         {
-            StartObject(name);
-
-            foreach (IState state in states)
-                state.ReadState(this);
-
-            EndObject();
+            AdvanceToEntry(name);
+            ReadArrayOpen();
+            _arrayFirstItemScopes.Push(true);
         }
 
-        public void ReadStaticArray(string name, List<IState> states)
+        public void BeginArrayElement()
         {
-            StartArray(name);
-
-            foreach (IState state in states)
+            SkipWhitespace();
+            if (!_hasStarted)
             {
-                if (!HasNextArrayElement())
-                    throw new InvalidOperationException($"Static array '{name}' requires {states.Count} entries but only reached the end of the array.");
-
-                state.ReadState(this);
+                ExpectCharacter('[');
+                _hasStarted = true;
             }
 
-            EndArray();
+            _arrayFirstItemScopes.Push(true);
         }
 
-        public void ReadDynamicArray<T>(string name, List<T> states) where T : IKeyedState
+        public void EndArray()
         {
-            StartArray(name);
-            int index = 0;
+            SkipWhitespace();
+            ExpectCharacter(']');
 
-            while (HasNextArrayElement())
-            {
-                if (index >= states.Count)
-                    throw new InvalidOperationException($"Dynamic array '{name}' requires at least {index + 1} entries but only {states.Count} exist.");
-
-                states[index].ReadState(this);
-                index++;
-            }
-
-            while (states.Count > index)
-                states.RemoveAt(states.Count - 1);
-
-            EndArray();
+            if (_arrayFirstItemScopes.Count > 0)
+                _arrayFirstItemScopes.Pop();
         }
 
-        public void ReadDynamicArray<T>(string name, List<T> states, IFactory<T> factory) where T : IKeyedState
+        public void BeginObjectProperty(string name)
         {
-            StartArray(name);
-
-            var incoming = new List<T>();
-            while (HasNextArrayElement())
+            if (_objectContentStarts.Count == 0)
             {
-                T staging = factory.Create(Guid.Empty);
-                staging.ReadState(this);
-                incoming.Add(staging);
+                AdvanceToEntry(name);
+                ReadObjectOpen();
+                return;
             }
 
-            var stateMap = new Dictionary<Guid, T>();
-            foreach (T state in states)
-                stateMap[state.StateKey.Value] = state;
+            int searchPosition = _objectContentStarts.Peek();
+            _position = searchPosition;
 
-            var next = new List<T>(incoming.Count);
-            foreach (T staging in incoming)
+            while (ReadNextPropertyKey(out string propertyKey))
             {
-                Guid key = staging.StateKey.Value;
-                if (stateMap.TryGetValue(key, out T existing))
+                if (string.Equals(propertyKey, name, StringComparison.OrdinalIgnoreCase))
                 {
-                    CopyStateFrom(staging, existing);
-                    next.Add(existing);
-                    stateMap.Remove(key);
+                    SkipWhitespace();
+                    ExpectCharacter('{');
+                    _objectContentStarts.Push(_position);
+                    return;
                 }
-                else
-                {
-                    T entry = factory.Create(key);
-                    CopyStateFrom(staging, entry);
-                    next.Add(entry);
-                }
-                factory.Dispose(staging);
+
+                SkipValue();
             }
 
-            foreach (T orphaned in stateMap.Values)
-                factory.Dispose(orphaned);
-
-            states.Clear();
-            states.AddRange(next);
-
-            EndArray();
+            throw new KeyNotFoundException($"Network identity '{name}' was not found in JSON state.");
         }
 
-        private void CopyStateFrom(IState source, IState target)
+        public void BeginObjectElement()
         {
-            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
-            source.WriteState(output);
-            new JsonStateInput(output.ToString()).ReadObject(string.Empty, new List<IState> { target });
+            SkipWhitespace();
+            if (!_hasStarted)
+            {
+                ExpectCharacter('{');
+                _hasStarted = true;
+                _objectContentStarts.Push(_position);
+                return;
+            }
+
+            SkipArrayElementSeparator();
+            ReadObjectOpen();
+        }
+
+        internal static IReadOnlyList<Guid> GetRootIdentityIds(string json)
+        {
+            JsonStateInput stateInput = new(json);
+            stateInput.BeginObjectElement();
+
+            List<Guid> identityIds = new();
+            stateInput._position = stateInput._objectContentStarts.Peek();
+
+            while (stateInput.ReadNextPropertyKey(out string propertyKey))
+            {
+                if (!Guid.TryParse(propertyKey, out Guid identityId))
+                    throw new InvalidOperationException($"Invalid network identity key '{propertyKey}'.");
+
+                identityIds.Add(identityId);
+                stateInput.SkipValue();
+            }
+
+            return identityIds;
+        }
+
+        public void EndObject()
+        {
+            ReadObjectClose();
+
+            if (_objectContentStarts.Count > 0)
+                _objectContentStarts.Pop();
+        }
+
+        private bool ReadNextPropertyKey(out string propertyKey)
+        {
+            propertyKey = null;
+            SkipWhitespace();
+
+            if (_position >= _jsonString.Length || _jsonString[_position] == '}')
+                return false;
+
+            SkipItemSeparator();
+            propertyKey = ReadQuotedString();
+
+            if (propertyKey == null)
+                throw new InvalidOperationException($"Expected quoted property key at position {_position}.");
+
+            SkipColon();
+            return true;
         }
 
         public string ReadString(string name)
@@ -165,88 +187,223 @@ namespace BananaParty.WebSocketRelay
             return ReadBoolAtPosition();
         }
 
+        public Vector2 ReadVector2(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            float x = ReadObjectComponentFloat("x");
+            float y = ReadObjectComponentFloat("y");
+
+            ReadObjectClose();
+            return new Vector2(x, y);
+        }
+
+        public Vector3 ReadVector3(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            float x = ReadObjectComponentFloat("x");
+            float y = ReadObjectComponentFloat("y");
+            float z = ReadObjectComponentFloat("z");
+
+            ReadObjectClose();
+            return new Vector3(x, y, z);
+        }
+
+        public Vector2Int ReadVector2Int(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            int x = ReadObjectComponentInt("x");
+            int y = ReadObjectComponentInt("y");
+
+            ReadObjectClose();
+            return new Vector2Int(x, y);
+        }
+
+        public Vector3Int ReadVector3Int(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            int x = ReadObjectComponentInt("x");
+            int y = ReadObjectComponentInt("y");
+            int z = ReadObjectComponentInt("z");
+
+            ReadObjectClose();
+            return new Vector3Int(x, y, z);
+        }
+
+        public Quaternion ReadQuaternion(string name)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+
+            float x = ReadObjectComponentFloat("x");
+            float y = ReadObjectComponentFloat("y");
+            float z = ReadObjectComponentFloat("z");
+            float w = ReadObjectComponentFloat("w");
+
+            ReadObjectClose();
+            return new Quaternion(x, y, z, w);
+        }
+
         public Guid ReadGuid(string name)
         {
             string value = ReadString(name);
             return Guid.TryParse(value, out Guid result) ? result : Guid.Empty;
         }
 
-        private void StartObject(string name)
-        {
-            AdvanceIntoContainer('{', name);
-            _inArrayStack.Push(false);
-        }
-
-        private void EndObject()
-        {
-            ReadContainerClose('}');
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
-
-        private void StartArray(string name)
-        {
-            AdvanceIntoContainer('[', name);
-            _inArrayStack.Push(true);
-        }
-
-        private void EndArray()
-        {
-            ReadContainerClose(']');
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
-
-        private bool HasNextArrayElement()
-        {
-            SkipWhitespace();
-            return _position < _jsonString.Length && _jsonString[_position] != ']';
-        }
-
-        private void AdvanceIntoContainer(char open, string name)
-        {
-            if (!InArray && !string.IsNullOrEmpty(name))
-            {
-                SkipWhitespace();
-                if (_position < _jsonString.Length && _jsonString[_position] == open)
-                    _position++;
-
-                SkipItemSeparator();
-                ReadContainerName(name);
-                SkipColon();
-            }
-            else if (InArray)
-            {
-                SkipItemSeparator();
-            }
-
-            SkipWhitespace();
-            if (_position < _jsonString.Length && _jsonString[_position] == open)
-                _position++;
-        }
-
-        private void ReadContainerClose(char close)
-        {
-            SkipWhitespace();
-            if (_position < _jsonString.Length && _jsonString[_position] == close)
-                _position++;
-        }
-
-        private void ReadContainerName(string expectedName)
-        {
-            ReadQuotedString();
-        }
-
         private void AdvanceToEntry(string expectedName)
         {
             SkipItemSeparator();
-            if (InArray) return;
 
+            if (_position < _jsonString.Length && _jsonString[_position] == '{')
+                _position++;
+
+            SkipWhitespace();
             string entryName = ReadQuotedString();
-            if (!string.IsNullOrEmpty(expectedName) && entryName != expectedName)
+            if (!string.IsNullOrEmpty(expectedName) && (entryName == null || entryName != expectedName))
                 throw new KeyNotFoundException($"Expected field '{expectedName}' but found '{entryName ?? "null"}' in JSON state.");
 
             SkipColon();
+        }
+
+        private void ReadObjectOpen()
+        {
+            SkipWhitespace();
+            ExpectCharacter('{');
+            _objectContentStarts.Push(_position);
+        }
+
+        private void ReadArrayOpen()
+        {
+            SkipWhitespace();
+            ExpectCharacter('[');
+        }
+
+        private void ReadObjectClose()
+        {
+            SkipWhitespace();
+            ExpectCharacter('}');
+        }
+
+        private void SkipArrayElementSeparator()
+        {
+            if (_arrayFirstItemScopes.Count == 0)
+                return;
+
+            bool isFirst = _arrayFirstItemScopes.Pop();
+            if (!isFirst)
+            {
+                SkipWhitespace();
+                ExpectCharacter(',');
+                SkipWhitespace();
+            }
+
+            _arrayFirstItemScopes.Push(false);
+        }
+
+        private void ExpectCharacter(char expected)
+        {
+            SkipWhitespace();
+
+            if (_position >= _jsonString.Length || _jsonString[_position] != expected)
+                throw new InvalidOperationException($"Expected JSON '{expected}' at position {_position}.");
+
+            _position++;
+        }
+
+        private float ReadObjectComponentFloat(string componentName)
+        {
+            SkipItemSeparator();
+
+            string entryName = ReadQuotedString();
+            if (entryName != componentName)
+                throw new KeyNotFoundException($"Expected field '{componentName}' but found '{entryName ?? "null"}' in JSON object.");
+
+            SkipColon();
+            return ReadFloatAtPosition();
+        }
+
+        private int ReadObjectComponentInt(string componentName)
+        {
+            SkipItemSeparator();
+
+            string entryName = ReadQuotedString();
+            if (entryName != componentName)
+                throw new KeyNotFoundException($"Expected field '{componentName}' but found '{entryName ?? "null"}' in JSON object.");
+
+            SkipColon();
+            return ReadIntAtPosition();
+        }
+
+        private void SkipValue()
+        {
+            SkipWhitespace();
+
+            if (_position >= _jsonString.Length)
+                return;
+
+            char current = _jsonString[_position];
+            if (current == '"')
+            {
+                ReadQuotedString();
+                return;
+            }
+
+            if (current == '{')
+            {
+                ReadObjectOpen();
+                SkipObjectContent();
+                ReadObjectClose();
+
+                if (_objectContentStarts.Count > 0)
+                    _objectContentStarts.Pop();
+
+                return;
+            }
+
+            if (current == '[')
+            {
+                ReadArrayOpen();
+                SkipArrayContent();
+                SkipWhitespace();
+                ExpectCharacter(']');
+                return;
+            }
+
+            ReadValueAsString();
+        }
+
+        private void SkipObjectContent()
+        {
+            SkipWhitespace();
+
+            while (_position < _jsonString.Length && _jsonString[_position] != '}')
+            {
+                SkipItemSeparator();
+                ReadQuotedString();
+                SkipColon();
+                SkipValue();
+            }
+        }
+
+        private void SkipArrayContent()
+        {
+            while (true)
+            {
+                SkipWhitespace();
+
+                if (_position >= _jsonString.Length || _jsonString[_position] == ']')
+                    return;
+
+                SkipItemSeparator();
+                SkipValue();
+            }
         }
 
         private void SkipItemSeparator()

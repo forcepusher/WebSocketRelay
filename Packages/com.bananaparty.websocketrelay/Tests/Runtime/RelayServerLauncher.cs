@@ -3,9 +3,9 @@ using System.Collections;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using BananaParty.WebSocketRelay.Transport;
+
 #if !UNITY_WEBGL || UNITY_EDITOR
-using System.Diagnostics;
-using System.IO;
 using System.Net.Sockets;
 #endif
 
@@ -16,7 +16,7 @@ namespace BananaParty.WebSocketRelay.Tests
         private const int ServerStartupTimeoutMs = 15000;
 
 #if !UNITY_WEBGL || UNITY_EDITOR
-        private static Process _serverProcess;
+        private static RelayServerProcess _serverProcess;
         private static bool _weOwnProcess;
         private static readonly SemaphoreSlim Gate = new(1, 1);
         private static readonly object EnsureTaskLock = new();
@@ -47,51 +47,20 @@ namespace BananaParty.WebSocketRelay.Tests
             await Gate.WaitAsync().ConfigureAwait(false);
             try
             {
-                if (await IsPortOpenAsync(TestParameters.RelayServerPort).ConfigureAwait(false))
-                    return true;
-
-                if (_serverProcess != null && !_serverProcess.HasExited)
+                if (_serverProcess != null && _serverProcess.IsRunning)
                     return await WaitForPortAsync(TestParameters.RelayServerPort, ServerStartupTimeoutMs).ConfigureAwait(false);
 
-                string scriptName = Application.platform switch
-                {
-                    RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsPlayer => "LaunchServer-Windows.bat",
-                    RuntimePlatform.OSXEditor or RuntimePlatform.OSXPlayer => "LaunchServer-MacOS.sh",
-                    _ => "LaunchServer-Linux.sh"
-                };
-
-                string scriptPath = Path.Combine(Environment.CurrentDirectory, "Packages", "com.bananaparty.websocketrelay", "Server", scriptName);
-
-                if (!File.Exists(scriptPath))
-                {
-                    UnityEngine.Debug.LogError($"Relay Server script not found at: {scriptPath}");
-                    return false;
-                }
-
-                ProcessStartInfo startInfo = new ProcessStartInfo
-                {
-                    CreateNoWindow = true,
-                    WorkingDirectory = Path.GetDirectoryName(scriptPath)
-                };
-
-                if (Application.platform == RuntimePlatform.WindowsEditor || Application.platform == RuntimePlatform.WindowsPlayer)
-                {
-                    startInfo.FileName = "cmd.exe";
-                    startInfo.Arguments = $"/c \"{scriptPath}\"";
-                    startInfo.UseShellExecute = false;
-                }
-                else
-                {
-                    startInfo.FileName = "/bin/bash";
-                    startInfo.Arguments = $"\"{scriptPath}\"";
-                    startInfo.UseShellExecute = false;
-                }
+                RelayServerProcess.KillAllRelayServers();
 
                 try
                 {
-                    _serverProcess = Process.Start(startInfo);
+                    _serverProcess = new RelayServerProcess();
+                    _serverProcess.Start(
+                        verboseDebug: true,
+                        createNoWindow: true,
+                        relayPort: TestParameters.RelayServerPort);
                     _weOwnProcess = true;
-                    UnityEngine.Debug.Log($"Started local relay server using {scriptName}. Waiting for port {TestParameters.RelayServerPort}...");
+                    UnityEngine.Debug.Log($"Started local relay server. Waiting for port {TestParameters.RelayServerPort}...");
 
                     if (await WaitForPortAsync(TestParameters.RelayServerPort, ServerStartupTimeoutMs).ConfigureAwait(false))
                         return true;
@@ -177,7 +146,7 @@ namespace BananaParty.WebSocketRelay.Tests
             await Gate.WaitAsync().ConfigureAwait(false);
             try
             {
-                if (!_weOwnProcess || _serverProcess == null || _serverProcess.HasExited)
+                if (!_weOwnProcess || _serverProcess == null || !_serverProcess.IsRunning)
                 {
                     _weOwnProcess = false;
                     return;
@@ -185,9 +154,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
                 try
                 {
-                    _serverProcess.Kill();
-                    await Task.Run(() => _serverProcess.WaitForExit(5000)).ConfigureAwait(false);
-                    _serverProcess.Dispose();
+                    _serverProcess.Stop();
                     UnityEngine.Debug.Log("Stopped local relay server.");
                 }
                 catch (Exception e)

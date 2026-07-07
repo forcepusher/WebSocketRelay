@@ -1,285 +1,321 @@
+using System;
 using System.Collections.Generic;
+using BananaParty.WebSocketRelay;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
     public class JsonStateTests
     {
-        private class MockState : IState
+        [Test]
+        public void ShouldWriteAndReadPrimitives()
         {
-            public string StateName { get; }
-            public int Value { get; set; }
+            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            output.WriteInt("Score", 10);
+            output.WriteInt("Level", 5);
 
-            public MockState(string name, int value)
-            {
-                StateName = name;
-                Value = value;
-            }
+            var input = new JsonStateInput(output.ToString());
 
-            public void WriteState(IStateOutput writeGraph)
-            {
-                writeGraph.WriteInt(StateName, Value);
-            }
-
-            public void ReadState(IStateInput readGraph)
-            {
-                Value = readGraph.ReadInt(StateName);
-            }
+            Assert.AreEqual(10, input.ReadInt("Score"));
+            Assert.AreEqual(5, input.ReadInt("Level"));
         }
 
         [Test]
-        public void ShouldWriteSimpleObjectState()
+        public void ShouldWriteAndReadVector3()
         {
-            var states = new List<IState>
-            {
-                new MockState("Score", 10),
-                new MockState("Level", 5)
-            };
-            var root = new ObjectState("GameState", states);
-            var graph = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            output.WriteVector3("Position", new Vector3(1, 2, 3));
 
-            root.WriteState(graph);
-            string json = graph.ToString();
+            var input = new JsonStateInput(output.ToString());
 
-            Assert.AreEqual("{\"GameState\":{\"Score\":10,\"Level\":5}}", json);
-        }
-
-        [Test]
-        public void ShouldReadSimpleObjectState()
-        {
-            var states = new List<IState>
-            {
-                new MockState("Score", 0),
-                new MockState("Level", 0)
-            };
-            var root = new ObjectState("GameState", states);
-            var graph = new JsonStateInput("{\"GameState\":{\"Score\":10,\"Level\":5}}");
-
-            root.ReadState(graph);
-
-            Assert.AreEqual(10, ((MockState)states[0]).Value);
-            Assert.AreEqual(5, ((MockState)states[1]).Value);
-        }
-
-        [Test]
-        public void ShouldWriteNestedObjectStates()
-        {
-            var playerStates = new List<IState>
-            {
-                new MockState("Health", 100),
-                new MockState("Mana", 50)
-            };
-            var player = new ObjectState("Player", playerStates);
-
-            var botStates = new List<IState>
-            {
-                new MockState("Health", 80),
-                new MockState("Mana", 20)
-            };
-            var bot = new ObjectState("Bot", botStates);
-
-            var rootStates = new List<IState> { player, bot };
-            var root = new ObjectState("GameState", rootStates);
-            var graph = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
-
-            root.WriteState(graph);
-            string json = graph.ToString();
-
-            Assert.AreEqual("{\"GameState\":{\"Player\":{\"Health\":100,\"Mana\":50},\"Bot\":{\"Health\":80,\"Mana\":20}}}", json);
-        }
-
-        [Test]
-        public void ShouldReadNestedObjectStates()
-        {
-            var playerStates = new List<IState>
-            {
-                new MockState("Health", 0),
-                new MockState("Mana", 0)
-            };
-            var player = new ObjectState("Player", playerStates);
-
-            var botStates = new List<IState>
-            {
-                new MockState("Health", 0),
-                new MockState("Mana", 0)
-            };
-            var bot = new ObjectState("Bot", botStates);
-
-            var rootStates = new List<IState> { player, bot };
-            var root = new ObjectState("GameState", rootStates);
-            var graph = new JsonStateInput("{\"GameState\":{\"Player\":{\"Health\":100,\"Mana\":50},\"Bot\":{\"Health\":80,\"Mana\":20}}}");
-
-            root.ReadState(graph);
-
-            Assert.AreEqual(100, ((MockState)playerStates[0]).Value);
-            Assert.AreEqual(50, ((MockState)playerStates[1]).Value);
-            Assert.AreEqual(80, ((MockState)botStates[0]).Value);
-            Assert.AreEqual(20, ((MockState)botStates[1]).Value);
+            Assert.AreEqual(new Vector3(1, 2, 3), input.ReadVector3("Position"));
         }
 
         [Test]
         public void ShouldHandlePrettyPrint()
         {
-            var states = new List<IState> { new MockState("X", 1) };
-            var root = new ObjectState("Root", states);
-            var graph = new JsonStateOutput(prettyPrint: true, bracesOnNewLine: true);
+            var output = new JsonStateOutput(prettyPrint: true, bracesOnNewLine: true);
+            output.WriteInt("X", 1);
 
-            root.WriteState(graph);
-            string json = graph.ToString();
+            string json = output.ToString();
 
             Assert.IsTrue(json.Contains("\n"));
-            Assert.IsTrue(json.Contains("    \"Root\":"));
+            Assert.IsTrue(json.Contains("\"X\":"));
         }
 
         [Test]
-        public void ShouldWriteSimpleArrayState()
+        public void ShouldPrettyPrintNetworkStateStructure()
         {
-            var scores = new List<MockState>
-            {
-                new MockState("", 10),
-                new MockState("", 20),
-                new MockState("", 30)
-            };
-            var root = new ObjectState("GameState", new List<IState>
-            {
-                new StaticArrayState<MockState>("Scores", scores)
-            });
-            var graph = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            Guid networkId = Guid.Parse("054c4725-f87c-4acd-98dc-81dcb03fd235");
+            Guid networkOwner = Guid.Parse("b27c471a-b17d-4a89-8285-0dee8e74b771");
 
-            root.WriteState(graph);
-            string json = graph.ToString();
+            var output = new JsonStateOutput(prettyPrint: true, bracesOnNewLine: true);
+            output.BeginObjectElement();
+            output.BeginObjectProperty(networkId.ToString());
+            output.WriteGuid("NetworkOwner", networkOwner);
+            output.BeginArrayProperty("NetworkStates");
+            output.BeginObjectElement();
+            output.WriteInt("_health", 100);
+            output.WriteVector3("_position", Vector3.zero);
+            output.EndObject();
+            output.EndArray();
+            output.EndObject();
+            output.EndObject();
 
-            Assert.AreEqual("{\"GameState\":{\"Scores\":[10,20,30]}}", json);
+            string json = output.ToString();
+
+            Assert.IsTrue(json.TrimStart().StartsWith("{"));
+            Assert.IsTrue(json.TrimEnd().EndsWith("}"));
+            Assert.IsTrue(json.Contains($"\"{networkId}\":"));
+            Assert.IsTrue(json.Contains("\"NetworkStates\":"));
+            Assert.IsTrue(json.Contains("["));
+            Assert.IsFalse(json.Contains($"\"{nameof(MockCharacterState)}\":"));
+            Assert.IsFalse(json.Contains("\"StateName\""));
+            Assert.IsFalse(json.Contains("\"NetworkIdentifier\""));
+            Assert.IsTrue(json.Contains("\"_position\":{\"x\":0,\"y\":0,\"z\":0}"));
         }
 
         [Test]
-        public void ShouldReadSimpleArrayState()
+        public void ShouldRoundTripKeyedObjectPropertyLookup()
         {
-            var scores = new List<MockState>
-            {
-                new MockState("", 0),
-                new MockState("", 0),
-                new MockState("", 0)
-            };
-            var root = new ObjectState("GameState", new List<IState>
-            {
-                new StaticArrayState<MockState>("Scores", scores)
-            });
-            var graph = new JsonStateInput("{\"GameState\":{\"Scores\":[10,20,30]}}");
+            Guid networkId = Guid.Parse("bf0c3839-ff9c-4ef4-9442-482648647d53");
+            Guid networkOwner = Guid.Parse("bea8ee69-bdcf-4eda-8755-bf4c4a886c29");
 
-            root.ReadState(graph);
+            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            output.BeginObjectElement();
+            output.BeginObjectProperty(networkId.ToString());
+            output.WriteGuid("NetworkOwner", networkOwner);
+            output.EndObject();
+            output.EndObject();
 
-            Assert.AreEqual(10, scores[0].Value);
-            Assert.AreEqual(20, scores[1].Value);
-            Assert.AreEqual(30, scores[2].Value);
+            string json = output.ToString();
+            var input = new JsonStateInput(json);
+            input.BeginObjectElement();
+            input.BeginObjectProperty(networkId.ToString());
+            Assert.AreEqual(networkOwner, input.ReadGuid("NetworkOwner"));
+            input.EndObject();
+            input.EndObject();
         }
 
         [Test]
-        public void ShouldWriteArrayOfObjectStates()
+        public void ShouldRoundTripKeyedNetworkStatesLayer()
         {
-            var playerOne = new ObjectState("", new List<IState>
-            {
-                new MockState("Health", 100),
-                new MockState("Mana", 50)
-            });
-            var playerTwo = new ObjectState("", new List<IState>
-            {
-                new MockState("Health", 80),
-                new MockState("Mana", 20)
-            });
-            var root = new ObjectState("GameState", new List<IState>
-            {
-                new StaticArrayState<ObjectState>("Players", new List<ObjectState> { playerOne, playerTwo })
-            });
-            var graph = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            Guid networkOwner = Guid.Parse("bea8ee69-bdcf-4eda-8755-bf4c4a886c29");
+            Guid networkId = Guid.Parse("bf0c3839-ff9c-4ef4-9442-482648647d53");
 
-            root.WriteState(graph);
-            string json = graph.ToString();
+            var output = new JsonStateOutput(prettyPrint: true, bracesOnNewLine: true);
+            output.BeginObjectElement();
+            output.BeginObjectProperty(networkId.ToString());
+            output.WriteGuid("NetworkOwner", networkOwner);
+            output.BeginArrayProperty("NetworkStates");
+            output.BeginObjectElement();
+            output.WriteInt("_health", 5);
+            output.WriteVector3("_position", new Vector3(1f, 2f, 3f));
+            output.EndObject();
+            output.EndArray();
+            output.EndObject();
+            output.EndObject();
 
-            Assert.AreEqual("{\"GameState\":{\"Players\":[{\"Health\":100,\"Mana\":50},{\"Health\":80,\"Mana\":20}]}}", json);
+            string json = output.ToString();
+            var input = new JsonStateInput(json);
+            input.BeginObjectElement();
+            input.BeginObjectProperty(networkId.ToString());
+            Assert.AreEqual(networkOwner, input.ReadGuid("NetworkOwner"));
+            input.BeginArrayProperty("NetworkStates");
+            input.BeginObjectElement();
+            Assert.AreEqual(5, input.ReadInt("_health"));
+            Assert.AreEqual(new Vector3(1f, 2f, 3f), input.ReadVector3("_position"));
+            input.EndObject();
+            input.EndArray();
+            input.EndObject();
+            input.EndObject();
         }
 
         [Test]
-        public void ShouldReadArrayOfObjectStates()
+        public void ShouldRoundTripKeyedNetworkStatesOutOfOrder()
         {
-            var playerOneStates = new List<IState>
-            {
-                new MockState("Health", 0),
-                new MockState("Mana", 0)
-            };
-            var playerTwoStates = new List<IState>
-            {
-                new MockState("Health", 0),
-                new MockState("Mana", 0)
-            };
-            var playerOne = new ObjectState("", playerOneStates);
-            var playerTwo = new ObjectState("", playerTwoStates);
-            var root = new ObjectState("GameState", new List<IState>
-            {
-                new StaticArrayState<ObjectState>("Players", new List<ObjectState> { playerOne, playerTwo })
-            });
-            var graph = new JsonStateInput("{\"GameState\":{\"Players\":[{\"Health\":100,\"Mana\":50},{\"Health\":80,\"Mana\":20}]}}");
+            Guid networkId1 = Guid.Parse("bf0c3839-ff9c-4ef4-9442-482648647d53");
+            Guid networkOwner1 = Guid.Parse("bea8ee69-bdcf-4eda-8755-bf4c4a886c29");
+            Guid networkId2 = Guid.Parse("5640008b-7dd5-4056-a15e-2c18d65e9018");
+            Guid networkOwner2 = Guid.Parse("dcf6650b-88cb-42d7-8bda-1875e41a75fa");
 
-            root.ReadState(graph);
+            var characterState1 = new MockCharacterState { Health = 100, Position = new Vector3(1f, 2f, 3f) };
+            var characterState2 = new MockCharacterState { Health = 75, Position = new Vector3(4f, 5f, 6f) };
 
-            Assert.AreEqual(100, ((MockState)playerOneStates[0]).Value);
-            Assert.AreEqual(50, ((MockState)playerOneStates[1]).Value);
-            Assert.AreEqual(80, ((MockState)playerTwoStates[0]).Value);
-            Assert.AreEqual(20, ((MockState)playerTwoStates[1]).Value);
+            var output = new JsonStateOutput(prettyPrint: true, bracesOnNewLine: true);
+            output.BeginObjectElement();
+            WriteIdentity(output, networkId2, networkOwner2, characterState2);
+            WriteIdentity(output, networkId1, networkOwner1, characterState1);
+            output.EndObject();
+
+            characterState1.Health = 0;
+            characterState1.Position = Vector3.zero;
+            characterState2.Health = 0;
+            characterState2.Position = Vector3.zero;
+
+            string json = output.ToString();
+
+            var inputForIdentity2 = new JsonStateInput(json);
+            inputForIdentity2.BeginObjectElement();
+            MockCharacterState readCharacterState2 = ReadIdentity(inputForIdentity2, networkId2, out Guid readNetworkOwner2);
+
+            var inputForIdentity1 = new JsonStateInput(json);
+            inputForIdentity1.BeginObjectElement();
+            MockCharacterState readCharacterState1 = ReadIdentity(inputForIdentity1, networkId1, out Guid readNetworkOwner1);
+
+            Assert.AreEqual(networkOwner1, readNetworkOwner1);
+            Assert.AreEqual(100, readCharacterState1.Health);
+            Assert.AreEqual(new Vector3(1f, 2f, 3f), readCharacterState1.Position);
+
+            Assert.AreEqual(networkOwner2, readNetworkOwner2);
+            Assert.AreEqual(75, readCharacterState2.Health);
+            Assert.AreEqual(new Vector3(4f, 5f, 6f), readCharacterState2.Position);
         }
 
         [Test]
-        public void ShouldWriteNestedArrayStates()
+        public void ShouldRoundTripPrettyPrintedNetworkStates()
         {
-            var rowOne = new StaticArrayState<MockState>("", new List<MockState>
-            {
-                new MockState("", 1),
-                new MockState("", 2)
-            });
-            var rowTwo = new StaticArrayState<MockState>("", new List<MockState>
-            {
-                new MockState("", 3),
-                new MockState("", 4)
-            });
-            var root = new ObjectState("GameState", new List<IState>
-            {
-                new StaticArrayState<StaticArrayState<MockState>>("Grid", new List<StaticArrayState<MockState>> { rowOne, rowTwo })
-            });
-            var graph = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            Guid networkId1 = Guid.Parse("bf0c3839-ff9c-4ef4-9442-482648647d53");
+            Guid networkOwner1 = Guid.Parse("bea8ee69-bdcf-4eda-8755-bf4c4a886c29");
+            Guid networkId2 = Guid.Parse("5640008b-7dd5-4056-a15e-2c18d65e9018");
+            Guid networkOwner2 = Guid.Parse("dcf6650b-88cb-42d7-8bda-1875e41a75fa");
 
-            root.WriteState(graph);
-            string json = graph.ToString();
+            var characterState1 = new MockCharacterState { Health = 100, Position = new Vector3(1f, 2f, 3f) };
+            var characterState2 = new MockCharacterState { Health = 75, Position = new Vector3(4f, 5f, 6f) };
 
-            Assert.AreEqual("{\"GameState\":{\"Grid\":[[1,2],[3,4]]}}", json);
+            var output = new JsonStateOutput(prettyPrint: true, bracesOnNewLine: true);
+            WriteNetworkSnapshot(
+                output,
+                (networkId1, networkOwner1, characterState1),
+                (networkId2, networkOwner2, characterState2));
+
+            characterState1.Health = 0;
+            characterState1.Position = Vector3.zero;
+            characterState2.Health = 0;
+            characterState2.Position = Vector3.zero;
+
+            string json = output.ToString();
+
+            var inputForIdentity1 = new JsonStateInput(json);
+            inputForIdentity1.BeginObjectElement();
+            MockCharacterState readCharacterState1 = ReadIdentity(inputForIdentity1, networkId1, out Guid readNetworkOwner1);
+
+            var inputForIdentity2 = new JsonStateInput(json);
+            inputForIdentity2.BeginObjectElement();
+            MockCharacterState readCharacterState2 = ReadIdentity(inputForIdentity2, networkId2, out Guid readNetworkOwner2);
+
+            Assert.AreEqual(networkOwner1, readNetworkOwner1);
+            Assert.AreEqual(100, readCharacterState1.Health);
+            Assert.AreEqual(new Vector3(1f, 2f, 3f), readCharacterState1.Position);
+
+            Assert.AreEqual(networkOwner2, readNetworkOwner2);
+            Assert.AreEqual(75, readCharacterState2.Health);
+            Assert.AreEqual(new Vector3(4f, 5f, 6f), readCharacterState2.Position);
+        }
+
+        private static void WriteNetworkSnapshot(
+            IStateOutput stateOutput,
+            (Guid NetworkIdentifier, Guid NetworkOwner, MockCharacterState CharacterState) identity1,
+            (Guid NetworkIdentifier, Guid NetworkOwner, MockCharacterState CharacterState) identity2)
+        {
+            stateOutput.BeginObjectElement();
+            WriteIdentity(stateOutput, identity1.NetworkIdentifier, identity1.NetworkOwner, identity1.CharacterState);
+            WriteIdentity(stateOutput, identity2.NetworkIdentifier, identity2.NetworkOwner, identity2.CharacterState);
+            stateOutput.EndObject();
+        }
+
+        private static void WriteIdentity(
+            IStateOutput stateOutput,
+            Guid networkIdentifier,
+            Guid networkOwner,
+            MockCharacterState characterState)
+        {
+            stateOutput.BeginObjectProperty(networkIdentifier.ToString());
+            stateOutput.WriteGuid("NetworkOwner", networkOwner);
+            stateOutput.BeginArrayProperty("NetworkStates");
+            stateOutput.BeginObjectElement();
+            characterState.WriteNetworkState(stateOutput);
+            stateOutput.EndObject();
+            stateOutput.EndArray();
+            stateOutput.EndObject();
+        }
+
+        private static MockCharacterState ReadIdentity(
+            IStateInput stateInput,
+            Guid networkIdentifier,
+            out Guid networkOwner)
+        {
+            stateInput.BeginObjectProperty(networkIdentifier.ToString());
+            networkOwner = stateInput.ReadGuid("NetworkOwner");
+            stateInput.BeginArrayProperty("NetworkStates");
+            stateInput.BeginObjectElement();
+            var characterState = new MockCharacterState();
+            characterState.ReadNetworkState(stateInput);
+            stateInput.EndObject();
+            stateInput.EndArray();
+            stateInput.EndObject();
+            return characterState;
+        }
+
+        private sealed class MockCharacterState : INetworkState
+        {
+            public string NetworkStateName => nameof(MockCharacterState);
+            public int Health { get; set; }
+            public Vector3 Position { get; set; }
+
+            public void WriteNetworkState(IStateOutput stateOutput)
+            {
+                stateOutput.WriteInt("_health", Health);
+                stateOutput.WriteVector3("_position", Position);
+            }
+
+            public void ReadNetworkState(IStateInput stateInput)
+            {
+                Health = stateInput.ReadInt("_health");
+                Position = stateInput.ReadVector3("_position");
+            }
         }
 
         [Test]
-        public void ShouldReadNestedArrayStates()
+        public void ShouldRoundTripBinaryNetworkStatesWithGuidLookup()
         {
-            var rowOneValues = new List<MockState>
-            {
-                new MockState("", 0),
-                new MockState("", 0)
-            };
-            var rowTwoValues = new List<MockState>
-            {
-                new MockState("", 0),
-                new MockState("", 0)
-            };
-            var rowOne = new StaticArrayState<MockState>("", rowOneValues);
-            var rowTwo = new StaticArrayState<MockState>("", rowTwoValues);
-            var root = new ObjectState("GameState", new List<IState>
-            {
-                new StaticArrayState<StaticArrayState<MockState>>("Grid", new List<StaticArrayState<MockState>> { rowOne, rowTwo })
-            });
-            var graph = new JsonStateInput("{\"GameState\":{\"Grid\":[[1,2],[3,4]]}}");
+            Guid networkId1 = Guid.Parse("bf0c3839-ff9c-4ef4-9442-482648647d53");
+            Guid networkOwner1 = Guid.Parse("bea8ee69-bdcf-4eda-8755-bf4c4a886c29");
+            Guid networkId2 = Guid.Parse("5640008b-7dd5-4056-a15e-2c18d65e9018");
+            Guid networkOwner2 = Guid.Parse("dcf6650b-88cb-42d7-8bda-1875e41a75fa");
+            Guid unknownId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
-            root.ReadState(graph);
+            var characterState1 = new MockCharacterState { Health = 100, Position = new Vector3(1f, 2f, 3f) };
+            var characterState2 = new MockCharacterState { Health = 75, Position = new Vector3(4f, 5f, 6f) };
 
-            Assert.AreEqual(1, rowOneValues[0].Value);
-            Assert.AreEqual(2, rowOneValues[1].Value);
-            Assert.AreEqual(3, rowTwoValues[0].Value);
-            Assert.AreEqual(4, rowTwoValues[1].Value);
+            using var output = new BinaryStateOutput();
+            output.BeginObjectElement();
+            WriteIdentity(output, networkId2, networkOwner2, characterState2);
+            WriteIdentity(output, networkId1, networkOwner1, characterState1);
+            output.EndObject();
+
+            var input = new BinaryStateInput(output.GetBuffer());
+            input.BeginObjectElement();
+            Assert.Throws<KeyNotFoundException>(() => input.BeginObjectProperty(unknownId.ToString()));
+            MockCharacterState readCharacterState1 = ReadIdentity(input, networkId1, out Guid readNetworkOwner1);
+            Assert.AreEqual(networkOwner1, readNetworkOwner1);
+            Assert.AreEqual(100, readCharacterState1.Health);
+            Assert.AreEqual(new Vector3(1f, 2f, 3f), readCharacterState1.Position);
+            input.EndObject();
+        }
+
+        [Test]
+        public void ShouldRoundTripBinary()
+        {
+            using var output = new BinaryStateOutput();
+            output.WriteInt("Score", 10);
+            output.WriteVector3("Position", new Vector3(1, 2, 3));
+
+            var input = new BinaryStateInput(output.GetBuffer());
+
+            Assert.AreEqual(10, input.ReadInt("Score"));
+            Assert.AreEqual(new Vector3(1, 2, 3), input.ReadVector3("Position"));
         }
     }
 }

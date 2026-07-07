@@ -1,11 +1,11 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Text;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 using BananaParty.WebSocketRelay;
+using BananaParty.WebSocketRelay.Transport;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
@@ -32,94 +32,84 @@ namespace BananaParty.WebSocketRelay.Tests
             stateA.PlayTime = 10;
             stateA.Health = 80f;
             stateA.Position = new Vector3(1, 2, 3);
+            stateA.NetworkAuthority = true;
+            stateB.NetworkAuthority = false;
 
-            using Socket socketA = new Socket(ServerAddress);
-            using Socket socketB = new Socket(ServerAddress);
+            TestRelayListener listenerA = new();
+            TestRelayListener listenerB = new();
+            using RelayClient relayA = new(ServerAddress, listenerA);
+            using RelayClient relayB = new(ServerAddress, listenerB);
 
-            socketA.Connect();
-            socketB.Connect();
+            relayA.Connect();
+            relayB.Connect();
 
-            // Wait for connections
-            float timeout = 5f;
-            float elapsed = 0;
-            while (!socketA.IsConnected || !socketB.IsConnected)
-            {
-                if (elapsed > timeout) Assert.Fail("Sockets failed to connect within timeout");
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
+            yield return new WaitWhile(() => !relayA.IsConnected || !relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            Assert.IsTrue(relayA.IsConnected && relayB.IsConnected, "Relays failed to connect.");
 
-            // Act: Client A serializes and sends state
+            relayA.SubscribeToTopic("state-sync");
+            relayB.SubscribeToTopic("state-sync");
+            relayA.ProcessIncomingMessages();
+            relayB.ProcessIncomingMessages();
+            yield return null;
+
+            // Act: Client A serializes and sends state via topic
             JsonStateOutput writeGraph = new();
-            stateA.WriteState(writeGraph);
-            string jsonPayload = writeGraph.ToString();
-            byte[] bytesToSend = Encoding.UTF8.GetBytes(jsonPayload);
+            stateA.WriteNetworkState(writeGraph);
+            byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
-            socketA.Send(bytesToSend);
-
-            // Wait for Client B to receive the payload
-            elapsed = 0;
-            while (!socketB.HasUnreadPayloadQueue)
+            bool captured = false;
+            listenerB.TopicMessageReceived += (_, topic, data) =>
             {
-                if (elapsed > timeout) Assert.Fail("Client B did not receive payload within timeout");
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
+                if (topic != "state-sync" || captured)
+                    return;
 
-            byte[] receivedBytes = socketB.ReadPayloadQueue();
-            string receivedJson = Encoding.UTF8.GetString(receivedBytes);
+                JsonStateInput readGraph = new(Encoding.UTF8.GetString(data));
+                stateB.ReadNetworkState(readGraph);
+                captured = true;
+            };
 
-            // Client B deserializes the state
-            JsonStateInput readGraph = new JsonStateInput(receivedJson);
-            stateB.ReadState(readGraph);
+            relayA.Send("state-sync", sentBytes);
+
+            yield return TestParameters.WaitForCondition(
+                () => captured,
+                TestParameters.ReceiveTimeoutThreshold,
+                () => relayB.ProcessIncomingMessages());
+
+            Assert.IsTrue(captured, "Topic message was never processed.");
 
             // Assert: Verify values were synchronized
-            Assert.AreEqual(stateA.PlayTime, stateB.PlayTime, "PlayTime should be synchronized");
-            Assert.AreEqual(stateA.Health, stateB.Health, 0.01f, "Health should be synchronized");
-            Assert.AreEqual(stateA.Position, stateB.Position, "Position should be synchronized");
+            Assert.AreEqual(stateA.PlayTime, stateB.PlayTime);
+            Assert.AreEqual(stateA.Health, stateB.Health, 0.01f);
+            Assert.AreEqual(stateA.Position, stateB.Position);
 
-            // Cleanup GameObjects
             UnityEngine.Object.DestroyImmediate(clientAObj);
             UnityEngine.Object.DestroyImmediate(clientBObj);
         }
 
-        private class MockGameState : MonoBehaviour, IState
+        private class MockGameState : MonoBehaviour, INetworkIdentity, INetworkState
         {
-            private IntegerState _playTimeState = new("PlayTime", 0);
-            private FloatState _healthState = new("Health", 0f);
-            private Vector3State _positionState = new("Position", Vector3.zero);
-            private List<IState> _states;
+            public string NetworkStateName => nameof(MockGameState);
+            public string PrefabName => nameof(MockGameState);
+            public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
+            public Guid NetworkOwner { get; set; } = Guid.NewGuid();
+            public bool NetworkAuthority { get; set; }
+            public int PlayTime { get; set; }
+            public float Health { get; set; }
+            public Vector3 Position { get; set; }
 
-            private List<IState> StatesList => _states ??= new List<IState>
+            public void WriteNetworkState(IStateOutput stateOutput)
             {
-                _playTimeState,
-                _healthState,
-                _positionState
-            };
-
-            public int PlayTime
-            {
-                get => _playTimeState.Value;
-                set => _playTimeState.Value = value;
+                stateOutput.WriteInt(nameof(PlayTime), PlayTime);
+                stateOutput.WriteFloat(nameof(Health), Health);
+                stateOutput.WriteVector3(nameof(Position), Position);
             }
 
-            public float Health
+            public void ReadNetworkState(IStateInput stateInput)
             {
-                get => _healthState.Value;
-                set => _healthState.Value = value;
+                PlayTime = stateInput.ReadInt(nameof(PlayTime));
+                Health = stateInput.ReadFloat(nameof(Health));
+                Position = stateInput.ReadVector3(nameof(Position));
             }
-
-            public Vector3 Position
-            {
-                get => _positionState.Value;
-                set => _positionState.Value = value;
-            }
-
-            public string StateName => "MockGameState";
-
-            public void WriteState(IStateOutput stateOutput) => stateOutput.WriteObject(StateName, StatesList);
-
-            public void ReadState(IStateInput stateInput) => stateInput.ReadObject(StateName, StatesList);
         }
     }
 }

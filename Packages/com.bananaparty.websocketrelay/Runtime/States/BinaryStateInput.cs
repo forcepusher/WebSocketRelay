@@ -2,315 +2,370 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
     public class BinaryStateInput : IStateInput
     {
-        private readonly ReadOnlyMemory<byte> _data;
-        private int _pos;
-        private readonly Stack<bool> _inArrayStack = new();
-
-        private bool InArray => _inArrayStack.Count > 0 && _inArrayStack.Peek();
+        private readonly ReadOnlyMemory<byte> _rootData;
+        private readonly Stack<IBinaryReadLayer> _layers = new();
+        private BinaryFieldReader _reader;
 
         public BinaryStateInput(ReadOnlyMemory<byte> data)
         {
-            _data = data;
+            _rootData = data;
+            _reader = new BinaryFieldReader(data);
         }
 
-        public void ReadObject(string name, List<IState> states)
+        public void BeginArrayProperty(string name)
         {
-            StartObject(name);
+            if (name != "NetworkStates")
+                throw new NotSupportedException($"Binary array property '{name}' is not supported.");
 
-            foreach (IState state in states)
-                state.ReadState(this);
-
-            EndObject();
+            _layers.Push(NetworkStatesReadLayer.Read(_reader, name));
         }
 
-        public void ReadStaticArray(string name, List<IState> states)
+        public void BeginArrayElement() { }
+
+        public void EndArray()
         {
-            StartArray(name);
+            if (_layers.Count == 0 || _layers.Peek() is not NetworkStatesReadLayer)
+                throw new InvalidOperationException("EndArray called without matching BeginArrayProperty.");
 
-            foreach (IState state in states)
-                state.ReadState(this);
-
-            EndArray();
+            _layers.Pop();
         }
 
-        public void ReadDynamicArray<T>(string name, List<T> states) where T : IKeyedState
+        public void BeginObjectProperty(string name)
         {
-            StartArray(name);
-            int count = ReadIntArrayEntry();
+            if (!Guid.TryParse(name, out Guid identityId))
+                throw new KeyNotFoundException($"Network identity '{name}' was not found in binary state.");
 
-            while (states.Count > count)
-                states.RemoveAt(states.Count - 1);
+            if (_layers.Count == 0 || _layers.Peek() is not IdentityMapReadLayer identityMapLayer)
+                throw new InvalidOperationException("Cannot read keyed object property outside of a network states object.");
 
-            if (states.Count < count)
-                throw new InvalidOperationException($"Dynamic array '{name}' requires {count} entries but only {states.Count} exist.");
+            if (!identityMapLayer.TryGetPayload(identityId, out ReadOnlyMemory<byte> payload))
+                throw new KeyNotFoundException($"Network identity '{name}' was not found in binary state.");
 
-            for (int i = 0; i < count; i++)
-                states[i].ReadState(this);
-
-            EndArray();
+            _layers.Push(new IdentityPayloadReadLayer());
+            _reader = new BinaryFieldReader(payload);
         }
 
-        public void ReadDynamicArray<T>(string name, List<T> states, IFactory<T> factory) where T : IKeyedState
+        public void BeginObjectElement()
         {
-            StartArray(name);
-            int count = ReadIntArrayEntry();
-
-            var incoming = new List<T>(count);
-            for (int i = 0; i < count; i++)
+            if (_layers.Count == 0)
             {
-                T staging = factory.Create(Guid.Empty);
-                staging.ReadState(this);
-                incoming.Add(staging);
+                _layers.Push(IdentityMapReadLayer.Read(_rootData));
+                return;
             }
 
-            var incomingKeys = new HashSet<Guid>();
-            foreach (T entry in incoming)
-                incomingKeys.Add(entry.StateKey.Value);
-
-            for (int i = states.Count - 1; i >= 0; i--)
-            {
-                if (incomingKeys.Contains(states[i].StateKey.Value))
-                    continue;
-
-                factory.Dispose(states[i]);
-                states.RemoveAt(i);
-            }
-
-            var next = new List<T>(incoming.Count);
-            foreach (T staging in incoming)
-            {
-                Guid entryKey = staging.StateKey.Value;
-                T existing = default;
-                foreach (T state in states)
-                {
-                    if (state.StateKey.Value != entryKey)
-                        continue;
-
-                    existing = state;
-                    break;
-                }
-
-                if (existing != null)
-                {
-                    CopyStateFrom(staging, existing);
-                    factory.Dispose(staging);
-                    next.Add(existing);
-                }
-                else
-                {
-                    T entry = factory.Create(entryKey);
-                    CopyStateFrom(staging, entry);
-                    factory.Dispose(staging);
-                    next.Add(entry);
-                }
-            }
-
-            states.Clear();
-            states.AddRange(next);
-
-            EndArray();
+            if (_layers.Peek() is NetworkStatesReadLayer networkStatesLayer)
+                _reader = networkStatesLayer.BeginNextState();
         }
 
-        private void CopyStateFrom(IState source, IState target)
+        public void EndObject()
         {
-            var output = new BinaryStateOutput();
-            source.WriteState(output);
-            target.ReadState(new BinaryStateInput(output.ToArray()));
+            if (_layers.Count == 0)
+                return;
+
+            if (_layers.Peek() is NetworkStatesReadLayer)
+                return;
+
+            if (_layers.Peek() is IdentityPayloadReadLayer)
+            {
+                _layers.Pop();
+                return;
+            }
+
+            if (_layers.Peek() is IdentityMapReadLayer)
+            {
+                _layers.Pop();
+                _reader = new BinaryFieldReader(_rootData);
+            }
+        }
+
+        internal static IReadOnlyList<Guid> GetRootIdentityIds(ReadOnlyMemory<byte> data)
+        {
+            BinaryFieldReader reader = new(data);
+            int identityCount = reader.ReadInt32();
+            List<Guid> identityIds = new(identityCount);
+
+            for (int identityIndex = 0; identityIndex < identityCount; identityIndex++)
+            {
+                identityIds.Add(reader.ReadGuidValue());
+                int payloadLength = reader.ReadInt32();
+                reader.ReadBytes(payloadLength);
+            }
+
+            return identityIds;
         }
 
         public string ReadString(string name)
         {
-            VerifyEntryName(name);
-            return ReadStringValue();
+            _reader.VerifyEntryName(name);
+            return _reader.ReadStringValue();
         }
 
         public byte ReadByte(string name)
         {
-            VerifyEntryName(name);
-            return ReadByteValue();
+            _reader.VerifyEntryName(name);
+            return _reader.ReadByteValue();
         }
 
         public int ReadInt(string name)
         {
-            VerifyEntryName(name);
-            return ReadInt32();
+            _reader.VerifyEntryName(name);
+            return _reader.ReadInt32();
         }
 
         public long ReadLong(string name)
         {
-            VerifyEntryName(name);
-            return ReadInt64();
+            _reader.VerifyEntryName(name);
+            return _reader.ReadInt64();
         }
 
         public float ReadFloat(string name)
         {
-            VerifyEntryName(name);
-            return ReadFloat32();
+            _reader.VerifyEntryName(name);
+            return _reader.ReadFloat32();
         }
 
         public double ReadDouble(string name)
         {
-            VerifyEntryName(name);
-            return ReadFloat64();
+            _reader.VerifyEntryName(name);
+            return _reader.ReadDouble64();
         }
 
         public bool ReadBool(string name)
         {
-            VerifyEntryName(name);
-            return ReadBoolValue();
+            _reader.VerifyEntryName(name);
+            return _reader.ReadBoolValue();
+        }
+
+        public Vector2 ReadVector2(string name)
+        {
+            _reader.VerifyEntryName(name);
+            return new Vector2(_reader.ReadFloat32(), _reader.ReadFloat32());
+        }
+
+        public Vector3 ReadVector3(string name)
+        {
+            _reader.VerifyEntryName(name);
+            return new Vector3(_reader.ReadFloat32(), _reader.ReadFloat32(), _reader.ReadFloat32());
+        }
+
+        public Vector2Int ReadVector2Int(string name)
+        {
+            _reader.VerifyEntryName(name);
+            return new Vector2Int(_reader.ReadInt32(), _reader.ReadInt32());
+        }
+
+        public Vector3Int ReadVector3Int(string name)
+        {
+            _reader.VerifyEntryName(name);
+            return new Vector3Int(_reader.ReadInt32(), _reader.ReadInt32(), _reader.ReadInt32());
+        }
+
+        public Quaternion ReadQuaternion(string name)
+        {
+            _reader.VerifyEntryName(name);
+            return new Quaternion(
+                _reader.ReadFloat32(),
+                _reader.ReadFloat32(),
+                _reader.ReadFloat32(),
+                _reader.ReadFloat32());
         }
 
         public Guid ReadGuid(string name)
         {
-            VerifyEntryName(name);
-            return ReadGuidValue();
+            _reader.VerifyEntryName(name);
+            return _reader.ReadGuidValue();
         }
 
-        private void StartObject(string name)
-        {
-            VerifyNameHash(name);
-            _inArrayStack.Push(false);
-        }
+        private interface IBinaryReadLayer { }
 
-        private void EndObject()
-        {
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
+        private sealed class IdentityPayloadReadLayer : IBinaryReadLayer { }
 
-        private void StartArray(string name)
+        private sealed class BinaryFieldReader
         {
-            VerifyNameHash(name);
-            _inArrayStack.Push(true);
-        }
+            private readonly ReadOnlyMemory<byte> _data;
+            private int _position;
 
-        private void EndArray()
-        {
-            if (_inArrayStack.Count > 0)
-                _inArrayStack.Pop();
-        }
-
-        private int ReadIntArrayEntry()
-        {
-            VerifyEntryName(null);
-            return ReadInt32();
-        }
-
-        private void VerifyEntryName(string expectedName)
-        {
-            VerifyNameHash(InArray ? null : expectedName);
-        }
-
-        private void VerifyNameHash(string expectedName)
-        {
-            int nameHash = ReadNameHash();
-            int expectedHash = Hash.StringToInt(expectedName);
-
-            if (nameHash != expectedHash)
+            public BinaryFieldReader(ReadOnlyMemory<byte> data)
             {
-                throw new InvalidDataException(
-                    $"Name hash mismatch. Expected '{expectedName ?? string.Empty}' ({expectedHash}), got {nameHash}.");
+                _data = data;
+            }
+
+            public void VerifyEntryName(string expectedName)
+            {
+                int nameHash = ReadInt32();
+                int expectedHash = Hash.StringToInt(expectedName);
+
+                if (nameHash != expectedHash)
+                {
+                    throw new InvalidDataException(
+                        $"Name hash mismatch. Expected '{expectedName ?? string.Empty}' ({expectedHash}), got {nameHash}.");
+                }
+            }
+
+            public byte ReadByteValue()
+            {
+                if (_position >= _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading byte value.");
+
+                return _data.Span[_position++];
+            }
+
+            public int ReadInt32()
+            {
+                if (_position + 4 > _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading Int32.");
+
+                int value = BitConverter.ToInt32(_data.Span.Slice(_position, 4));
+                _position += 4;
+                return value;
+            }
+
+            public long ReadInt64()
+            {
+                if (_position + 8 > _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading Int64.");
+
+                long value = BitConverter.ToInt64(_data.Span.Slice(_position, 8));
+                _position += 8;
+                return value;
+            }
+
+            public float ReadFloat32()
+            {
+                if (_position + 4 > _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading Float32.");
+
+                float value = BitConverter.ToSingle(_data.Span.Slice(_position, 4));
+                _position += 4;
+                return value;
+            }
+
+            public double ReadDouble64()
+            {
+                if (_position + 8 > _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading Float64.");
+
+                double value = BitConverter.ToDouble(_data.Span.Slice(_position, 8));
+                _position += 8;
+                return value;
+            }
+
+            public bool ReadBoolValue()
+            {
+                if (_position >= _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading boolean.");
+
+                return _data.Span[_position++] != 0;
+            }
+
+            public string ReadStringValue()
+            {
+                if (_position + 2 > _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading string length.");
+
+                ushort length = BitConverter.ToUInt16(_data.Span.Slice(_position, 2));
+                _position += 2;
+
+                if (length == 0)
+                    return string.Empty;
+
+                if (_position + length > _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading string content.");
+
+                string value = Encoding.UTF8.GetString(_data.Span.Slice(_position, length));
+                _position += length;
+                return value;
+            }
+
+            public Guid ReadGuidValue()
+            {
+                if (_position + 16 > _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading Guid.");
+
+                ReadOnlySpan<byte> guidBytes = _data.Span.Slice(_position, 16);
+                _position += 16;
+                return new Guid(guidBytes);
+            }
+
+            public ReadOnlyMemory<byte> ReadBytes(int length)
+            {
+                if (length < 0)
+                    throw new InvalidDataException("Binary payload length cannot be negative.");
+
+                if (_position + length > _data.Length)
+                    throw new EndOfStreamException("Unexpected end of binary stream while reading bytes.");
+
+                ReadOnlyMemory<byte> bytes = _data.Slice(_position, length);
+                _position += length;
+                return bytes;
             }
         }
 
-        private int ReadNameHash()
+        private sealed class IdentityMapReadLayer : IBinaryReadLayer
         {
-            if (_pos + 4 > _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading name hash.");
+            private readonly Dictionary<Guid, ReadOnlyMemory<byte>> _payloadsByIdentity = new();
 
-            int hash = BitConverter.ToInt32(_data.Span.Slice(_pos, 4));
-            _pos += 4;
-            return hash;
+            public static IdentityMapReadLayer Read(ReadOnlyMemory<byte> rootData)
+            {
+                IdentityMapReadLayer layer = new();
+                BinaryFieldReader reader = new(rootData);
+                int identityCount = reader.ReadInt32();
+
+                for (int identityIndex = 0; identityIndex < identityCount; identityIndex++)
+                {
+                    Guid identityId = reader.ReadGuidValue();
+                    int payloadLength = reader.ReadInt32();
+                    ReadOnlyMemory<byte> payload = reader.ReadBytes(payloadLength);
+                    layer._payloadsByIdentity[identityId] = payload;
+                }
+
+                return layer;
+            }
+
+            public bool TryGetPayload(Guid identityId, out ReadOnlyMemory<byte> payload)
+            {
+                return _payloadsByIdentity.TryGetValue(identityId, out payload);
+            }
         }
 
-        private byte ReadByteValue()
+        private sealed class NetworkStatesReadLayer : IBinaryReadLayer
         {
-            if (_pos >= _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading byte value.");
+            private readonly ReadOnlyMemory<byte>[] _statePayloads;
+            private int _nextStateIndex;
 
-            return _data.Span[_pos++];
-        }
+            private NetworkStatesReadLayer(ReadOnlyMemory<byte>[] statePayloads)
+            {
+                _statePayloads = statePayloads;
+            }
 
-        private int ReadInt32()
-        {
-            if (_pos + 4 > _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading Int32.");
+            public static NetworkStatesReadLayer Read(BinaryFieldReader reader, string propertyName)
+            {
+                reader.VerifyEntryName(propertyName);
+                int stateCount = reader.ReadInt32();
+                ReadOnlyMemory<byte>[] statePayloads = new ReadOnlyMemory<byte>[stateCount];
 
-            int value = BitConverter.ToInt32(_data.Span.Slice(_pos, 4));
-            _pos += 4;
-            return value;
-        }
+                for (int stateIndex = 0; stateIndex < stateCount; stateIndex++)
+                {
+                    int payloadLength = reader.ReadInt32();
+                    statePayloads[stateIndex] = reader.ReadBytes(payloadLength);
+                }
 
-        private long ReadInt64()
-        {
-            if (_pos + 8 > _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading Int64.");
+                return new NetworkStatesReadLayer(statePayloads);
+            }
 
-            long value = BitConverter.ToInt64(_data.Span.Slice(_pos, 8));
-            _pos += 8;
-            return value;
-        }
+            public BinaryFieldReader BeginNextState()
+            {
+                if (_nextStateIndex >= _statePayloads.Length)
+                    throw new InvalidOperationException("No more network states in binary array.");
 
-        private float ReadFloat32()
-        {
-            if (_pos + 4 > _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading Float32.");
-
-            float value = BitConverter.ToSingle(_data.Span.Slice(_pos, 4));
-            _pos += 4;
-            return value;
-        }
-
-        private double ReadFloat64()
-        {
-            if (_pos + 8 > _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading Float64.");
-
-            double value = BitConverter.ToDouble(_data.Span.Slice(_pos, 8));
-            _pos += 8;
-            return value;
-        }
-
-        private bool ReadBoolValue()
-        {
-            if (_pos >= _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading boolean.");
-
-            return _data.Span[_pos++] != 0;
-        }
-
-        private string ReadStringValue()
-        {
-            if (_pos + 2 > _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading string length.");
-
-            ushort length = BitConverter.ToUInt16(_data.Span.Slice(_pos, 2));
-            _pos += 2;
-
-            if (length == 0)
-                return string.Empty;
-
-            if (_pos + length > _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading string content.");
-
-            string value = Encoding.UTF8.GetString(_data.Span.Slice(_pos, length));
-            _pos += length;
-            return value;
-        }
-
-        private Guid ReadGuidValue()
-        {
-            if (_pos + 16 > _data.Length)
-                throw new EndOfStreamException("Unexpected end of binary stream while reading Guid.");
-
-            ReadOnlySpan<byte> guidBytes = _data.Span.Slice(_pos, 16);
-            _pos += 16;
-            return new Guid(guidBytes);
+                return new BinaryFieldReader(_statePayloads[_nextStateIndex++]);
+            }
         }
     }
 }
