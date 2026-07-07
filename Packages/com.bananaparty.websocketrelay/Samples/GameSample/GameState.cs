@@ -1,5 +1,4 @@
 using System;
-using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
@@ -8,10 +7,11 @@ namespace BananaParty.WebSocketRelay.Samples
     {
         private Network _network;
 
-        private Room _room;
-
         [SerializeField]
         private NetworkContext _networkContext;
+
+        [SerializeField]
+        private NetworkIdentity _playerCharacterPrefab;
 
         private void Start()
         {
@@ -47,19 +47,19 @@ namespace BananaParty.WebSocketRelay.Samples
             _network.Disconnect();
         }
 
-        public void OnConnectedToRelay(Guid clientGuid)
+        public void OnConnectedToRelay()
         {
             _network.JoinRoom("game-room");
         }
 
         public void OnConnectedToRoom(Room room)
         {
-            _room = room;
+            room.Instantiate(_playerCharacterPrefab, room.LocalPlayerGuid);
         }
 
         public void OnDisconnectedFromRoom(Room room)
         {
-            _room = null;
+
         }
 
         public void OnRoomPlayerAdded(NetworkPlayer networkPlayer)

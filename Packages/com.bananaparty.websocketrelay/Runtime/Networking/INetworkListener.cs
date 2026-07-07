@@ -1,10 +1,8 @@
-using System;
-
 namespace BananaParty.WebSocketRelay
 {
     public interface INetworkListener
     {
-        void OnConnectedToRelay(Guid clientGuid);
+        void OnConnectedToRelay();
 
         void OnConnectedToRoom(Room room);
         void OnDisconnectedFromRoom(Room room);

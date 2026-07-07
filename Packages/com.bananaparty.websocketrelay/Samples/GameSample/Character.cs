@@ -7,8 +7,6 @@ namespace BananaParty.WebSocketRelay.Samples
     {
         public string NetworkStateName => nameof(Character);
 
-        public bool HasAuthority { get; set; }
-
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float rotationSpeed = 10f;
         [SerializeField] private float jumpHeight = 2f;
@@ -51,7 +49,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Move()
         {
-            if (HasAuthority)
+            if (true)
             {
                 Vector3 moveDirection = new Vector3(_characterInput.MovementInput.x, 0, _characterInput.MovementInput.y).normalized;
 

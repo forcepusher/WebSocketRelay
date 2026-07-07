@@ -11,7 +11,7 @@ namespace BananaParty.WebSocketRelay
         private readonly string _serverAddress;
         private readonly INetworkListener _networkListener;
 
-        private Guid _localPlayerGuid;
+        public Guid LocalPlayerGuid { get; private set; }
 
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
@@ -100,14 +100,14 @@ namespace BananaParty.WebSocketRelay
 
         public void OnConnectedToRelay(Guid clientGuid)
         {
-            _localPlayerGuid = clientGuid;
+            LocalPlayerGuid = clientGuid;
             _networkContext.LocalClientIdentity = clientGuid;
-            _networkListener.OnConnectedToRelay(clientGuid);
+            _networkListener.OnConnectedToRelay();
         }
 
         public void OnSubscribedToTopic(string topic)
         {
-            var room = new Room(this, topic, _localPlayerGuid);
+            var room = new Room(this, topic, LocalPlayerGuid);
             _rooms.Add(room);
             _networkListener.OnConnectedToRoom(room);
         }

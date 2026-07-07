@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
@@ -8,24 +9,19 @@ namespace BananaParty.WebSocketRelay
         private const float ConnectionTimeoutSeconds = 15f;
 
         private readonly Network _network;
-        private readonly Guid _localPlayerGuid;
+        public Guid LocalPlayerGuid {  get; private set; }
 
         private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _guidToNetworkPlayers = new();
         private readonly Dictionary<Guid, float> _timeSinceLastMessageByPlayer = new();
-        private readonly Queue<byte[]> _payloadQueue = new();
 
         public string RoomName { get; private set; }
-
-        public bool HasUnreadPayloadQueue => _payloadQueue.Count > 0;
-
-        public byte[] ReadPayloadQueue() => _payloadQueue.Dequeue();
 
         public Room(Network network, string roomName, Guid localPlayerGuid)
         {
             RoomName = roomName;
             _network = network;
-            _localPlayerGuid = localPlayerGuid;
+            LocalPlayerGuid = localPlayerGuid;
         }
 
         public void Send(byte[] data)
@@ -47,11 +43,15 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
+        public void Instantiate(NetworkIdentity networkIdentityPrefab, Guid ownerGuid)
+        {        
+            NetworkIdentity networkIdentity = GameObject.Instantiate<NetworkIdentity>(networkIdentityPrefab);
+            networkIdentity.NetworkOwner = ownerGuid;
+        }
+
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
         {
-            _payloadQueue.Enqueue(data);
-
-            if (senderGuid == _localPlayerGuid)
+            if (senderGuid == LocalPlayerGuid)
                 return;
 
             if (_guidToNetworkPlayers.ContainsKey(senderGuid))
