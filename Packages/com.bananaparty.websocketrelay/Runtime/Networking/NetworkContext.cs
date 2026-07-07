@@ -26,6 +26,9 @@ namespace BananaParty.WebSocketRelay
 
         public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, Guid ownerGuid)
         {
+            if (!_networkPrefabs.Contains(networkIdentityPrefab))
+                throw new InvalidOperationException($"Network prefab is not registered in {nameof(_networkPrefabs)}");
+
             NetworkIdentity networkIdentity = GameObject.Instantiate(networkIdentityPrefab);
             networkIdentity.NetworkOwner = ownerGuid;
             networkIdentity.NetworkIdentifier = Guid.NewGuid();
