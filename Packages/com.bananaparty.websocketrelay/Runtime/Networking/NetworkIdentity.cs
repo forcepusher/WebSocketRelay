@@ -52,7 +52,11 @@ namespace BananaParty.WebSocketRelay
         {
             stateOutput.WriteString(nameof(PrefabName), PrefabName);
             stateOutput.WriteGuid(nameof(NetworkOwner), NetworkOwner);
+            WriteNetworkStateBody(stateOutput);
+        }
 
+        public void WriteNetworkStateBody(IStateOutput stateOutput)
+        {
             stateOutput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
             {
