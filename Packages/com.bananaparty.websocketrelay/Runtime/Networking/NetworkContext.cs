@@ -77,13 +77,13 @@ namespace BananaParty.WebSocketRelay
 
         public void ProcessTopicMessage(Guid senderGuid)
         {
-            if (_guidToNetworkPlayers.ContainsKey(senderGuid))
+            if (_guidToNetworkPlayers.TryGetValue(senderGuid, out NetworkPlayer networkPlayer))
             {
-                _guidToNetworkPlayers[senderGuid].TimeSinceLastMessage = 0f;
+                networkPlayer.TimeSinceLastMessage = 0f;
             }
             else
             {
-                NetworkPlayer networkPlayer = new NetworkPlayer(senderGuid);
+                networkPlayer = new NetworkPlayer(senderGuid);
                 AddNetworkPlayer(networkPlayer);
             }
         }
