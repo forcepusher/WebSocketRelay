@@ -7,8 +7,13 @@ namespace BananaParty.WebSocketRelay
 {
     public class Network : IRelayListener, IDisposable
     {
+        private const float FullSyncInterval = 1f;
+        private const float PartialSyncInterval = 0.1f;
+
         private readonly NetworkContext _networkContext;
         private readonly string _serverAddress;
+
+        private float TimeSinceLastFullSync = 0f;
 
         public Guid LocalPlayerGuid { get; private set; }
 
@@ -72,6 +77,13 @@ namespace BananaParty.WebSocketRelay
             //var jsonStateOutput = new JsonStateOutput();
             //_networkContext.WriteNetworkStates(jsonStateOutput);
             //Debug.Log(jsonStateOutput.ToString());
+
+            TimeSinceLastFullSync += unscaledDeltaTime;
+            if (TimeSinceLastFullSync >= FullSyncInterval)
+            {
+                TimeSinceLastFullSync = 0f;
+                _networkContext.WriteNetworkStates();
+            }
         }
 
         public void Send(string topic, byte[] data)
