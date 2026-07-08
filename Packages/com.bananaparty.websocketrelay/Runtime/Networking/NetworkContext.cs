@@ -25,12 +25,12 @@ namespace BananaParty.WebSocketRelay
         private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
 
-        public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab)
+        public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, string topic)
         {
-            return Instantiate(networkIdentityPrefab.PrefabName, Guid.NewGuid(), LocalClientIdentity);
+            return Instantiate(networkIdentityPrefab.PrefabName, topic, Guid.NewGuid(), LocalClientIdentity);
         }
 
-        private NetworkIdentity Instantiate(string prefabName, Guid networkIdentifier, Guid networkOwner)
+        private NetworkIdentity Instantiate(string prefabName, string topic, Guid networkIdentifier, Guid networkOwner)
         {
             NetworkIdentity prefab = _networkPrefabs.Find(networkPrefab => networkPrefab.PrefabName == prefabName);
             if (prefab == null)
@@ -39,6 +39,7 @@ namespace BananaParty.WebSocketRelay
             NetworkIdentity networkIdentity = GameObject.Instantiate(prefab);
             networkIdentity.NetworkIdentifier = networkIdentifier;
             networkIdentity.NetworkOwner = networkOwner;
+            networkIdentity.Topic = topic;
 
             RegisterNetworkIdentity(networkIdentity);
 

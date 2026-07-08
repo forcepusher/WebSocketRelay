@@ -5,7 +5,14 @@ namespace BananaParty.WebSocketRelay.Samples
 {
     public class GameState : MonoBehaviour
     {
+        private const float FullSyncInterval = 1f;
+        private const float PartialSyncInterval = 0.1f;
+
         private Network _network;
+
+        private string _networkTopic = "game-room";
+
+        private float _timeSinceLastFullSync = 0f;
 
         [SerializeField]
         private NetworkContext _networkContext;
@@ -25,6 +32,13 @@ namespace BananaParty.WebSocketRelay.Samples
         private void Update()
         {
             _network?.ManualUpdate(Time.unscaledDeltaTime);
+
+            _timeSinceLastFullSync += Time.unscaledDeltaTime;
+            if (_timeSinceLastFullSync >= FullSyncInterval)
+            {
+                _timeSinceLastFullSync = 0f;
+                _network.SendSyncIdentities(_networkTopic);
+            }
         }
 
         public void OnStartServerButtonClick()
@@ -65,9 +79,9 @@ namespace BananaParty.WebSocketRelay.Samples
 
             Debug.Log("Connected to relay");
 
-            _network.SubscribeToTopic("game-room");
+            _network.SubscribeToTopic(_networkTopic);
 
-            while (!_network.SubscribedTopics.Contains("game-room"))
+            while (!_network.SubscribedTopics.Contains(_networkTopic))
             {
                 elapsed += Time.unscaledDeltaTime;
                 if (elapsed > connectionTimeout)
@@ -78,9 +92,9 @@ namespace BananaParty.WebSocketRelay.Samples
                 yield return null;
             }
 
-            Debug.Log("Subscribed to game-room");
+            Debug.Log($"Subscribed to {_networkTopic}");
 
-            _networkContext.Instantiate(_playerCharacterPrefab);
+            _networkContext.Instantiate(_playerCharacterPrefab, _networkTopic);
         }
     }
 }

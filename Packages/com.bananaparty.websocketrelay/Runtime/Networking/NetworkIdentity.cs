@@ -14,6 +14,7 @@ namespace BananaParty.WebSocketRelay
         private readonly List<INetworkState> _networkStates = new();
 
         public string PrefabName => _prefabName;
+        public string Topic { get; set; }
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
         public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
