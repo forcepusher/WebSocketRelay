@@ -162,15 +162,18 @@ namespace BananaParty.WebSocketRelay
             if (data == null || data.Length == 0)
                 throw new InvalidOperationException("Topic message data is null or empty");
 
-            ApplyIncomingTopicState(data);
+            ApplyIncomingTopicState(topic, data);
         }
 
-        private void WriteOwnedNetworkStates(IStateOutput stateOutput)
+        private void WriteOwnedNetworkStates(IStateOutput stateOutput, string topic)
         {
             stateOutput.BeginObjectElement();
             foreach (INetworkIdentity networkIdentity in _networkIdentities)
             {
                 if (networkIdentity.NetworkOwner != LocalClientIdentity)
+                    continue;
+
+                if (networkIdentity.Topic != topic)
                     continue;
 
                 stateOutput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
@@ -180,23 +183,23 @@ namespace BananaParty.WebSocketRelay
             stateOutput.EndObject();
         }
 
-        public byte[] GetOwnedNetworkIdentitiesPayload()
+        public byte[] GetOwnedNetworkIdentitiesPayload(string topic)
         {
             if (_useBinary)
             {
                 using BinaryStateOutput stateOutput = new();
-                WriteOwnedNetworkStates(stateOutput);
+                WriteOwnedNetworkStates(stateOutput, topic);
                 return stateOutput.GetBuffer().ToArray();
             }
             else
             {
                 JsonStateOutput jsonStateOutput = new(prettyPrint: false, bracesOnNewLine: false);
-                WriteOwnedNetworkStates(jsonStateOutput);
+                WriteOwnedNetworkStates(jsonStateOutput, topic);
                 return Encoding.UTF8.GetBytes(jsonStateOutput.ToString());
             }
         }
 
-        private void ApplyIncomingTopicState(byte[] data)
+        private void ApplyIncomingTopicState(string topic, byte[] data)
         {
             ReadOnlyMemory<byte> payload = StripMessageHeader(data);
 
@@ -223,7 +226,7 @@ namespace BananaParty.WebSocketRelay
                     string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
                     Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
 
-                    NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, networkIdentifier, networkOwner);
+                    NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, topic, networkIdentifier, networkOwner);
                     ReadNetworkIdentityComponents(spawnedNetworkIdentity, stateInput);
                 }
 

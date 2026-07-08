@@ -91,6 +91,7 @@ namespace BananaParty.WebSocketRelay.Tests
         {
             public string NetworkStateName => nameof(MockGameState);
             public string PrefabName => nameof(MockGameState);
+            public string Topic { get; set; }
             public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
             public Guid NetworkOwner { get; set; } = Guid.NewGuid();
             public bool NetworkAuthority { get; set; }

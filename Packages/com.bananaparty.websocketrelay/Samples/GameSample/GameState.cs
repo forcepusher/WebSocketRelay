@@ -37,7 +37,7 @@ namespace BananaParty.WebSocketRelay.Samples
             if (_timeSinceLastFullSync >= FullSyncInterval)
             {
                 _timeSinceLastFullSync = 0f;
-                _network.SendSyncIdentities(_networkTopic);
+                _network.SendSyncIdentities();
             }
         }
 

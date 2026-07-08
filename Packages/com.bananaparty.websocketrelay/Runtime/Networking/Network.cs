@@ -76,11 +76,14 @@ namespace BananaParty.WebSocketRelay
 
         public void SendSyncIdentities()
         {
-            byte[] payload = _networkContext.GetOwnedNetworkIdentitiesPayload();
-            byte[] message = new byte[payload.Length + 1];
-            message[0] = NetworkMessage.SyncIdentities;
-            Buffer.BlockCopy(payload, 0, message, 1, payload.Length);
-            _relayClient.Send(topic, message);
+            foreach (string topic in SubscribedTopics)
+            {
+                byte[] payload = _networkContext.GetOwnedNetworkIdentitiesPayload(topic);
+                byte[] message = new byte[payload.Length + 1];
+                message[0] = NetworkMessage.SyncIdentities;
+                Buffer.BlockCopy(payload, 0, message, 1, payload.Length);
+                _relayClient.Send(topic, message);
+            }
         }
 
         public void SubscribeToTopic(string topic)
