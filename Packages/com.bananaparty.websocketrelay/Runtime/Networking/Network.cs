@@ -82,13 +82,17 @@ namespace BananaParty.WebSocketRelay
             if (TimeSinceLastFullSync >= FullSyncInterval)
             {
                 TimeSinceLastFullSync = 0f;
-                _networkContext.GetOwnedNetworkIdentitiesPayload();
+                SendSyncIdentities();
             }
         }
 
-        public void Send(string topic, byte[] data)
+        public void SendSyncIdentities(string topic)
         {
-            _relayClient.Send(topic, data);
+            byte[] payload = _networkContext.GetOwnedNetworkIdentitiesPayload();
+            byte[] message = new byte[payload.Length + 1];
+            message[0] = NetworkMessage.SyncIdentities;
+            Buffer.BlockCopy(payload, 0, message, 1, payload.Length);
+            _relayClient.Send(topic, message);
         }
 
         public void SubscribeToTopic(string topic)
