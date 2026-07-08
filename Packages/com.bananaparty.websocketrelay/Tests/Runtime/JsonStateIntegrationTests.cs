@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Text;
 using NUnit.Framework;
 using UnityEngine;
@@ -93,6 +94,7 @@ namespace BananaParty.WebSocketRelay.Tests
             public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
             public Guid NetworkOwner { get; set; } = Guid.NewGuid();
             public bool NetworkAuthority { get; set; }
+            public IReadOnlyList<INetworkState> NetworkStates => Array.Empty<INetworkState>();
             public int PlayTime { get; set; }
             public float Health { get; set; }
             public Vector3 Position { get; set; }

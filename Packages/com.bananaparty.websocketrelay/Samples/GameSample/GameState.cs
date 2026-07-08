@@ -81,7 +81,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
             Debug.Log("Subscribed to game-room");
 
-            _networkContext.Instantiate(_playerCharacterPrefab, _network.LocalPlayerGuid);
+            _networkContext.Instantiate(_playerCharacterPrefab);
         }
     }
 }
