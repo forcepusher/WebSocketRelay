@@ -82,7 +82,7 @@ namespace BananaParty.WebSocketRelay
             if (TimeSinceLastFullSync >= FullSyncInterval)
             {
                 TimeSinceLastFullSync = 0f;
-                _networkContext.WriteNetworkStates();
+                _networkContext.GetOwnedNetworkIdentitiesPayload();
             }
         }
 

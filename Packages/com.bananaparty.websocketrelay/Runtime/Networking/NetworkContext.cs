@@ -164,18 +164,33 @@ namespace BananaParty.WebSocketRelay
             ApplyIncomingTopicState(data);
         }
 
+        private void WriteOwnedNetworkStates(IStateOutput stateOutput)
+        {
+            stateOutput.BeginObjectElement();
+            foreach (INetworkIdentity networkIdentity in _networkIdentities)
+            {
+                if (networkIdentity.NetworkOwner != LocalClientIdentity)
+                    continue;
+
+                stateOutput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
+                WriteNetworkIdentityState(networkIdentity, stateOutput);
+                stateOutput.EndObject();
+            }
+            stateOutput.EndObject();
+        }
+
         public byte[] GetOwnedNetworkIdentitiesPayload()
         {
             if (_useBinary)
             {
                 using BinaryStateOutput stateOutput = new();
-                WriteNetworkStates(stateOutput);
+                WriteOwnedNetworkStates(stateOutput);
                 return stateOutput.GetBuffer().ToArray();
             }
             else
             {
                 JsonStateOutput jsonStateOutput = new(prettyPrint: false, bracesOnNewLine: false);
-                WriteNetworkStates(jsonStateOutput);
+                WriteOwnedNetworkStates(jsonStateOutput);
                 return Encoding.UTF8.GetBytes(jsonStateOutput.ToString());
             }
         }
