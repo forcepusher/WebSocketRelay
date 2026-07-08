@@ -164,7 +164,7 @@ namespace BananaParty.WebSocketRelay
             ApplyIncomingTopicState(data);
         }
 
-        public byte[] GetNetworkStatesPayload()
+        public byte[] GetOwnedNetworkIdentitiesPayload()
         {
             if (_useBinary)
             {
