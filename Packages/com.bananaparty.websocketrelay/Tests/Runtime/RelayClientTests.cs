@@ -24,6 +24,9 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [UnityTest] public IEnumerator ClientHasGuidOnCreation() => TestClientHasGuidOnCreation();
+        [UnityTest] public IEnumerator ClientUsesProvidedGuid() => TestClientUsesProvidedGuid();
+        [UnityTest] public IEnumerator Connect_NoServerHandshakeMessages() => TestConnectNoServerHandshakeMessages();
+        [UnityTest] public IEnumerator Subscribe_NoServerConfirmation() => TestSubscribeNoServerConfirmation();
         [UnityTest] public IEnumerator TopicMessageIncludesSenderGuid() => TestTopicMessageIncludesSenderGuid();
         [UnityTest] public IEnumerator TwoClients_MessageRelay() => TestTopicMessage("relay-100", 2);
         [UnityTest] public IEnumerator ThreeClients_AllReceive() => TestTopicMessage("relay-100", 3);
@@ -40,6 +43,62 @@ namespace BananaParty.WebSocketRelay.Tests
         {
             _relayA = CreateRelay(out _listenerA);
             Assert.AreNotEqual(Guid.Empty, _relayA.ClientGuid);
+
+            Cleanup();
+            yield return null;
+        }
+
+        private IEnumerator TestClientUsesProvidedGuid()
+        {
+            Guid expectedGuid = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+            _listenerA = new TestRelayListener();
+            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, expectedGuid);
+
+            Assert.AreEqual(expectedGuid, _relayA.ClientGuid);
+
+            Cleanup();
+            yield return null;
+        }
+
+        private IEnumerator TestConnectNoServerHandshakeMessages()
+        {
+            bool connectedCallback = false;
+            bool topicMessageReceived = false;
+
+            _listenerA = new TestRelayListener();
+            _listenerA.Connected += () => connectedCallback = true;
+            _listenerA.TopicMessageReceived += (_, _, _) => topicMessageReceived = true;
+
+            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
+            _relayA.Connect();
+
+            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+
+            yield return TestParameters.WaitForDuration(0.25f, () => _relayA.ProcessIncomingMessages());
+
+            Assert.IsFalse(connectedCallback);
+            Assert.IsFalse(topicMessageReceived);
+
+            Cleanup();
+            yield return null;
+        }
+
+        private IEnumerator TestSubscribeNoServerConfirmation()
+        {
+            bool topicMessageReceived = false;
+
+            _relayA = CreateRelay(out _listenerA);
+            _listenerA.TopicMessageReceived += (_, _, _) => topicMessageReceived = true;
+            _relayA.Connect();
+
+            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+
+            _relayA.SubscribeToTopic("no-ack");
+            Assert.IsTrue(_relayA.SubscribedTopics.Contains("no-ack"));
+
+            yield return TestParameters.WaitForDuration(0.25f, () => _relayA.ProcessIncomingMessages());
+
+            Assert.IsFalse(topicMessageReceived);
 
             Cleanup();
             yield return null;
