@@ -162,9 +162,7 @@ namespace BananaParty.WebSocketRelay
                         continue;
 
                     UnregisterNetworkIdentity(networkIdentity);
-
-                    if (networkIdentity is Component component)
-                        Destroy(component.gameObject);
+                    Destroy(networkIdentity.GameObject);
                 }
 
                 RemoveNetworkPlayer(networkPlayer);

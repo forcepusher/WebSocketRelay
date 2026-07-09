@@ -13,6 +13,7 @@ namespace BananaParty.WebSocketRelay
 
         private readonly List<INetworkState> _networkStates = new();
 
+        public GameObject GameObject => gameObject;
         public string PrefabName => _prefabName;
         public string Topic { get; set; }
         public Guid NetworkIdentifier { get; set; }
