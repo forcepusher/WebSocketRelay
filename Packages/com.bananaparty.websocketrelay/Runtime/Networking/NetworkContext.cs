@@ -9,7 +9,7 @@ namespace BananaParty.WebSocketRelay
     public class NetworkContext : ScriptableObject, INetworkContext
     {
         [SerializeField]
-        private float _playerTimeoutSeconds = 15f;
+        private float _playerTimeoutSeconds = 10f;
 
         [SerializeField]
         private bool _useBinary = false;
@@ -140,12 +140,35 @@ namespace BananaParty.WebSocketRelay
 
         public void ManualUpdate(float unscaledDeltaTime)
         {
+            TickPlayers(unscaledDeltaTime);
+        }
+
+        private void TickPlayers(float unscaledDeltaTime)
+        {
             for (int networkPlayerIndex = _networkPlayers.Count - 1; networkPlayerIndex >= 0; networkPlayerIndex -= 1)
             {
                 NetworkPlayer networkPlayer = _networkPlayers[networkPlayerIndex];
+                networkPlayer.TimeSinceLastMessage += unscaledDeltaTime;
 
-                if (networkPlayer.TimeSinceLastMessage >= _playerTimeoutSeconds)
-                    RemoveNetworkPlayer(networkPlayer);
+                if (networkPlayer.TimeSinceLastMessage < _playerTimeoutSeconds)
+                    continue;
+
+                Guid playerGuid = networkPlayer.Guid;
+
+                for (int identityIndex = _networkIdentities.Count - 1; identityIndex >= 0; identityIndex -= 1)
+                {
+                    INetworkIdentity networkIdentity = _networkIdentities[identityIndex];
+                    if (networkIdentity.NetworkOwner != playerGuid)
+                        continue;
+
+                    UnregisterNetworkIdentity(networkIdentity);
+
+                    if (networkIdentity is Component component)
+                        Destroy(component.gameObject);
+                }
+
+                RemoveNetworkPlayer(networkPlayer);
+                Debug.Log($"Removed timed out player {playerGuid}");
             }
         }
 
@@ -210,6 +233,8 @@ namespace BananaParty.WebSocketRelay
             IStateInput stateInput = _useBinary
                 ? new BinaryStateInput(payload)
                 : new JsonStateInput(Encoding.UTF8.GetString(payload.Span));
+
+            Debug.Log("Received " + data.Length + " " + Encoding.UTF8.GetString(payload.Span));
 
             stateInput.BeginObjectElement();
 
