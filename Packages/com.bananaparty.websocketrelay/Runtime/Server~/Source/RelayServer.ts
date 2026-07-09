@@ -5,7 +5,6 @@ import {
     relayReadGuid,
     relayReadTopic,
     relayReadTopicLength,
-    relayWriteProtocolMessage,
 } from "./RelayMessageType";
 import { RelayServerLog } from "./RelayServerLog";
 
@@ -108,14 +107,14 @@ export class RelayServer {
             return;
         }
 
-        if (!this.#subscribe(ws, topic)) {
+        if (ws.isSubscribed(topic)) {
             RelayServerLog.debug(
                 `subscribe ignored id=${ws.data.connectionId} topic=${topic} reason=already-subscribed`,
             );
             return;
         }
 
-        ws.send(relayWriteProtocolMessage(RelayMessageType.Subscribed, topic));
+        ws.subscribe(topic);
 
         RelayServerLog.info(
             `subscribed id=${ws.data.connectionId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
@@ -131,14 +130,14 @@ export class RelayServer {
             return;
         }
 
-        if (!this.#unsubscribe(ws, topic)) {
+        if (!ws.isSubscribed(topic)) {
             RelayServerLog.debug(
                 `unsubscribe ignored id=${ws.data.connectionId} topic=${topic} reason=not-subscribed`,
             );
             return;
         }
 
-        ws.send(relayWriteProtocolMessage(RelayMessageType.Unsubscribed, topic));
+        ws.unsubscribe(topic);
 
         RelayServerLog.info(
             `unsubscribed id=${ws.data.connectionId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
@@ -168,19 +167,5 @@ export class RelayServer {
         RelayServerLog.debug(
             `published id=${ws.data.connectionId} guid=${senderGuid} topic=${topic} bytes=${message.byteLength} deliveredTo=${deliveredTo}`,
         );
-    }
-
-    #subscribe(ws: Bun.ServerWebSocket<RelayWebSocketData>, topic: string): boolean {
-        if (ws.isSubscribed(topic)) return false;
-
-        ws.subscribe(topic);
-        return true;
-    }
-
-    #unsubscribe(ws: Bun.ServerWebSocket<RelayWebSocketData>, topic: string): boolean {
-        if (!ws.isSubscribed(topic)) return false;
-
-        ws.unsubscribe(topic);
-        return true;
     }
 }

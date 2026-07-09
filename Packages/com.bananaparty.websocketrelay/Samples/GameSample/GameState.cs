@@ -85,19 +85,6 @@ namespace BananaParty.WebSocketRelay.Samples
 
             _network.SubscribeToTopic(_networkTopic);
 
-            while (!_network.SubscribedTopics.Contains(_networkTopic))
-            {
-                elapsed += Time.unscaledDeltaTime;
-                if (elapsed > connectionTimeout)
-                {
-                    Debug.LogError($"Subscription timed out after {connectionTimeout}s");
-                    yield break;
-                }
-                yield return null;
-            }
-
-            Debug.Log($"Subscribed to {_networkTopic}");
-
             _networkContext.Instantiate(_playerCharacterPrefab, _networkTopic);
         }
     }

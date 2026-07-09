@@ -104,17 +104,6 @@ namespace BananaParty.WebSocketRelay
 
         public void OnConnectedToRelay()
         {
-
-        }
-
-        public void OnSubscribedToTopic(string topic)
-        {
-
-        }
-
-        public void OnUnsubscribedFromTopic(string topic)
-        {
-
         }
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)

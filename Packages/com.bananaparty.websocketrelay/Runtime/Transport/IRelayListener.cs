@@ -6,10 +6,6 @@ namespace BananaParty.WebSocketRelay.Transport
     {
         void OnConnectedToRelay();
 
-        void OnSubscribedToTopic(string topic);
-
-        void OnUnsubscribedFromTopic(string topic);
-
         void OnTopicMessage(Guid senderGuid, string topic, byte[] data);
     }
 }

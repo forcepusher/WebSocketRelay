@@ -92,12 +92,6 @@ namespace BananaParty.WebSocketRelay.Transport
 
                 switch (type)
                 {
-                    case RelayMessageType.Subscribed:
-                        processedLength = ProcessSubscribedMessage(payloadBytes);
-                        break;
-                    case RelayMessageType.Unsubscribed:
-                        processedLength = ProcessUnsubscribedMessage(payloadBytes);
-                        break;
                     case RelayMessageType.TopicMessage:
                         processedLength = ProcessTopicMessage(payloadBytes);
                         break;
@@ -113,26 +107,6 @@ namespace BananaParty.WebSocketRelay.Transport
                 Array.Copy(payloadBytes, processedLength, remaining, 0, remaining.Length);
                 payloadBytes = remaining;
             }
-        }
-
-        private int ProcessSubscribedMessage(byte[] data)
-        {
-            int topicLength = RelayMessageCodec.ReadTopicLength(data);
-            if (topicLength < 0)
-                throw new InvalidDataException("Incomplete topic control message.");
-
-            _relayListener.OnSubscribedToTopic(RelayMessageCodec.ReadTopic(data));
-            return RelayMessageCodec.GetPayloadOffset(topicLength);
-        }
-
-        private int ProcessUnsubscribedMessage(byte[] data)
-        {
-            int topicLength = RelayMessageCodec.ReadTopicLength(data);
-            if (topicLength < 0)
-                throw new InvalidDataException("Incomplete topic control message.");
-
-            _relayListener.OnUnsubscribedFromTopic(RelayMessageCodec.ReadTopic(data));
-            return RelayMessageCodec.GetPayloadOffset(topicLength);
         }
 
         private int ProcessTopicMessage(byte[] data)

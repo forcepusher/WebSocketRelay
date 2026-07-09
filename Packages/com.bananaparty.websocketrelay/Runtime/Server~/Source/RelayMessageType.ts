@@ -1,9 +1,7 @@
 export const RelayMessageType = {
     Subscribe: 0x01,
     Unsubscribe: 0x02,
-    Subscribed: 0x10,
-    Unsubscribed: 0x11,
-    TopicMessage: 0x12,
+    TopicMessage: 0x03,
 } as const;
 
 export const RelayMessageGuidSize = 16;
@@ -18,8 +16,6 @@ export const RelayMessageTopicMessageTopicOffset = RelayMessageTopicMessageTopic
 const relayMessageTypeNames: Record<number, string> = {
     [RelayMessageType.Subscribe]: "Subscribe",
     [RelayMessageType.Unsubscribe]: "Unsubscribe",
-    [RelayMessageType.Subscribed]: "Subscribed",
-    [RelayMessageType.Unsubscribed]: "Unsubscribed",
     [RelayMessageType.TopicMessage]: "TopicMessage",
 };
 

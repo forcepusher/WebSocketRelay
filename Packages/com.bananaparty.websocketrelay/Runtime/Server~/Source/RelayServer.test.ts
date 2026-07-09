@@ -17,6 +17,11 @@ function subscribe(ws: WebSocket, topic: string): void {
     ws.send(relayWriteProtocolMessage(RelayMessageType.Subscribe, topic));
 }
 
+async function subscribeAndSettle(ws: WebSocket, topic: string): Promise<void> {
+    subscribe(ws, topic);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+}
+
 function unsubscribe(ws: WebSocket, topic: string): void {
     ws.send(relayWriteProtocolMessage(RelayMessageType.Unsubscribe, topic));
 }
@@ -54,6 +59,16 @@ async function openSocket(clientGuid = crypto.randomUUID()): Promise<{ ws: WebSo
     return { ws, clientGuid };
 }
 
+async function expectNoMessage(ws: WebSocket, timeoutMs = 100): Promise<void> {
+    let unexpectedMessage = false;
+    ws.onmessage = () => {
+        unexpectedMessage = true;
+    };
+
+    await new Promise((resolve) => setTimeout(resolve, timeoutMs));
+    expect(unexpectedMessage).toBe(false);
+}
+
 describe("RelayServer", () => {
     const server = new RelayServer(testPort);
 
@@ -65,44 +80,26 @@ describe("RelayServer", () => {
         server.stop();
     });
 
-    test("connection does not send CONNECTED message", async () => {
+    test("connection does not send messages on open", async () => {
         const { ws } = await openSocket();
-
-        let unexpectedMessage = false;
-        ws.onmessage = () => {
-            unexpectedMessage = true;
-        };
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        expect(unexpectedMessage).toBe(false);
-
+        await expectNoMessage(ws);
         ws.close();
     });
 
-    test("subscribe sends SUBSCRIBED confirmation", async () => {
+    test("subscribe does not send confirmation", async () => {
         const { ws } = await openSocket();
         subscribe(ws, "lobby");
-
-        const response = await receiveBinary(ws);
-        expect(response[0]).toBe(RelayMessageType.Subscribed);
-        expect(relayReadTopic(response)).toBe("lobby");
-
+        await expectNoMessage(ws);
         ws.close();
     });
 
-    test("duplicate subscribe does not send another confirmation", async () => {
+    test("duplicate subscribe does not send a message", async () => {
         const { ws } = await openSocket();
         subscribe(ws, "events");
-        await receiveBinary(ws);
+        await expectNoMessage(ws);
 
         subscribe(ws, "events");
-        let duplicateConfirmation = false;
-        ws.onmessage = () => {
-            duplicateConfirmation = true;
-        };
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        expect(duplicateConfirmation).toBe(false);
+        await expectNoMessage(ws);
 
         ws.close();
     });
@@ -111,10 +108,8 @@ describe("RelayServer", () => {
         const sender = await openSocket();
         const receiver = await openSocket();
 
-        subscribe(sender.ws, "chat");
-        subscribe(receiver.ws, "chat");
-        await receiveBinary(sender.ws);
-        await receiveBinary(receiver.ws);
+        await subscribeAndSettle(sender.ws, "chat");
+        await subscribeAndSettle(receiver.ws, "chat");
 
         sendTopicMessage(sender.ws, sender.clientGuid, "chat", new Uint8Array([0xaa, 0xbb]));
 
@@ -140,20 +135,12 @@ describe("RelayServer", () => {
         const sender = await openSocket();
         const otherTopicClient = await openSocket();
 
-        subscribe(sender.ws, "alpha");
-        subscribe(otherTopicClient.ws, "beta");
-        await receiveBinary(sender.ws);
-        await receiveBinary(otherTopicClient.ws);
+        await subscribeAndSettle(sender.ws, "alpha");
+        await subscribeAndSettle(otherTopicClient.ws, "beta");
 
         sendTopicMessage(sender.ws, sender.clientGuid, "alpha", new Uint8Array([0x01]));
 
-        let unexpectedMessage = false;
-        otherTopicClient.ws.onmessage = () => {
-            unexpectedMessage = true;
-        };
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        expect(unexpectedMessage).toBe(false);
+        await expectNoMessage(otherTopicClient.ws);
 
         sender.ws.close();
         otherTopicClient.ws.close();
@@ -163,8 +150,7 @@ describe("RelayServer", () => {
         const sender = await openSocket();
         const receiver = await openSocket();
 
-        subscribe(receiver.ws, "game");
-        await receiveBinary(receiver.ws);
+        await subscribeAndSettle(receiver.ws, "game");
 
         sendTopicMessage(sender.ws, sender.clientGuid, "game", new Uint8Array([0x99]));
 
@@ -176,18 +162,11 @@ describe("RelayServer", () => {
         receiver.ws.close();
     });
 
-    test("unsubscribe sends UNSUBSCRIBED only when client was subscribed", async () => {
+    test("unsubscribe does not send confirmation", async () => {
         const { ws } = await openSocket();
 
         unsubscribe(ws, "missing");
-
-        let unexpectedMessage = false;
-        ws.onmessage = () => {
-            unexpectedMessage = true;
-        };
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        expect(unexpectedMessage).toBe(false);
+        await expectNoMessage(ws);
 
         ws.close();
     });
