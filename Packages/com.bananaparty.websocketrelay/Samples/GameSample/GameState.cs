@@ -31,6 +31,9 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Update()
         {
+            if (_network == null || !_network.IsConnected)
+                return;
+
             _network?.ManualUpdate(Time.unscaledDeltaTime);
 
             _timeSinceLastFullSync += Time.unscaledDeltaTime;

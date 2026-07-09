@@ -15,7 +15,7 @@ namespace BananaParty.WebSocketRelay
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
 
-        public bool IsConnected => _relayClient.IsConnected;
+        public bool IsConnected => _relayClient?.IsConnected ?? false;
         public HashSet<string> SubscribedTopics => _relayClient.SubscribedTopics;
 
         public Network(string address, NetworkContext context)
