@@ -10,6 +10,7 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float rotationSpeed = 10f;
         [SerializeField] private float jumpHeight = 2f;
+        private float positionDecay = 7f;
 
         private CharacterController _characteController;
         private ICharacterInput _characterInput;
@@ -80,7 +81,8 @@ namespace BananaParty.WebSocketRelay.Samples
             }
             else
             {
-                transform.position = Vector3.Lerp(transform.position, _position, 0.1f);
+                float decay = Mathf.Exp(-positionDecay * Time.deltaTime);
+                transform.position = _position + (transform.position - _position) * decay;
             }
         }
     }
