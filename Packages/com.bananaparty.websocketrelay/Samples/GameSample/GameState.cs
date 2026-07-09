@@ -6,8 +6,7 @@ namespace BananaParty.WebSocketRelay.Samples
 {
     public class GameState : MonoBehaviour
     {
-        private const float FullSyncInterval = 1f;
-        private const float PartialSyncInterval = 0.1f;
+        private const float SyncInterval = 1f;
 
         private Network _network;
 
@@ -38,7 +37,7 @@ namespace BananaParty.WebSocketRelay.Samples
             _network?.ManualUpdate(Time.unscaledDeltaTime);
 
             _timeSinceLastFullSync += Time.unscaledDeltaTime;
-            if (_timeSinceLastFullSync >= FullSyncInterval)
+            if (_timeSinceLastFullSync >= SyncInterval)
             {
                 _timeSinceLastFullSync = 0f;
                 _network.SendSyncIdentities();
