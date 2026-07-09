@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
@@ -14,16 +13,13 @@ namespace BananaParty.WebSocketRelay.Samples
             Vector2 movementInput = Vector2.zero;
             JumpInput = false;
 
-            if (Keyboard.current == null)
-                return;
-
-            if (Keyboard.current.wKey.isPressed) movementInput.y += 1f;
-            if (Keyboard.current.sKey.isPressed) movementInput.y -= 1f;
-            if (Keyboard.current.aKey.isPressed) movementInput.x -= 1f;
-            if (Keyboard.current.dKey.isPressed) movementInput.x += 1f;
+            if (Input.GetKey(KeyCode.W)) movementInput.y += 1f;
+            if (Input.GetKey(KeyCode.S)) movementInput.y -= 1f;
+            if (Input.GetKey(KeyCode.A)) movementInput.x -= 1f;
+            if (Input.GetKey(KeyCode.D)) movementInput.x += 1f;
 
             MovementInput = movementInput;
-            JumpInput = Keyboard.current.spaceKey.wasPressedThisFrame;
+            JumpInput = Input.GetKeyDown(KeyCode.Space);
         }
     }
 }
