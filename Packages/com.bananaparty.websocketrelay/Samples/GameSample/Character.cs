@@ -19,11 +19,12 @@ namespace BananaParty.WebSocketRelay.Samples
         private float _health = 100f;
         private Vector3 _position = Vector3.zero;
 
-        private Vector3 _lastReceivedPosition = Vector3.zero;
+        private NetworkIdentity _networkIdentity;
 
         private void Awake()
         {
             _characteController = GetComponent<CharacterController>();
+            _networkIdentity = GetComponent<NetworkIdentity>();
 
             _characterInput = GetComponent<ICharacterInput>();
         }
@@ -38,18 +39,18 @@ namespace BananaParty.WebSocketRelay.Samples
         public void WriteNetworkState(IStateOutput stateOutput)
         {
             stateOutput.WriteFloat(nameof(_health), _health);
-            stateOutput.WriteVector3(nameof(_position), _position);
+            stateOutput.WriteVector3(nameof(_position), transform.position);
         }
 
         public void ReadNetworkState(IStateInput stateInput)
         {
             _health = stateInput.ReadFloat(nameof(_health));
-            _lastReceivedPosition = stateInput.ReadVector3(nameof(_position));
+            _position = stateInput.ReadVector3(nameof(_position));
         }
 
         private void Move()
         {
-            if (true)
+            if (_networkIdentity.NetworkAuthority)
             {
                 Vector3 moveDirection = new Vector3(_characterInput.MovementInput.x, 0, _characterInput.MovementInput.y).normalized;
 
@@ -79,7 +80,7 @@ namespace BananaParty.WebSocketRelay.Samples
             }
             else
             {
-                transform.position = Vector3.Lerp(transform.position, _lastReceivedPosition, 0.1f);
+                transform.position = Vector3.Lerp(transform.position, _position, 0.1f);
             }
         }
     }

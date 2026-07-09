@@ -6,7 +6,7 @@ namespace BananaParty.WebSocketRelay.Samples
 {
     public class GameState : MonoBehaviour
     {
-        private const float SyncInterval = 1f;
+        private const float SyncInterval = 0.1f;
 
         private Network _network;
 
