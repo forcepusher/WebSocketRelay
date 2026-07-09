@@ -5,8 +5,9 @@ namespace BananaParty.WebSocketRelay.Samples
 {
     public class DebugOutput : MonoBehaviour
     {
-        [SerializeField] private int maxLogs = 20;
+        [SerializeField] private int maxLogs = 100;
         private readonly List<string> logs = new List<string>();
+        private readonly object lockObject = new object();
         private Vector2 scrollPosition;
         private bool isVisible = false;
 
@@ -20,20 +21,23 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void OnEnable()
         {
-            Application.logMessageReceived += HandleLog;
+            Application.logMessageReceivedThreaded += HandleLog;
         }
 
         private void OnDisable()
         {
-            Application.logMessageReceived -= HandleLog;
+            Application.logMessageReceivedThreaded -= HandleLog;
         }
 
         private void HandleLog(string condition, string stackTrace, LogType type)
         {
-            logs.Add($"[{type}] {condition}");
-            if (logs.Count > maxLogs)
+            lock (lockObject)
             {
-                logs.RemoveAt(0);
+                logs.Add($"[{type}] {condition}");
+                if (logs.Count > maxLogs)
+                {
+                    logs.RemoveAt(0);
+                }
             }
         }
 
@@ -45,9 +49,12 @@ namespace BananaParty.WebSocketRelay.Samples
             GUILayout.BeginVertical("box");
 
             scrollPosition = GUILayout.BeginScrollView(scrollPosition);
-            foreach (var log in logs)
+            lock (lockObject)
             {
-                GUILayout.Label(log);
+                foreach (var log in logs)
+                {
+                    GUILayout.Label(log);
+                }
             }
             GUILayout.EndScrollView();
 
