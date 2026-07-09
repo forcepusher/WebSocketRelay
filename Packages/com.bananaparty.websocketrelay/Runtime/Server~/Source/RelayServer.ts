@@ -1,18 +1,16 @@
 import {
     RelayMessageType,
     relayMessageTypeName,
-    relayPayloadOffset,
+    RelayMessageTopicMessageTopicLengthOffset,
+    relayReadGuid,
     relayReadTopic,
     relayReadTopicLength,
-    relayWriteConnectedMessage,
-    relayWriteMessage,
-    relayWriteTopicMessage,
+    relayWriteProtocolMessage,
 } from "./RelayMessageType";
 import { RelayServerLog } from "./RelayServerLog";
 
 type RelayWebSocketData = {
     connectionId: number;
-    clientGuid: string;
 };
 
 export class RelayServer {
@@ -31,7 +29,7 @@ export class RelayServer {
                 const connectionId = this.#nextConnectionId++;
                 if (
                     server.upgrade(req, {
-                        data: { connectionId, clientGuid: "" },
+                        data: { connectionId },
                     })
                 ) {
                     RelayServerLog.debug(
@@ -45,17 +43,13 @@ export class RelayServer {
             websocket: {
                 data: {} as RelayWebSocketData,
                 open: (ws) => {
-                    const clientGuid = crypto.randomUUID();
-                    ws.data.clientGuid = clientGuid;
-                    ws.send(relayWriteConnectedMessage(clientGuid));
-
                     RelayServerLog.info(
-                        `connected id=${ws.data.connectionId} guid=${clientGuid} remote=${ws.remoteAddress} subscriptions=[]`,
+                        `connected id=${ws.data.connectionId} remote=${ws.remoteAddress} subscriptions=[]`,
                     );
                 },
                 close: (ws) => {
                     RelayServerLog.info(
-                        `disconnected id=${ws.data.connectionId} guid=${ws.data.clientGuid} remote=${ws.remoteAddress} subscriptions=[${ws.subscriptions.join(", ")}]`,
+                        `disconnected id=${ws.data.connectionId} remote=${ws.remoteAddress} subscriptions=[${ws.subscriptions.join(", ")}]`,
                     );
                 },
                 message: (ws, message) => {
@@ -79,8 +73,8 @@ export class RelayServer {
                         case RelayMessageType.Unsubscribe:
                             this.#handleUnsubscribe(ws, message);
                             break;
-                        case RelayMessageType.Send:
-                            this.#handleSend(ws, message);
+                        case RelayMessageType.TopicMessage:
+                            this.#handleTopicMessage(ws, message);
                             break;
                         default:
                             RelayServerLog.warn(
@@ -121,7 +115,7 @@ export class RelayServer {
             return;
         }
 
-        ws.send(relayWriteMessage(RelayMessageType.Subscribed, topic));
+        ws.send(relayWriteProtocolMessage(RelayMessageType.Subscribed, topic));
 
         RelayServerLog.info(
             `subscribed id=${ws.data.connectionId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
@@ -144,45 +138,35 @@ export class RelayServer {
             return;
         }
 
-        ws.send(relayWriteMessage(RelayMessageType.Unsubscribed, topic));
+        ws.send(relayWriteProtocolMessage(RelayMessageType.Unsubscribed, topic));
 
         RelayServerLog.info(
             `unsubscribed id=${ws.data.connectionId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
         );
     }
 
-    #handleSend(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
-        const topicLength = relayReadTopicLength(message);
+    #handleTopicMessage(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
+        const topicLength = relayReadTopicLength(message, RelayMessageTopicMessageTopicLengthOffset);
         if (topicLength < 0) {
             RelayServerLog.warn(
-                `send rejected id=${ws.data.connectionId} reason=short-frame bytes=${message.byteLength}`,
+                `topic message rejected id=${ws.data.connectionId} reason=short-frame bytes=${message.byteLength}`,
             );
             return;
         }
 
-        const topic = relayReadTopic(message);
+        const topic = relayReadTopic(message, RelayMessageTopicMessageTopicLengthOffset);
         if (!topic) {
             RelayServerLog.warn(
-                `send rejected id=${ws.data.connectionId} reason=missing-topic bytes=${message.byteLength}`,
+                `topic message rejected id=${ws.data.connectionId} reason=missing-topic bytes=${message.byteLength}`,
             );
             return;
         }
 
-        if (!ws.isSubscribed(topic)) {
-            RelayServerLog.warn(
-                `send rejected id=${ws.data.connectionId} topic=${topic} reason=not-subscribed`,
-            );
-            return;
-        }
-
-        const payloadOffset = relayPayloadOffset(topicLength);
-        const payload = message.subarray(payloadOffset);
-        const response = relayWriteTopicMessage(ws.data.clientGuid, topic, payload);
-
-        const deliveredTo = ws.publish(topic, response);
+        const senderGuid = relayReadGuid(message, 1);
+        const deliveredTo = this.#server!.publish(topic, message);
 
         RelayServerLog.debug(
-            `published id=${ws.data.connectionId} guid=${ws.data.clientGuid} topic=${topic} payloadBytes=${payload.byteLength} deliveredTo=${deliveredTo}`,
+            `published id=${ws.data.connectionId} guid=${senderGuid} topic=${topic} bytes=${message.byteLength} deliveredTo=${deliveredTo}`,
         );
     }
 

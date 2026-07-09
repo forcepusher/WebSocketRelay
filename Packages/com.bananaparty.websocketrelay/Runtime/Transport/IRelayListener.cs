@@ -4,7 +4,7 @@ namespace BananaParty.WebSocketRelay.Transport
 {
     public interface IRelayListener
     {
-        void OnConnectedToRelay(Guid clientGuid);
+        void OnConnectedToRelay();
 
         void OnSubscribedToTopic(string topic);
 

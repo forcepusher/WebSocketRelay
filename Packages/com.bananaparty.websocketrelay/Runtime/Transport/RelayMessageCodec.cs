@@ -11,13 +11,11 @@ namespace BananaParty.WebSocketRelay.Transport
         public const int TopicLengthOffset = 1;
         public const int TopicOffset = 3;
 
-        public const int ConnectedMessageSize = 1 + GuidSize;
-
         public const int TopicMessageGuidOffset = 1;
         public const int TopicMessageTopicLengthOffset = TopicMessageGuidOffset + GuidSize;
         public const int TopicMessageTopicOffset = TopicMessageTopicLengthOffset + 2;
 
-        public static byte[] CreateMessage(byte type, string topic, ReadOnlySpan<byte> payload = default)
+        public static byte[] CreateProtocolMessage(byte type, string topic, ReadOnlySpan<byte> payload = default)
         {
             byte[] topicBytes = Encoding.UTF8.GetBytes(topic);
             int payloadOffset = TopicOffset + topicBytes.Length;
@@ -25,6 +23,19 @@ namespace BananaParty.WebSocketRelay.Transport
             message[0] = type;
             BinaryPrimitives.WriteUInt16LittleEndian(message.AsSpan(TopicLengthOffset), (ushort)topicBytes.Length);
             topicBytes.CopyTo(message.AsSpan(TopicOffset));
+            payload.CopyTo(message.AsSpan(payloadOffset));
+            return message;
+        }
+
+        public static byte[] CreateTopicMessage(Guid clientId, string topic, ReadOnlySpan<byte> payload = default)
+        {
+            byte[] topicBytes = Encoding.UTF8.GetBytes(topic);
+            int payloadOffset = TopicMessageTopicOffset + topicBytes.Length;
+            byte[] message = new byte[payloadOffset + payload.Length];
+            message[0] = RelayMessageType.TopicMessage;
+            WriteGuid(message.AsSpan(TopicMessageGuidOffset), clientId);
+            BinaryPrimitives.WriteUInt16LittleEndian(message.AsSpan(TopicMessageTopicLengthOffset), (ushort)topicBytes.Length);
+            topicBytes.CopyTo(message.AsSpan(TopicMessageTopicOffset));
             payload.CopyTo(message.AsSpan(payloadOffset));
             return message;
         }
@@ -61,6 +72,12 @@ namespace BananaParty.WebSocketRelay.Transport
             short b = BinaryPrimitives.ReadInt16BigEndian(bytes.Slice(4));
             short c = BinaryPrimitives.ReadInt16BigEndian(bytes.Slice(6));
             return new Guid(a, b, c, bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]);
+        }
+
+        public static void WriteGuid(Span<byte> destination, Guid guid)
+        {
+            if (!guid.TryWriteBytes(destination))
+                throw new ArgumentException("Destination is too small for a Guid.");
         }
     }
 }

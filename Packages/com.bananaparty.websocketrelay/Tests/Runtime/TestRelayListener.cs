@@ -10,8 +10,8 @@ namespace BananaParty.WebSocketRelay.Tests
         public event Action<string> Unsubscribed;
         public event Action<Guid, string, byte[]> TopicMessageReceived;
 
-        public void OnConnectedToRelay(Guid clientGuid)
-            => Connected?.Invoke(clientGuid);
+        public void OnConnectedToRelay()
+            => Connected?.Invoke(Guid.Empty);
 
         public void OnSubscribedToTopic(string topic)
             => Subscribed?.Invoke(topic);

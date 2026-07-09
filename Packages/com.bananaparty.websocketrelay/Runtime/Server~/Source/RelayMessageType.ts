@@ -1,11 +1,9 @@
 export const RelayMessageType = {
     Subscribe: 0x01,
     Unsubscribe: 0x02,
-    Send: 0x03,
     Subscribed: 0x10,
     Unsubscribed: 0x11,
     TopicMessage: 0x12,
-    Connected: 0x13,
 } as const;
 
 export const RelayMessageGuidSize = 16;
@@ -17,16 +15,12 @@ export const RelayMessageTopicMessageGuidOffset = 1;
 export const RelayMessageTopicMessageTopicLengthOffset = RelayMessageTopicMessageGuidOffset + RelayMessageGuidSize;
 export const RelayMessageTopicMessageTopicOffset = RelayMessageTopicMessageTopicLengthOffset + 2;
 
-export const RelayMessageConnectedSize = 1 + RelayMessageGuidSize;
-
 const relayMessageTypeNames: Record<number, string> = {
     [RelayMessageType.Subscribe]: "Subscribe",
     [RelayMessageType.Unsubscribe]: "Unsubscribe",
-    [RelayMessageType.Send]: "Send",
     [RelayMessageType.Subscribed]: "Subscribed",
     [RelayMessageType.Unsubscribed]: "Unsubscribed",
     [RelayMessageType.TopicMessage]: "TopicMessage",
-    [RelayMessageType.Connected]: "Connected",
 };
 
 export function relayMessageTypeName(type: number): string {
@@ -74,7 +68,7 @@ export function relayReadTopic(message: Uint8Array, topicLengthOffset: number = 
     );
 }
 
-export function relayWriteMessage(type: number, topic: string, payload?: Uint8Array): Uint8Array {
+export function relayWriteProtocolMessage(type: number, topic: string, payload?: Uint8Array): Uint8Array {
     const topicBytes = new TextEncoder().encode(topic);
     const payloadLength = payload?.byteLength ?? 0;
     const message = new Uint8Array(relayPayloadOffset(topicBytes.byteLength) + payloadLength);
@@ -83,13 +77,6 @@ export function relayWriteMessage(type: number, topic: string, payload?: Uint8Ar
     view.setUint16(RelayMessageTopicLengthOffset, topicBytes.byteLength, true);
     message.set(topicBytes, RelayMessageTopicOffset);
     if (payload) message.set(payload, relayPayloadOffset(topicBytes.byteLength));
-    return message;
-}
-
-export function relayWriteConnectedMessage(clientGuid: string): Uint8Array {
-    const message = new Uint8Array(RelayMessageConnectedSize);
-    message[0] = RelayMessageType.Connected;
-    message.set(relayGuidToBytes(clientGuid), 1);
     return message;
 }
 

@@ -10,8 +10,6 @@ namespace BananaParty.WebSocketRelay
         private readonly NetworkContext _networkContext;
         private readonly string _serverAddress;
 
-        public Guid LocalPlayerGuid { get; private set; }
-
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
 
@@ -44,12 +42,14 @@ namespace BananaParty.WebSocketRelay
             Debug.Log("Relay server stopped.");
         }
 
-        public void Connect()
+        public void Connect(Guid clientGuid)
         {
             if (_relayClient != null)
                 throw new InvalidOperationException("Already connected");
 
-            _relayClient = new RelayClient(_serverAddress, this);
+            _networkContext.LocalClientIdentity = clientGuid;
+
+            _relayClient = new RelayClient(_serverAddress, this, clientGuid);
             _relayClient.Connect();
             Debug.Log($"Connected to relay server at {_serverAddress}");
         }
@@ -102,20 +102,19 @@ namespace BananaParty.WebSocketRelay
             _relayClient?.Dispose();
         }
 
-        public void OnConnectedToRelay(Guid clientGuid)
+        public void OnConnectedToRelay()
         {
-            LocalPlayerGuid = clientGuid;
-            _networkContext.LocalClientIdentity = clientGuid;
+
         }
 
         public void OnSubscribedToTopic(string topic)
         {
-            
+
         }
 
         public void OnUnsubscribedFromTopic(string topic)
         {
-            
+
         }
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)

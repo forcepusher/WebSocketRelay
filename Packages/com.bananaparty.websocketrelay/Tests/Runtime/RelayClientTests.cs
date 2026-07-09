@@ -23,7 +23,7 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return RelayServerLauncher.StartCoroutine();
         }
 
-        [UnityTest] public IEnumerator ClientReceivesGuidOnConnect() => TestClientReceivesGuidOnConnect();
+        [UnityTest] public IEnumerator ClientHasGuidOnCreation() => TestClientHasGuidOnCreation();
         [UnityTest] public IEnumerator TopicMessageIncludesSenderGuid() => TestTopicMessageIncludesSenderGuid();
         [UnityTest] public IEnumerator TwoClients_MessageRelay() => TestTopicMessage("relay-100", 2);
         [UnityTest] public IEnumerator ThreeClients_AllReceive() => TestTopicMessage("relay-100", 3);
@@ -36,20 +36,13 @@ namespace BananaParty.WebSocketRelay.Tests
         [UnityTest] public IEnumerator LargePayload_Relays() => TestLargeMessage();
         [UnityTest] public IEnumerator RapidMessages_AllDelivered() => TestRapidMessages(50);
 
-        private IEnumerator TestClientReceivesGuidOnConnect()
+        private IEnumerator TestClientHasGuidOnCreation()
         {
             _relayA = CreateRelay(out _listenerA);
-            _relayA.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
-
-            yield return TestParameters.WaitForCondition(
-                () => _relayA.ClientId != Guid.Empty,
-                TestParameters.ConnectTimeoutThreshold,
-                () => _relayA.ProcessIncomingMessages());
-
-            Assert.AreNotEqual(Guid.Empty, _relayA.ClientId);
+            Assert.AreNotEqual(Guid.Empty, _relayA.ClientGuid);
 
             Cleanup();
+            yield return null;
         }
 
         private IEnumerator TestTopicMessageIncludesSenderGuid()
@@ -59,15 +52,6 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayA.Connect();
             _relayB.Connect();
             yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
-
-            yield return TestParameters.WaitForCondition(
-                () => _relayA.ClientId != Guid.Empty && _relayB.ClientId != Guid.Empty,
-                TestParameters.ConnectTimeoutThreshold,
-                () =>
-                {
-                    _relayA.ProcessIncomingMessages();
-                    _relayB.ProcessIncomingMessages();
-                });
 
             _relayA.SubscribeToTopic("guid-test");
             _relayB.SubscribeToTopic("guid-test");
@@ -90,7 +74,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 TestParameters.ReceiveTimeoutThreshold,
                 () => _relayB.ProcessIncomingMessages());
 
-            Assert.AreEqual(_relayA.ClientId, receivedSenderId);
+            Assert.AreEqual(_relayA.ClientGuid, receivedSenderId);
 
             Cleanup();
         }
@@ -408,7 +392,7 @@ namespace BananaParty.WebSocketRelay.Tests
         private RelayClient CreateRelay(out TestRelayListener listener)
         {
             listener = new TestRelayListener();
-            return new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", listener);
+            return new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", listener, Guid.NewGuid());
         }
 
         private byte[] GenerateRandomBytes(int length)

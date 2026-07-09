@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -67,7 +68,7 @@ namespace BananaParty.WebSocketRelay.Samples
         private IEnumerator ConnectCoroutine(float connectionTimeout)
         {
             float elapsed = 0;
-            _network.Connect();
+            _network.Connect(Guid.NewGuid());
 
             while (!_network.IsConnected)
             {

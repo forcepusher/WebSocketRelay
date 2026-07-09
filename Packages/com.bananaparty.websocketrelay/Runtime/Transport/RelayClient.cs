@@ -13,13 +13,15 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public bool HasUnreadPayloadQueue => _socket.HasUnreadPayloadQueue;
 
-        public Guid ClientId { get; private set; }
+        public Guid ClientGuid { get; }
+
         public HashSet<string> SubscribedTopics => _subscribedTopics;
 
         private IRelayListener _relayListener;
 
-        public RelayClient(string serverAddress, IRelayListener relayListener)
+        public RelayClient(string serverAddress, IRelayListener relayListener, Guid clientGuid)
         {
+            ClientGuid = clientGuid;
             _socket = new Socket(serverAddress);
             _relayListener = relayListener;
         }
@@ -47,7 +49,7 @@ namespace BananaParty.WebSocketRelay.Transport
             if (!_subscribedTopics.Add(topic))
                 return;
 
-            _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Subscribe, topic));
+            _socket.Send(RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Subscribe, topic));
         }
 
         public void UnsubscribeToTopic(string topic)
@@ -55,7 +57,7 @@ namespace BananaParty.WebSocketRelay.Transport
             if (!_subscribedTopics.Remove(topic))
                 throw new KeyNotFoundException($"Not subscribed to topic '{topic}'.");
 
-            _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Unsubscribe, topic));
+            _socket.Send(RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Unsubscribe, topic));
         }
 
         public void Send(string topic, byte[] data)
@@ -63,7 +65,7 @@ namespace BananaParty.WebSocketRelay.Transport
             if (!_subscribedTopics.Contains(topic))
                 throw new KeyNotFoundException($"Not subscribed to topic '{topic}'.");
 
-            _socket.Send(RelayMessageCodec.CreateMessage(RelayMessageType.Send, topic, data));
+            _socket.Send(RelayMessageCodec.CreateTopicMessage(ClientGuid, topic, data));
         }
 
         public void Dispose()
@@ -90,9 +92,6 @@ namespace BananaParty.WebSocketRelay.Transport
 
                 switch (type)
                 {
-                    case RelayMessageType.Connected:
-                        processedLength = ProcessConnectedMessage(payloadBytes);
-                        break;
                     case RelayMessageType.Subscribed:
                         processedLength = ProcessSubscribedMessage(payloadBytes);
                         break;
@@ -114,16 +113,6 @@ namespace BananaParty.WebSocketRelay.Transport
                 Array.Copy(payloadBytes, processedLength, remaining, 0, remaining.Length);
                 payloadBytes = remaining;
             }
-        }
-
-        private int ProcessConnectedMessage(byte[] data)
-        {
-            if (data.Length < RelayMessageCodec.ConnectedMessageSize)
-                throw new InvalidDataException("Incomplete connected message.");
-
-            ClientId = RelayMessageCodec.ReadGuid(data);
-            _relayListener.OnConnectedToRelay(ClientId);
-            return RelayMessageCodec.ConnectedMessageSize;
         }
 
         private int ProcessSubscribedMessage(byte[] data)
