@@ -41,6 +41,7 @@ namespace BananaParty.WebSocketRelay.Tests
         [UnityTest] public IEnumerator DisposeWhileConnected_DoesNotCallDisconnected() => TestDisposeWhileConnectedDoesNotCallDisconnected();
         [UnityTest] public IEnumerator DisposeBeforeConnect_DoesNotCallDisconnected() => TestDisposeBeforeConnectDoesNotCallDisconnected();
         [UnityTest] public IEnumerator ServerStop_CallsDisconnected() => TestServerStopCallsDisconnected();
+        [UnityTest] public IEnumerator ServerStop_DisposeDoesNotThrow() => TestServerStopDisposeDoesNotThrow();
         [UnityTest] public IEnumerator Disconnect_NotCalledTwice() => TestDisconnectNotCalledTwice();
 
         private IEnumerator TestClientHasGuidOnCreation()
@@ -510,6 +511,26 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayA.ProcessIncomingMessages();
             Assert.AreEqual(1, disconnectCount, "Disconnect callback should not fire again while polling.");
 
+            Assert.DoesNotThrow(() => _relayA.Dispose());
+            _relayA = null;
+            yield return null;
+        }
+
+        private IEnumerator TestServerStopDisposeDoesNotThrow()
+        {
+            _relayA = CreateRelay(out _listenerA);
+            _relayA.Connect();
+
+            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            _relayA.ProcessIncomingMessages();
+
+            yield return RelayServerLauncher.StopCoroutine();
+
+            yield return TestParameters.WaitForDuration(
+                0.5f,
+                () => _relayA.ProcessIncomingMessages());
+
+            Assert.DoesNotThrow(() => _relayA.Dispose());
             _relayA = null;
             yield return null;
         }
@@ -538,6 +559,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             Assert.AreEqual(1, disconnectCount);
 
+            Assert.DoesNotThrow(() => _relayA.Dispose());
             _relayA = null;
             yield return null;
         }

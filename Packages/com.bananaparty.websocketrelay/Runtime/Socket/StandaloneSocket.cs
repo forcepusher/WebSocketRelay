@@ -38,7 +38,13 @@ namespace BananaParty.WebSocketRelay
 
         public void Disconnect()
         {
-            _disconnectTokenSource.Cancel();
+            try
+            {
+                _disconnectTokenSource.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
 
         public void Send(byte[] payloadBytes)
@@ -128,8 +134,21 @@ namespace BananaParty.WebSocketRelay
             await _clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
 
         ConnectionAborted:
-            _disconnectTokenSource.Dispose();
-            _clientWebSocket.Dispose();
+            try
+            {
+                _disconnectTokenSource.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            try
+            {
+                _clientWebSocket.Dispose();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
 
         public void Dispose()

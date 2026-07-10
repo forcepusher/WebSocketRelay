@@ -9,7 +9,16 @@ namespace BananaParty.WebSocketRelay.Transport
         private readonly Socket _socket;
         private readonly HashSet<string> _subscribedTopics = new();
 
-        public bool IsConnected => _socket.IsConnected;
+        public bool IsConnected
+        {
+            get
+            {
+                if (_socket.IsConnected)
+                    _wasConnected = true;
+
+                return _socket.IsConnected;
+            }
+        }
 
         public bool HasUnreadPayloadQueue => _socket.HasUnreadPayloadQueue;
 

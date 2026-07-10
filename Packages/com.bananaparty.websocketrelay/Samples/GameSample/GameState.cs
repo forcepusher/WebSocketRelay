@@ -31,10 +31,13 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Update()
         {
-            if (_network == null || !_network.IsConnected)
+            if (_network == null)
                 return;
 
-            _network?.ManualUpdate(Time.unscaledDeltaTime);
+            _network.ManualUpdate(Time.unscaledDeltaTime);
+
+            if (!_network.IsConnected)
+                return;
 
             _timeSinceLastFullSync += Time.unscaledDeltaTime;
             if (_timeSinceLastFullSync >= SyncInterval)
@@ -71,10 +74,13 @@ namespace BananaParty.WebSocketRelay.Samples
 
             while (!_network.IsConnected)
             {
+                _network.ManualUpdate(Time.unscaledDeltaTime);
                 elapsed += Time.unscaledDeltaTime;
                 if (elapsed > connectionTimeout)
                 {
                     Debug.LogError($"Connection timed out after {connectionTimeout}s");
+                    if (_network.HasRelayClient)
+                        _network.Disconnect();
                     yield break;
                 }
                 yield return null;

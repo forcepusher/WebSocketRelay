@@ -14,6 +14,7 @@ namespace BananaParty.WebSocketRelay
         private RelayClient _relayClient;
 
         public bool IsConnected => _relayClient?.IsConnected ?? false;
+        public bool HasRelayClient => _relayClient != null;
         public HashSet<string> SubscribedTopics => _relayClient?.SubscribedTopics;
 
         public Network(string address, NetworkContext context)
@@ -50,7 +51,7 @@ namespace BananaParty.WebSocketRelay
 
             _relayClient = new RelayClient(_serverAddress, this, clientGuid);
             _relayClient.Connect();
-            Debug.Log($"Connected to relay server at {_serverAddress}");
+            Debug.Log($"Connecting to relay server at {_serverAddress}");
         }
 
         public void Disconnect()
@@ -89,11 +90,17 @@ namespace BananaParty.WebSocketRelay
 
         public void SubscribeToTopic(string topic)
         {
+            if (_relayClient == null)
+                throw new InvalidOperationException("Not connected to subscribe to a topic");
+
             _relayClient.SubscribeToTopic(topic);
         }
 
         public void UnsubscribeFromTopic(string topic)
         {
+            if (_relayClient == null)
+                throw new InvalidOperationException("Not connected to unsubscribe from a topic");
+
             _relayClient.UnsubscribeToTopic(topic);
         }
 
