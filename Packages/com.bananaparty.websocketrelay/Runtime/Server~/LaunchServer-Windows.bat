@@ -19,5 +19,6 @@ set "RELAY_TLS_KEY=%SSL_KEY%"
 echo SSL certificates found. Starting relay server on port 443 with WSS.
 
 :launch
-set "BUN_PATH=%SCRIPT_DIR%Bun\bun-windows-x64\bun.exe"
-"%BUN_PATH%" --cwd "%SCRIPT_DIR%" Source\index.ts -relay-server
+cd /d "%~dp0"
+set "BUN_PATH=%~dp0Bun\bun-windows-x64\bun.exe"
+"%BUN_PATH%" Source\index.ts -relay-server
