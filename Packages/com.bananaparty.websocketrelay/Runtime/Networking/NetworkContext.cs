@@ -9,7 +9,7 @@ namespace BananaParty.WebSocketRelay
     public class NetworkContext : ScriptableObject, INetworkContext
     {
         [SerializeField]
-        private float _playerTimeoutSeconds = 10f;
+        private float _playerTimeoutSeconds = 5f;
 
         [SerializeField]
         private bool _useBinary = false;
