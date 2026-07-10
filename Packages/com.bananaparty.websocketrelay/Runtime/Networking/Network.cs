@@ -105,6 +105,10 @@ namespace BananaParty.WebSocketRelay
         {
         }
 
+        public void OnDisconnectedFromRelay()
+        {
+        }
+
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
         {
             _networkContext.ProcessTopicMessage(senderGuid, topic, data);
