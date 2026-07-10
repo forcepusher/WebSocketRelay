@@ -1,7 +1,9 @@
 {
     "name": "BananaParty.WebSocketRelay.Editor",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "BananaParty.WebSocketRelay"
+    ],
     "includePlatforms": [
         "Editor"
     ],
