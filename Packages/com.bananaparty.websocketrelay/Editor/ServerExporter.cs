@@ -8,6 +8,7 @@ namespace BananaParty.WebSocketRelay.Editor
     public static class ServerExporter
     {
         private const string PackageName = "com.bananaparty.websocketrelay";
+        private const string LastExportPathKey = "com.bananaparty.websocketrelay.exportServerPath";
 
         [MenuItem("Tools/WebSocket Relay/Export Server")]
         public static void ExportServer()
@@ -22,9 +23,15 @@ namespace BananaParty.WebSocketRelay.Editor
                 return;
             }
 
-            string destinationDirectory = EditorUtility.OpenFolderPanel("Export Server", "", "");
+            string lastExportPath = EditorPrefs.GetString(LastExportPathKey, "");
+            if (!string.IsNullOrEmpty(lastExportPath) && !Directory.Exists(lastExportPath))
+                lastExportPath = "";
+
+            string destinationDirectory = EditorUtility.OpenFolderPanel("Export Server", lastExportPath, "");
             if (string.IsNullOrEmpty(destinationDirectory))
                 return;
+
+            EditorPrefs.SetString(LastExportPathKey, destinationDirectory);
 
             bool destinationHasContent = Directory.GetFileSystemEntries(destinationDirectory).Length > 0;
             if (destinationHasContent)
