@@ -13,7 +13,7 @@ See minimum required Unity version in the `package.json` file.
   
 Networking as simple as it gets (for programmers though).  
 It's basically a peer-to-peer networking through a relay server.  
-The goal is to provide bare minimum to get things done.  
+The goal is to provide bare minimum to get things done and to ship the game ASAP.  
   
 Key priorities:  
 1. Developer Experience - JSON data stream for developing. Binary stream for shipping.  
