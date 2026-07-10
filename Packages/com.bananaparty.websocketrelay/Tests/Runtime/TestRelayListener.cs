@@ -7,7 +7,7 @@ namespace BananaParty.WebSocketRelay.Tests
     {
         public event Action Connected;
         public event Action Disconnected;
-        public event Action<Guid, string, byte[]> TopicMessageReceived;
+        public event Action<Guid, string, byte[]> ChannelMessageReceived;
 
         public void OnConnectedToRelay()
             => Connected?.Invoke();
@@ -15,7 +15,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public void OnDisconnectedFromRelay()
             => Disconnected?.Invoke();
 
-        public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
-            => TopicMessageReceived?.Invoke(senderGuid, topic, data);
+        public void OnChannelMessage(Guid senderGuid, string channel, byte[] data)
+            => ChannelMessageReceived?.Invoke(senderGuid, channel, data);
     }
 }

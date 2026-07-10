@@ -47,18 +47,18 @@ namespace BananaParty.WebSocketRelay.Tests
             string prefabName,
             Guid networkOwner,
             Guid networkIdentifier,
-            string topic = "test-topic")
+            string channel = "test-channel")
         {
             GameObject = gameObject;
             PrefabName = prefabName;
             NetworkOwner = networkOwner;
             NetworkIdentifier = networkIdentifier;
-            Topic = topic;
+            Channel = channel;
         }
 
         public string PrefabName { get; }
         public GameObject GameObject { get; }
-        public string Topic { get; set; }
+        public string Channel { get; set; }
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
         public bool NetworkAuthority => false;

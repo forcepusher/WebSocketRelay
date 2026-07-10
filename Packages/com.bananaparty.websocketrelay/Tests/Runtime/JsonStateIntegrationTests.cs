@@ -54,21 +54,21 @@ namespace BananaParty.WebSocketRelay.Tests
                 });
             Assert.IsTrue(relayA.IsConnected && relayB.IsConnected, "Relays failed to connect.");
 
-            relayA.SubscribeToTopic("state-sync");
-            relayB.SubscribeToTopic("state-sync");
+            relayA.SubscribeToChannel("state-sync");
+            relayB.SubscribeToChannel("state-sync");
             relayA.ProcessIncomingMessages();
             relayB.ProcessIncomingMessages();
             yield return null;
 
-            // Act: Client A serializes and sends state via topic
+            // Act: Client A serializes and sends state via channel
             JsonStateOutput writeGraph = new();
             stateA.WriteNetworkState(writeGraph);
             byte[] sentBytes = Encoding.UTF8.GetBytes(writeGraph.ToString());
 
             bool captured = false;
-            listenerB.TopicMessageReceived += (_, topic, data) =>
+            listenerB.ChannelMessageReceived += (_, channel, data) =>
             {
-                if (topic != "state-sync" || captured)
+                if (channel != "state-sync" || captured)
                     return;
 
                 JsonStateInput readGraph = new(Encoding.UTF8.GetString(data));
@@ -83,7 +83,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 TestParameters.ReceiveTimeoutThreshold,
                 () => relayB.ProcessIncomingMessages());
 
-            Assert.IsTrue(captured, "Topic message was never processed.");
+            Assert.IsTrue(captured, "Channel message was never processed.");
 
             // Assert: Verify values were synchronized
             Assert.AreEqual(stateA.PlayTime, stateB.PlayTime);
@@ -99,7 +99,7 @@ namespace BananaParty.WebSocketRelay.Tests
             public string NetworkStateName => nameof(MockGameState);
             public GameObject GameObject => throw new NotImplementedException();
             public string PrefabName => nameof(MockGameState);
-            public string Topic { get; set; }
+            public string Channel { get; set; }
             public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
             public Guid NetworkOwner { get; set; } = Guid.NewGuid();
             public bool NetworkAuthority { get; set; }

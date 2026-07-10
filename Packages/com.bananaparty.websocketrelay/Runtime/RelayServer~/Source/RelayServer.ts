@@ -1,10 +1,10 @@
 import {
     RelayMessageType,
     relayMessageTypeName,
-    RelayMessageTopicMessageTopicLengthOffset,
+    RelayMessageChannelMessageChannelLengthOffset,
     relayReadGuid,
-    relayReadTopic,
-    relayReadTopicLength,
+    relayReadChannel,
+    relayReadChannelLength,
 } from "./RelayMessageType";
 import { RelayServerLog } from "./RelayServerLog";
 
@@ -87,8 +87,8 @@ export class RelayServer {
                         case RelayMessageType.Unsubscribe:
                             this.#handleUnsubscribe(ws, message);
                             break;
-                        case RelayMessageType.TopicMessage:
-                            this.#handleTopicMessage(ws, message);
+                        case RelayMessageType.ChannelMessage:
+                            this.#handleChannelMessage(ws, message);
                             break;
                         default:
                             RelayServerLog.warn(
@@ -115,73 +115,73 @@ export class RelayServer {
     }
 
     #handleSubscribe(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
-        const topic = relayReadTopic(message);
-        if (!topic) {
+        const channel = relayReadChannel(message);
+        if (!channel) {
             RelayServerLog.warn(
-                `subscribe rejected id=${ws.data.connectionId} reason=missing-topic bytes=${message.byteLength}`,
+                `subscribe rejected id=${ws.data.connectionId} reason=missing-channel bytes=${message.byteLength}`,
             );
             return;
         }
 
-        if (ws.isSubscribed(topic)) {
+        if (ws.isSubscribed(channel)) {
             RelayServerLog.debug(
-                `subscribe ignored id=${ws.data.connectionId} topic=${topic} reason=already-subscribed`,
+                `subscribe ignored id=${ws.data.connectionId} channel=${channel} reason=already-subscribed`,
             );
             return;
         }
 
-        ws.subscribe(topic);
+        ws.subscribe(channel);
 
         RelayServerLog.info(
-            `subscribed id=${ws.data.connectionId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
+            `subscribed id=${ws.data.connectionId} channel=${channel} subscriptions=[${ws.subscriptions.join(", ")}]`,
         );
     }
 
     #handleUnsubscribe(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
-        const topic = relayReadTopic(message);
-        if (!topic) {
+        const channel = relayReadChannel(message);
+        if (!channel) {
             RelayServerLog.warn(
-                `unsubscribe rejected id=${ws.data.connectionId} reason=missing-topic bytes=${message.byteLength}`,
+                `unsubscribe rejected id=${ws.data.connectionId} reason=missing-channel bytes=${message.byteLength}`,
             );
             return;
         }
 
-        if (!ws.isSubscribed(topic)) {
+        if (!ws.isSubscribed(channel)) {
             RelayServerLog.debug(
-                `unsubscribe ignored id=${ws.data.connectionId} topic=${topic} reason=not-subscribed`,
+                `unsubscribe ignored id=${ws.data.connectionId} channel=${channel} reason=not-subscribed`,
             );
             return;
         }
 
-        ws.unsubscribe(topic);
+        ws.unsubscribe(channel);
 
         RelayServerLog.info(
-            `unsubscribed id=${ws.data.connectionId} topic=${topic} subscriptions=[${ws.subscriptions.join(", ")}]`,
+            `unsubscribed id=${ws.data.connectionId} channel=${channel} subscriptions=[${ws.subscriptions.join(", ")}]`,
         );
     }
 
-    #handleTopicMessage(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
-        const topicLength = relayReadTopicLength(message, RelayMessageTopicMessageTopicLengthOffset);
-        if (topicLength < 0) {
+    #handleChannelMessage(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
+        const channelLength = relayReadChannelLength(message, RelayMessageChannelMessageChannelLengthOffset);
+        if (channelLength < 0) {
             RelayServerLog.warn(
-                `topic message rejected id=${ws.data.connectionId} reason=short-frame bytes=${message.byteLength}`,
+                `channel message rejected id=${ws.data.connectionId} reason=short-frame bytes=${message.byteLength}`,
             );
             return;
         }
 
-        const topic = relayReadTopic(message, RelayMessageTopicMessageTopicLengthOffset);
-        if (!topic) {
+        const channel = relayReadChannel(message, RelayMessageChannelMessageChannelLengthOffset);
+        if (!channel) {
             RelayServerLog.warn(
-                `topic message rejected id=${ws.data.connectionId} reason=missing-topic bytes=${message.byteLength}`,
+                `channel message rejected id=${ws.data.connectionId} reason=missing-channel bytes=${message.byteLength}`,
             );
             return;
         }
 
         const senderGuid = relayReadGuid(message, 1);
-        const deliveredTo = this.#server!.publish(topic, message);
+        const deliveredTo = this.#server!.publish(channel, message);
 
         RelayServerLog.debug(
-            `published id=${ws.data.connectionId} guid=${senderGuid} topic=${topic} bytes=${message.byteLength} deliveredTo=${deliveredTo}`,
+            `published id=${ws.data.connectionId} guid=${senderGuid} channel=${channel} bytes=${message.byteLength} deliveredTo=${deliveredTo}`,
         );
     }
 }

@@ -8,61 +8,61 @@ namespace BananaParty.WebSocketRelay.Transport
     {
         public const int GuidSize = 16;
 
-        public const int TopicLengthOffset = 1;
-        public const int TopicOffset = 3;
+        public const int ChannelLengthOffset = 1;
+        public const int ChannelOffset = 3;
 
-        public const int TopicMessageGuidOffset = 1;
-        public const int TopicMessageTopicLengthOffset = TopicMessageGuidOffset + GuidSize;
-        public const int TopicMessageTopicOffset = TopicMessageTopicLengthOffset + 2;
+        public const int ChannelMessageGuidOffset = 1;
+        public const int ChannelMessageChannelLengthOffset = ChannelMessageGuidOffset + GuidSize;
+        public const int ChannelMessageChannelOffset = ChannelMessageChannelLengthOffset + 2;
 
-        public static byte[] CreateProtocolMessage(byte type, string topic, ReadOnlySpan<byte> payload = default)
+        public static byte[] CreateProtocolMessage(byte type, string channel, ReadOnlySpan<byte> payload = default)
         {
-            byte[] topicBytes = Encoding.UTF8.GetBytes(topic);
-            int payloadOffset = TopicOffset + topicBytes.Length;
+            byte[] channelBytes = Encoding.UTF8.GetBytes(channel);
+            int payloadOffset = ChannelOffset + channelBytes.Length;
             byte[] message = new byte[payloadOffset + payload.Length];
             message[0] = type;
-            BinaryPrimitives.WriteUInt16LittleEndian(message.AsSpan(TopicLengthOffset), (ushort)topicBytes.Length);
-            topicBytes.CopyTo(message.AsSpan(TopicOffset));
+            BinaryPrimitives.WriteUInt16LittleEndian(message.AsSpan(ChannelLengthOffset), (ushort)channelBytes.Length);
+            channelBytes.CopyTo(message.AsSpan(ChannelOffset));
             payload.CopyTo(message.AsSpan(payloadOffset));
             return message;
         }
 
-        public static byte[] CreateTopicMessage(Guid clientId, string topic, ReadOnlySpan<byte> payload = default)
+        public static byte[] CreateChannelMessage(Guid clientId, string channel, ReadOnlySpan<byte> payload = default)
         {
-            byte[] topicBytes = Encoding.UTF8.GetBytes(topic);
-            int payloadOffset = TopicMessageTopicOffset + topicBytes.Length;
+            byte[] channelBytes = Encoding.UTF8.GetBytes(channel);
+            int payloadOffset = ChannelMessageChannelOffset + channelBytes.Length;
             byte[] message = new byte[payloadOffset + payload.Length];
-            message[0] = RelayMessageType.TopicMessage;
-            WriteGuid(message.AsSpan(TopicMessageGuidOffset), clientId);
-            BinaryPrimitives.WriteUInt16LittleEndian(message.AsSpan(TopicMessageTopicLengthOffset), (ushort)topicBytes.Length);
-            topicBytes.CopyTo(message.AsSpan(TopicMessageTopicOffset));
+            message[0] = RelayMessageType.ChannelMessage;
+            WriteGuid(message.AsSpan(ChannelMessageGuidOffset), clientId);
+            BinaryPrimitives.WriteUInt16LittleEndian(message.AsSpan(ChannelMessageChannelLengthOffset), (ushort)channelBytes.Length);
+            channelBytes.CopyTo(message.AsSpan(ChannelMessageChannelOffset));
             payload.CopyTo(message.AsSpan(payloadOffset));
             return message;
         }
 
-        public static int ReadTopicLength(ReadOnlySpan<byte> message, int topicLengthOffset = TopicLengthOffset)
+        public static int ReadChannelLength(ReadOnlySpan<byte> message, int channelLengthOffset = ChannelLengthOffset)
         {
-            if (message.Length < topicLengthOffset + 2)
+            if (message.Length < channelLengthOffset + 2)
                 return -1;
 
-            return BinaryPrimitives.ReadUInt16LittleEndian(message.Slice(topicLengthOffset, 2));
+            return BinaryPrimitives.ReadUInt16LittleEndian(message.Slice(channelLengthOffset, 2));
         }
 
-        public static int GetPayloadOffset(int topicLength) => TopicOffset + topicLength;
+        public static int GetPayloadOffset(int channelLength) => ChannelOffset + channelLength;
 
-        public static int GetTopicMessagePayloadOffset(int topicLength) => TopicMessageTopicOffset + topicLength;
+        public static int GetChannelMessagePayloadOffset(int channelLength) => ChannelMessageChannelOffset + channelLength;
 
-        public static string ReadTopic(ReadOnlySpan<byte> message, int topicLengthOffset = TopicLengthOffset)
+        public static string ReadChannel(ReadOnlySpan<byte> message, int channelLengthOffset = ChannelLengthOffset)
         {
-            int topicLength = ReadTopicLength(message, topicLengthOffset);
-            if (topicLength < 0)
+            int channelLength = ReadChannelLength(message, channelLengthOffset);
+            if (channelLength < 0)
                 return string.Empty;
 
-            int topicOffset = topicLengthOffset + 2;
-            if (message.Length < topicOffset + topicLength)
+            int channelOffset = channelLengthOffset + 2;
+            if (message.Length < channelOffset + channelLength)
                 return string.Empty;
 
-            return Encoding.UTF8.GetString(message.Slice(topicOffset, topicLength));
+            return Encoding.UTF8.GetString(message.Slice(channelOffset, channelLength));
         }
 
         public static Guid ReadGuid(ReadOnlySpan<byte> message, int offset = 1)

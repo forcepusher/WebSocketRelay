@@ -34,9 +34,9 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return "RelayServer > connection does not send messages on open";
             yield return "RelayServer > subscribe does not send confirmation";
             yield return "RelayServer > duplicate subscribe does not send a message";
-            yield return "RelayServer > relays topic messages with client-provided sender guid";
-            yield return "RelayServer > does not relay to clients on other topics";
-            yield return "RelayServer > relays topic message even when sender is not subscribed to topic";
+            yield return "RelayServer > relays channel messages with client-provided sender guid";
+            yield return "RelayServer > does not relay to clients on other channels";
+            yield return "RelayServer > relays channel message even when sender is not subscribed to channel";
             yield return "RelayServer > unsubscribe does not send confirmation";
         }
 

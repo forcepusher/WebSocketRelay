@@ -15,7 +15,7 @@ namespace BananaParty.WebSocketRelay
 
         public GameObject GameObject => gameObject;
         public string PrefabName => _prefabName;
-        public string Topic { get; set; }
+        public string Channel { get; set; }
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
         public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;

@@ -2,32 +2,32 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { RelayServer } from "./RelayServer";
 import {
     RelayMessageType,
-    RelayMessageTopicMessageTopicLengthOffset,
+    RelayMessageChannelMessageChannelLengthOffset,
     relayReadGuid,
-    relayReadTopic,
-    relayReadTopicLength,
-    relayTopicMessagePayloadOffset,
+    relayReadChannel,
+    relayReadChannelLength,
+    relayChannelMessagePayloadOffset,
     relayWriteProtocolMessage,
-    relayWriteTopicMessage,
+    relayWriteChannelMessage,
 } from "./RelayMessageType";
 
 const testPort = 23145;
 
-function subscribe(ws: WebSocket, topic: string): void {
-    ws.send(relayWriteProtocolMessage(RelayMessageType.Subscribe, topic));
+function subscribe(ws: WebSocket, channel: string): void {
+    ws.send(relayWriteProtocolMessage(RelayMessageType.Subscribe, channel));
 }
 
-async function subscribeAndSettle(ws: WebSocket, topic: string): Promise<void> {
-    subscribe(ws, topic);
+async function subscribeAndSettle(ws: WebSocket, channel: string): Promise<void> {
+    subscribe(ws, channel);
     await new Promise((resolve) => setTimeout(resolve, 10));
 }
 
-function unsubscribe(ws: WebSocket, topic: string): void {
-    ws.send(relayWriteProtocolMessage(RelayMessageType.Unsubscribe, topic));
+function unsubscribe(ws: WebSocket, channel: string): void {
+    ws.send(relayWriteProtocolMessage(RelayMessageType.Unsubscribe, channel));
 }
 
-function sendTopicMessage(ws: WebSocket, senderGuid: string, topic: string, payload: Uint8Array): void {
-    ws.send(relayWriteTopicMessage(senderGuid, topic, payload));
+function sendChannelMessage(ws: WebSocket, senderGuid: string, channel: string, payload: Uint8Array): void {
+    ws.send(relayWriteChannelMessage(senderGuid, channel, payload));
 }
 
 async function toUint8Array(data: unknown): Promise<Uint8Array> {
@@ -104,24 +104,24 @@ describe("RelayServer", () => {
         ws.close();
     });
 
-    test("relays topic messages with client-provided sender guid", async () => {
+    test("relays channel messages with client-provided sender guid", async () => {
         const sender = await openSocket();
         const receiver = await openSocket();
 
         await subscribeAndSettle(sender.ws, "chat");
         await subscribeAndSettle(receiver.ws, "chat");
 
-        sendTopicMessage(sender.ws, sender.clientGuid, "chat", new Uint8Array([0xaa, 0xbb]));
+        sendChannelMessage(sender.ws, sender.clientGuid, "chat", new Uint8Array([0xaa, 0xbb]));
 
         const response = await receiveBinary(receiver.ws);
-        expect(response[0]).toBe(RelayMessageType.TopicMessage);
+        expect(response[0]).toBe(RelayMessageType.ChannelMessage);
         expect(relayReadGuid(response, 1)).toBe(sender.clientGuid);
-        expect(relayReadTopic(response, RelayMessageTopicMessageTopicLengthOffset)).toBe("chat");
+        expect(relayReadChannel(response, RelayMessageChannelMessageChannelLengthOffset)).toBe("chat");
         expect(
             Array.from(
                 response.subarray(
-                    relayTopicMessagePayloadOffset(
-                        relayReadTopicLength(response, RelayMessageTopicMessageTopicLengthOffset),
+                    relayChannelMessagePayloadOffset(
+                        relayReadChannelLength(response, RelayMessageChannelMessageChannelLengthOffset),
                     ),
                 ),
             ),
@@ -131,31 +131,31 @@ describe("RelayServer", () => {
         receiver.ws.close();
     });
 
-    test("does not relay to clients on other topics", async () => {
+    test("does not relay to clients on other channels", async () => {
         const sender = await openSocket();
-        const otherTopicClient = await openSocket();
+        const otherChannelClient = await openSocket();
 
         await subscribeAndSettle(sender.ws, "alpha");
-        await subscribeAndSettle(otherTopicClient.ws, "beta");
+        await subscribeAndSettle(otherChannelClient.ws, "beta");
 
-        sendTopicMessage(sender.ws, sender.clientGuid, "alpha", new Uint8Array([0x01]));
+        sendChannelMessage(sender.ws, sender.clientGuid, "alpha", new Uint8Array([0x01]));
 
-        await expectNoMessage(otherTopicClient.ws);
+        await expectNoMessage(otherChannelClient.ws);
 
         sender.ws.close();
-        otherTopicClient.ws.close();
+        otherChannelClient.ws.close();
     });
 
-    test("relays topic message even when sender is not subscribed to topic", async () => {
+    test("relays channel message even when sender is not subscribed to channel", async () => {
         const sender = await openSocket();
         const receiver = await openSocket();
 
         await subscribeAndSettle(receiver.ws, "game");
 
-        sendTopicMessage(sender.ws, sender.clientGuid, "game", new Uint8Array([0x99]));
+        sendChannelMessage(sender.ws, sender.clientGuid, "game", new Uint8Array([0x99]));
 
         const response = await receiveBinary(receiver.ws);
-        expect(response[0]).toBe(RelayMessageType.TopicMessage);
+        expect(response[0]).toBe(RelayMessageType.ChannelMessage);
         expect(relayReadGuid(response, 1)).toBe(sender.clientGuid);
 
         sender.ws.close();

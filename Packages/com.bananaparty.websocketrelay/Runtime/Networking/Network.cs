@@ -15,7 +15,7 @@ namespace BananaParty.WebSocketRelay
 
         public bool IsConnected => _relayClient?.IsConnected ?? false;
         public bool HasRelayClient => _relayClient != null;
-        public HashSet<string> SubscribedTopics => _relayClient?.SubscribedTopics;
+        public HashSet<string> SubscribedChannels => _relayClient?.SubscribedChannels;
 
         public Network(string address, NetworkContext context)
         {
@@ -78,30 +78,30 @@ namespace BananaParty.WebSocketRelay
             if (_relayClient == null)
                 return;
 
-            foreach (string topic in SubscribedTopics)
+            foreach (string channel in SubscribedChannels)
             {
-                byte[] payload = _networkContext.GetOwnedNetworkIdentitiesPayload(topic);
+                byte[] payload = _networkContext.GetOwnedNetworkIdentitiesPayload(channel);
                 byte[] message = new byte[payload.Length + 1];
                 message[0] = NetworkMessage.SyncIdentities;
                 Buffer.BlockCopy(payload, 0, message, 1, payload.Length);
-                _relayClient.Send(topic, message);
+                _relayClient.Send(channel, message);
             }
         }
 
-        public void SubscribeToTopic(string topic)
+        public void SubscribeToChannel(string channel)
         {
             if (_relayClient == null)
-                throw new InvalidOperationException("Not connected to subscribe to a topic");
+                throw new InvalidOperationException("Not connected to subscribe to a channel");
 
-            _relayClient.SubscribeToTopic(topic);
+            _relayClient.SubscribeToChannel(channel);
         }
 
-        public void UnsubscribeFromTopic(string topic)
+        public void UnsubscribeFromChannel(string channel)
         {
             if (_relayClient == null)
-                throw new InvalidOperationException("Not connected to unsubscribe from a topic");
+                throw new InvalidOperationException("Not connected to unsubscribe from a channel");
 
-            _relayClient.UnsubscribeToTopic(topic);
+            _relayClient.UnsubscribeFromChannel(channel);
         }
 
         public void Dispose()
@@ -134,9 +134,9 @@ namespace BananaParty.WebSocketRelay
             _relayClient = null;
         }
 
-        public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
+        public void OnChannelMessage(Guid senderGuid, string channel, byte[] data)
         {
-            _networkContext.ProcessTopicMessage(senderGuid, topic, data);
+            _networkContext.ProcessChannelMessage(senderGuid, channel, data);
         }
     }
 }

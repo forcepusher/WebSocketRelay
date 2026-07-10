@@ -10,7 +10,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private Network _network;
 
-        private string _networkTopic = "game-room";
+        private string _networkChannel = "game-room";
 
         private float _timeSinceLastFullSync = 0f;
 
@@ -88,9 +88,9 @@ namespace BananaParty.WebSocketRelay.Samples
 
             Debug.Log("Connected to relay");
 
-            _network.SubscribeToTopic(_networkTopic);
+            _network.SubscribeToChannel(_networkChannel);
 
-            _networkContext.Instantiate(_playerCharacterPrefab, _networkTopic);
+            _networkContext.Instantiate(_playerCharacterPrefab, _networkChannel);
         }
     }
 }

@@ -17,39 +17,39 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
-        public void CreateTopicMessage_UsesTopicMessageType()
+        public void CreateChannelMessage_UsesChannelMessageType()
         {
-            byte[] message = RelayMessageCodec.CreateTopicMessage(
+            byte[] message = RelayMessageCodec.CreateChannelMessage(
                 Guid.NewGuid(),
                 "chat",
                 new byte[] { 0x01 });
 
-            Assert.AreEqual(RelayMessageType.TopicMessage, message[0]);
+            Assert.AreEqual(RelayMessageType.ChannelMessage, message[0]);
         }
 
         [Test]
-        public void CreateProtocolMessage_Subscribe_EncodesTopic()
+        public void CreateProtocolMessage_Subscribe_EncodesChannel()
         {
             byte[] message = RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Subscribe, "lobby");
 
             Assert.AreEqual(RelayMessageType.Subscribe, message[0]);
-            Assert.AreEqual("lobby", RelayMessageCodec.ReadTopic(message));
+            Assert.AreEqual("lobby", RelayMessageCodec.ReadChannel(message));
         }
 
         [Test]
-        public void CreateTopicMessage_EmbedsClientGuidTopicAndPayload()
+        public void CreateChannelMessage_EmbedsClientGuidChannelAndPayload()
         {
             Guid clientGuid = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
             byte[] payload = { 0xde, 0xad };
-            byte[] message = RelayMessageCodec.CreateTopicMessage(clientGuid, "sync", payload);
+            byte[] message = RelayMessageCodec.CreateChannelMessage(clientGuid, "sync", payload);
 
-            Assert.AreEqual(clientGuid, RelayMessageCodec.ReadGuid(message, RelayMessageCodec.TopicMessageGuidOffset));
+            Assert.AreEqual(clientGuid, RelayMessageCodec.ReadGuid(message, RelayMessageCodec.ChannelMessageGuidOffset));
             Assert.AreEqual(
                 "sync",
-                RelayMessageCodec.ReadTopic(message, RelayMessageCodec.TopicMessageTopicLengthOffset));
+                RelayMessageCodec.ReadChannel(message, RelayMessageCodec.ChannelMessageChannelLengthOffset));
 
-            int topicLength = RelayMessageCodec.ReadTopicLength(message, RelayMessageCodec.TopicMessageTopicLengthOffset);
-            int payloadOffset = RelayMessageCodec.GetTopicMessagePayloadOffset(topicLength);
+            int channelLength = RelayMessageCodec.ReadChannelLength(message, RelayMessageCodec.ChannelMessageChannelLengthOffset);
+            int payloadOffset = RelayMessageCodec.GetChannelMessagePayloadOffset(channelLength);
             Assert.AreEqual(0xde, message[payloadOffset]);
             Assert.AreEqual(0xad, message[payloadOffset + 1]);
         }

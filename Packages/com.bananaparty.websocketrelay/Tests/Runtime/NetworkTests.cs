@@ -22,8 +22,8 @@ namespace BananaParty.WebSocketRelay.Tests
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             Network network = new Network(ServerAddress, context);
 
-            Assert.Throws<InvalidOperationException>(() => network.SubscribeToTopic("room"));
-            Assert.Throws<InvalidOperationException>(() => network.UnsubscribeFromTopic("room"));
+            Assert.Throws<InvalidOperationException>(() => network.SubscribeToChannel("room"));
+            Assert.Throws<InvalidOperationException>(() => network.UnsubscribeFromChannel("room"));
 
             UnityEngine.Object.DestroyImmediate(context);
         }

@@ -8,6 +8,6 @@ namespace BananaParty.WebSocketRelay.Transport
 
         void OnDisconnectedFromRelay();
 
-        void OnTopicMessage(Guid senderGuid, string topic, byte[] data);
+        void OnChannelMessage(Guid senderGuid, string channel, byte[] data);
     }
 }

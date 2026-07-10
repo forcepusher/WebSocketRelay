@@ -14,7 +14,7 @@ namespace BananaParty.WebSocketRelay.Transport
         }
 
         private readonly Socket _socket;
-        private readonly HashSet<string> _subscribedTopics = new();
+        private readonly HashSet<string> _subscribedChannels = new();
 
         public bool IsConnected => _connectionState == ConnectionState.Connected;
 
@@ -22,7 +22,7 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public Guid ClientGuid { get; }
 
-        public HashSet<string> SubscribedTopics => _subscribedTopics;
+        public HashSet<string> SubscribedChannels => _subscribedChannels;
 
         private IRelayListener _relayListener;
         private ConnectionState _connectionState = ConnectionState.Idle;
@@ -40,7 +40,7 @@ namespace BananaParty.WebSocketRelay.Transport
         }
 
         /// <summary>
-        /// Drains queued WebSocket frames, dispatches topic messages, and updates connection state.
+        /// Drains queued WebSocket frames, dispatches channel messages, and updates connection state.
         /// Call this periodically (e.g. in Update).
         /// </summary>
         public void ProcessIncomingMessages()
@@ -56,33 +56,33 @@ namespace BananaParty.WebSocketRelay.Transport
             UpdateConnectionState();
         }
 
-        public void SubscribeToTopic(string topic)
+        public void SubscribeToChannel(string channel)
         {
-            if (!_subscribedTopics.Add(topic))
+            if (!_subscribedChannels.Add(channel))
                 return;
 
-            _socket.Send(RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Subscribe, topic));
+            _socket.Send(RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Subscribe, channel));
         }
 
-        public void UnsubscribeToTopic(string topic)
+        public void UnsubscribeFromChannel(string channel)
         {
-            if (!_subscribedTopics.Remove(topic))
-                throw new KeyNotFoundException($"Not subscribed to topic '{topic}'.");
+            if (!_subscribedChannels.Remove(channel))
+                throw new KeyNotFoundException($"Not subscribed to channel '{channel}'.");
 
-            _socket.Send(RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Unsubscribe, topic));
+            _socket.Send(RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Unsubscribe, channel));
         }
 
-        public void Send(string topic, byte[] data)
+        public void Send(string channel, byte[] data)
         {
-            if (!_subscribedTopics.Contains(topic))
-                throw new KeyNotFoundException($"Not subscribed to topic '{topic}'.");
+            if (!_subscribedChannels.Contains(channel))
+                throw new KeyNotFoundException($"Not subscribed to channel '{channel}'.");
 
-            _socket.Send(RelayMessageCodec.CreateTopicMessage(ClientGuid, topic, data));
+            _socket.Send(RelayMessageCodec.CreateChannelMessage(ClientGuid, channel, data));
         }
 
         public void Dispose()
         {
-            _subscribedTopics.Clear();
+            _subscribedChannels.Clear();
 
             try
             {
@@ -121,8 +121,8 @@ namespace BananaParty.WebSocketRelay.Transport
 
                 switch (type)
                 {
-                    case RelayMessageType.TopicMessage:
-                        processedLength = ProcessTopicMessage(payloadBytes);
+                    case RelayMessageType.ChannelMessage:
+                        processedLength = ProcessChannelMessage(payloadBytes);
                         break;
                     default:
                         processedLength = SkipUnknownMessage(payloadBytes);
@@ -138,25 +138,25 @@ namespace BananaParty.WebSocketRelay.Transport
             }
         }
 
-        private int ProcessTopicMessage(byte[] data)
+        private int ProcessChannelMessage(byte[] data)
         {
-            int topicLength = RelayMessageCodec.ReadTopicLength(data, RelayMessageCodec.TopicMessageTopicLengthOffset);
-            if (topicLength < 0)
-                throw new InvalidDataException("Incomplete topic message.");
+            int channelLength = RelayMessageCodec.ReadChannelLength(data, RelayMessageCodec.ChannelMessageChannelLengthOffset);
+            if (channelLength < 0)
+                throw new InvalidDataException("Incomplete channel message.");
 
-            Guid senderId = RelayMessageCodec.ReadGuid(data, RelayMessageCodec.TopicMessageGuidOffset);
-            string topic = RelayMessageCodec.ReadTopic(data, RelayMessageCodec.TopicMessageTopicLengthOffset);
-            int payloadOffset = RelayMessageCodec.GetTopicMessagePayloadOffset(topicLength);
+            Guid senderId = RelayMessageCodec.ReadGuid(data, RelayMessageCodec.ChannelMessageGuidOffset);
+            string channel = RelayMessageCodec.ReadChannel(data, RelayMessageCodec.ChannelMessageChannelLengthOffset);
+            int payloadOffset = RelayMessageCodec.GetChannelMessagePayloadOffset(channelLength);
 
             if (data.Length < payloadOffset)
-                throw new InvalidDataException("Incomplete topic message.");
+                throw new InvalidDataException("Incomplete channel message.");
 
-            if (!_subscribedTopics.Contains(topic))
+            if (!_subscribedChannels.Contains(channel))
                 return data.Length;
 
             byte[] messageData = new byte[data.Length - payloadOffset];
             Array.Copy(data, payloadOffset, messageData, 0, messageData.Length);
-            _relayListener.OnTopicMessage(senderId, topic, messageData);
+            _relayListener.OnChannelMessage(senderId, channel, messageData);
 
             return data.Length;
         }

@@ -8,7 +8,7 @@ namespace BananaParty.WebSocketRelay
     {
         string PrefabName { get; }
         GameObject GameObject { get; }
-        string Topic { get; set; }
+        string Channel { get; set; }
         Guid NetworkIdentifier { get; set; }
         Guid NetworkOwner { get; set; }
         bool NetworkAuthority { get; }
