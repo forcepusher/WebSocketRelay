@@ -106,7 +106,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 "Packages",
                 "com.bananaparty.websocketrelay",
                 "Runtime",
-                "Server~"));
+                "RelayServer~"));
 
         public static string GetBunExecutablePath(string serverDirectory) =>
             Application.platform switch

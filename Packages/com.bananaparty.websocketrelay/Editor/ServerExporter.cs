@@ -86,7 +86,7 @@ namespace BananaParty.WebSocketRelay.Editor
             if (packageInfo == null)
                 throw new InvalidOperationException($"Package not found: {PackageName}");
 
-            return Path.Combine(packageInfo.resolvedPath, "Runtime", "Server~");
+            return Path.Combine(packageInfo.resolvedPath, "Runtime", "RelayServer~");
         }
     }
 }
