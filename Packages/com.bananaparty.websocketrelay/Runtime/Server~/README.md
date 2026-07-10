@@ -8,7 +8,7 @@ WebSocket relay server powered by [Bun](https://bun.sh/).
 - **Linux:** `LaunchServer-Linux.sh`
 - **macOS:** `LaunchServer-MacOS.sh`
 
-Default port **23144** (`ws://localhost:23144`) — leet **RELAY** (`R3L4Y`).
+Default port **80** (`ws://localhost`) when no TLS certificates are present. Place `ssl.crt` and `ssl.key` in `Runtime/` (one folder above `Server~/`) to enable **WSS** on port **443** (`wss://localhost`).
 
 ## Why `--cwd` in the launch scripts?
 

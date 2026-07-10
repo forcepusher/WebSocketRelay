@@ -12,18 +12,33 @@ type RelayWebSocketData = {
     connectionId: number;
 };
 
+type RelayServerTlsOptions = {
+    cert: string;
+    key: string;
+};
+
 export class RelayServer {
     #port: number;
+    #tls?: RelayServerTlsOptions;
     #server: Bun.Server<RelayWebSocketData> | null = null;
     #nextConnectionId = 1;
 
-    constructor(port: number = 23144) {
+    constructor(port: number = 80, tls?: RelayServerTlsOptions) {
         this.#port = port;
+        this.#tls = tls;
     }
 
     start(): void {
         this.#server = Bun.serve<RelayWebSocketData>({
             port: this.#port,
+            ...(this.#tls
+                ? {
+                      tls: {
+                          cert: Bun.file(this.#tls.cert),
+                          key: Bun.file(this.#tls.key),
+                      },
+                  }
+                : {}),
             fetch: (req, server) => {
                 const connectionId = this.#nextConnectionId++;
                 if (
@@ -85,8 +100,9 @@ export class RelayServer {
             },
         });
 
+        const scheme = this.#tls ? "wss" : "ws";
         RelayServerLog.info(
-            `listening on port ${this.#port} debug=${process.env.RELAY_DEBUG === "1" ? "verbose" : "basic"}`,
+            `listening on ${scheme}://0.0.0.0:${this.#port} debug=${process.env.RELAY_DEBUG === "1" ? "verbose" : "basic"}`,
         );
     }
 

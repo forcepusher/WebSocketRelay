@@ -22,7 +22,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Start()
         {
-            _network = new Network("ws://127.0.0.1:23144", _networkContext);
+            _network = new Network("ws://127.0.0.1:80", _networkContext);
 
             //var jsonStateOutput = new JsonStateOutput();
             //WriteState(jsonStateOutput);
