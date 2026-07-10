@@ -12,18 +12,16 @@ See minimum required Unity version in the `package.json` file.
 ---  
   
 Networking as simple as it gets (for programmers though).  
+It's basically a peer-to-peer networking through a relay server.  
 The goal is to provide bare minimum to get things done.  
   
 Key priorities:  
-1. Developer Experience - JSON data stream for developing. Binary for shipping (JSON debug output on demand).  
+1. Developer Experience - JSON data stream for developing. Binary stream for shipping.  
 2. Portable & Cheap - Relay server runtime embedded in Unity package. No expensive setups, doubleclick-ready.  
 3. Tests & Stability - Integration tests using the portable runtime for quick QA. Especially valuable for AI slop.  
   
-Yes, it actually serializes your game state to JSON so you can easily spot bugs.  
-That is the core difference for improving your debugging experience.  
-  
 Architecture is stupid-simple. It's a just a pub/sub, where each channel can represent a room or an area.  
-User can be listening to multiple channels (rooms) at the same time. Seamless world is possible by listening to 4 channels.  
+You can even build a seamless world if you listen to 4 channels, where each channel represents an area.  
   
 Future plans:  
 1. Sample projects to use as a template for kickstarting development of your games.  
@@ -37,5 +35,5 @@ Not planned:
   
 ---  
   
-Library boilerplate code and tests were AI-assisted, LLMs can't design OOP code like this anyway.  
+Library boilerplate code and tests were AI-assisted, while design decisions and OOP is done by hand.  
 And as always - beware it's all code.  
