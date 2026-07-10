@@ -61,6 +61,22 @@ namespace BananaParty.WebSocketRelay
             _networkIdentitiesByGuid.Remove(networkIdentity.NetworkIdentifier);
         }
 
+        public void ClearNetworkSession()
+        {
+            for (int identityIndex = _networkIdentities.Count - 1; identityIndex >= 0; identityIndex--)
+            {
+                INetworkIdentity networkIdentity = _networkIdentities[identityIndex];
+                UnregisterNetworkIdentity(networkIdentity);
+
+                if (networkIdentity.GameObject != null)
+                    Destroy(networkIdentity.GameObject);
+            }
+
+            _networkPlayers.Clear();
+            _networkPlayersByGuid.Clear();
+            LocalClientIdentity = Guid.Empty;
+        }
+
         private void AddNetworkPlayer(NetworkPlayer networkPlayer)
         {
             _networkPlayers.Add(networkPlayer);

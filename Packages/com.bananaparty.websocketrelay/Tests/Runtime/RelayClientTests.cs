@@ -38,7 +38,7 @@ namespace BananaParty.WebSocketRelay.Tests
         [UnityTest] public IEnumerator EmptyPayload_Relays() => TestEmptyMessage();
         [UnityTest] public IEnumerator LargePayload_Relays() => TestLargeMessage();
         [UnityTest] public IEnumerator RapidMessages_AllDelivered() => TestRapidMessages(50);
-        [UnityTest] public IEnumerator DisposeWhileConnected_CallsDisconnected() => TestDisposeWhileConnectedCallsDisconnected();
+        [UnityTest] public IEnumerator DisposeWhileConnected_DoesNotCallDisconnected() => TestDisposeWhileConnectedDoesNotCallDisconnected();
         [UnityTest] public IEnumerator DisposeBeforeConnect_DoesNotCallDisconnected() => TestDisposeBeforeConnectDoesNotCallDisconnected();
         [UnityTest] public IEnumerator ServerStop_CallsDisconnected() => TestServerStopCallsDisconnected();
         [UnityTest] public IEnumerator Disconnect_NotCalledTwice() => TestDisconnectNotCalledTwice();
@@ -452,7 +452,7 @@ namespace BananaParty.WebSocketRelay.Tests
             Cleanup();
         }
 
-        private IEnumerator TestDisposeWhileConnectedCallsDisconnected()
+        private IEnumerator TestDisposeWhileConnectedDoesNotCallDisconnected()
         {
             int disconnectCount = 0;
 
@@ -467,7 +467,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayA.Dispose();
             _relayA = null;
 
-            Assert.AreEqual(1, disconnectCount);
+            Assert.AreEqual(0, disconnectCount);
             yield return null;
         }
 

@@ -128,5 +128,64 @@ namespace BananaParty.WebSocketRelay.Tests
             UnityEngine.Object.DestroyImmediate(remoteObject);
             UnityEngine.Object.DestroyImmediate(context);
         }
+
+        [UnityTest]
+        public IEnumerator ClearNetworkSession_RemovesAllIdentitiesAndPlayers()
+        {
+            NetworkContext context = NetworkContextTestHelpers.CreateContext();
+            Guid localPlayer = Guid.NewGuid();
+            Guid remotePlayer = Guid.NewGuid();
+            context.LocalClientIdentity = localPlayer;
+
+            context.ProcessTopicMessage(remotePlayer, "room", Encoding.UTF8.GetBytes("{}"));
+
+            GameObject localObject = new("LocalOwnedObject");
+            GameObject remoteObject = new("RemoteOwnedObject");
+            context.RegisterNetworkIdentity(new StubNetworkIdentity(
+                localObject,
+                "LocalPrefab",
+                localPlayer,
+                Guid.NewGuid()));
+            context.RegisterNetworkIdentity(new StubNetworkIdentity(
+                remoteObject,
+                "RemotePrefab",
+                remotePlayer,
+                Guid.NewGuid()));
+
+            context.ClearNetworkSession();
+            yield return null;
+
+            Assert.AreEqual(Guid.Empty, context.LocalClientIdentity);
+            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
+            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.IsTrue(localObject == null);
+            Assert.IsTrue(remoteObject == null);
+
+            UnityEngine.Object.DestroyImmediate(context);
+        }
+
+        [UnityTest]
+        public IEnumerator OnDisconnectedFromRelay_ClearsNetworkSession()
+        {
+            NetworkContext context = NetworkContextTestHelpers.CreateContext();
+            context.LocalClientIdentity = Guid.NewGuid();
+
+            GameObject localObject = new("LocalOwnedObject");
+            context.RegisterNetworkIdentity(new StubNetworkIdentity(
+                localObject,
+                "LocalPrefab",
+                context.LocalClientIdentity,
+                Guid.NewGuid()));
+
+            Network network = new Network("ws://127.0.0.1:1", context);
+            network.OnDisconnectedFromRelay();
+            yield return null;
+
+            Assert.AreEqual(Guid.Empty, context.LocalClientIdentity);
+            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.IsTrue(localObject == null);
+
+            UnityEngine.Object.DestroyImmediate(context);
+        }
     }
 }

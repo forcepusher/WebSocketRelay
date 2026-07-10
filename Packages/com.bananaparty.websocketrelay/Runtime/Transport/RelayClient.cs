@@ -82,7 +82,6 @@ namespace BananaParty.WebSocketRelay.Transport
             }
             finally
             {
-                NotifyDisconnectedIfNeeded();
                 _socket.Dispose();
             }
         }

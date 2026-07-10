@@ -14,7 +14,7 @@ namespace BananaParty.WebSocketRelay
         private RelayClient _relayClient;
 
         public bool IsConnected => _relayClient?.IsConnected ?? false;
-        public HashSet<string> SubscribedTopics => _relayClient.SubscribedTopics;
+        public HashSet<string> SubscribedTopics => _relayClient?.SubscribedTopics;
 
         public Network(string address, NetworkContext context)
         {
@@ -58,9 +58,8 @@ namespace BananaParty.WebSocketRelay
             if (_relayClient == null)
                 throw new InvalidOperationException("Not connected to disconnect");
 
-            _relayClient.Dispose();
-            _relayClient = null;
-            Debug.Log("Disconnected from relay server.");
+            _networkContext.ClearNetworkSession();
+            DisposeRelayClient();
         }
 
         public void ManualUpdate(float unscaledDeltaTime)
@@ -75,6 +74,9 @@ namespace BananaParty.WebSocketRelay
 
         public void SendSyncIdentities()
         {
+            if (_relayClient == null)
+                return;
+
             foreach (string topic in SubscribedTopics)
             {
                 byte[] payload = _networkContext.GetOwnedNetworkIdentitiesPayload(topic);
@@ -98,7 +100,12 @@ namespace BananaParty.WebSocketRelay
         public void Dispose()
         {
             _relayServerProcess?.Stop();
-            _relayClient?.Dispose();
+
+            if (_relayClient != null)
+            {
+                _networkContext.ClearNetworkSession();
+                DisposeRelayClient();
+            }
         }
 
         public void OnConnectedToRelay()
@@ -107,6 +114,17 @@ namespace BananaParty.WebSocketRelay
 
         public void OnDisconnectedFromRelay()
         {
+            _networkContext.ClearNetworkSession();
+            DisposeRelayClient();
+        }
+
+        private void DisposeRelayClient()
+        {
+            if (_relayClient == null)
+                return;
+
+            _relayClient.Dispose();
+            _relayClient = null;
         }
 
         public void OnTopicMessage(Guid senderGuid, string topic, byte[] data)
