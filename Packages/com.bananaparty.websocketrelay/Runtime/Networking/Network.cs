@@ -29,7 +29,6 @@ namespace BananaParty.WebSocketRelay
 
             _relayServerProcess = new RelayServerProcess();
             _relayServerProcess.Start();
-            Debug.Log("Relay server started.");
         }
 
         public void StopServer()

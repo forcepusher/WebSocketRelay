@@ -232,7 +232,7 @@ namespace BananaParty.WebSocketRelay
                 ? new BinaryStateInput(payload)
                 : new JsonStateInput(Encoding.UTF8.GetString(payload.Span));
 
-            Debug.Log("Received " + data.Length + " " + Encoding.UTF8.GetString(payload.Span));
+            //Debug.Log("Received " + data.Length + " " + Encoding.UTF8.GetString(payload.Span));
 
             stateInput.BeginObjectElement();
 
