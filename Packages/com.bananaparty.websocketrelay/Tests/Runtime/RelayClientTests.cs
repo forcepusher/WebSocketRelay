@@ -38,6 +38,10 @@ namespace BananaParty.WebSocketRelay.Tests
         [UnityTest] public IEnumerator EmptyPayload_Relays() => TestEmptyMessage();
         [UnityTest] public IEnumerator LargePayload_Relays() => TestLargeMessage();
         [UnityTest] public IEnumerator RapidMessages_AllDelivered() => TestRapidMessages(50);
+        [UnityTest] public IEnumerator DisposeWhileConnected_CallsDisconnected() => TestDisposeWhileConnectedCallsDisconnected();
+        [UnityTest] public IEnumerator DisposeBeforeConnect_DoesNotCallDisconnected() => TestDisposeBeforeConnectDoesNotCallDisconnected();
+        [UnityTest] public IEnumerator ServerStop_CallsDisconnected() => TestServerStopCallsDisconnected();
+        [UnityTest] public IEnumerator Disconnect_NotCalledTwice() => TestDisconnectNotCalledTwice();
 
         private IEnumerator TestClientHasGuidOnCreation()
         {
@@ -446,6 +450,96 @@ namespace BananaParty.WebSocketRelay.Tests
             Assert.AreEqual(count, receivedCount, $"Expected {count} messages, received {receivedCount}.");
 
             Cleanup();
+        }
+
+        private IEnumerator TestDisposeWhileConnectedCallsDisconnected()
+        {
+            int disconnectCount = 0;
+
+            _listenerA = new TestRelayListener();
+            _listenerA.Disconnected += () => disconnectCount++;
+            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
+            _relayA.Connect();
+
+            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            _relayA.ProcessIncomingMessages();
+
+            _relayA.Dispose();
+            _relayA = null;
+
+            Assert.AreEqual(1, disconnectCount);
+            yield return null;
+        }
+
+        private IEnumerator TestDisposeBeforeConnectDoesNotCallDisconnected()
+        {
+            int disconnectCount = 0;
+
+            _listenerA = new TestRelayListener();
+            _listenerA.Disconnected += () => disconnectCount++;
+            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
+
+            _relayA.Dispose();
+            _relayA = null;
+
+            Assert.AreEqual(0, disconnectCount);
+            yield return null;
+        }
+
+        private IEnumerator TestServerStopCallsDisconnected()
+        {
+            int disconnectCount = 0;
+
+            _listenerA = new TestRelayListener();
+            _listenerA.Disconnected += () => disconnectCount++;
+            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
+            _relayA.Connect();
+
+            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            _relayA.ProcessIncomingMessages();
+
+            yield return RelayServerLauncher.StopCoroutine();
+
+            yield return TestParameters.WaitForCondition(
+                () => disconnectCount > 0,
+                TestParameters.DisconnectTimeoutThreshold,
+                () => _relayA.ProcessIncomingMessages());
+
+            Assert.AreEqual(1, disconnectCount);
+
+            _relayA.ProcessIncomingMessages();
+            Assert.AreEqual(1, disconnectCount, "Disconnect callback should not fire again while polling.");
+
+            _relayA = null;
+            yield return null;
+        }
+
+        private IEnumerator TestDisconnectNotCalledTwice()
+        {
+            int disconnectCount = 0;
+
+            _listenerA = new TestRelayListener();
+            _listenerA.Disconnected += () => disconnectCount++;
+            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
+            _relayA.Connect();
+
+            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            _relayA.ProcessIncomingMessages();
+
+            yield return RelayServerLauncher.StopCoroutine();
+
+            yield return TestParameters.WaitForCondition(
+                () => disconnectCount > 0,
+                TestParameters.DisconnectTimeoutThreshold,
+                () => _relayA.ProcessIncomingMessages());
+
+            _relayA.ProcessIncomingMessages();
+            _relayA.ProcessIncomingMessages();
+
+            Assert.AreEqual(1, disconnectCount);
+
+            _relayA = null;
+            yield return null;
         }
 
         private RelayClient CreateRelay(out TestRelayListener listener)

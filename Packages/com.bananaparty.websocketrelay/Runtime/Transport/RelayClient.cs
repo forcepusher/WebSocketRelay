@@ -18,6 +18,7 @@ namespace BananaParty.WebSocketRelay.Transport
         public HashSet<string> SubscribedTopics => _subscribedTopics;
 
         private IRelayListener _relayListener;
+        private bool _wasConnected;
 
         public RelayClient(string serverAddress, IRelayListener relayListener, Guid clientGuid)
         {
@@ -37,11 +38,13 @@ namespace BananaParty.WebSocketRelay.Transport
         /// </summary>
         public void ProcessIncomingMessages()
         {
-            while (_socket.HasUnreadPayloadQueue)
+            while (_socket.IsConnected && _socket.HasUnreadPayloadQueue)
             {
                 byte[] payload = _socket.ReadPayloadQueue();
                 ProcessPayload(payload);
             }
+
+            UpdateConnectionState();
         }
 
         public void SubscribeToTopic(string topic)
@@ -79,8 +82,26 @@ namespace BananaParty.WebSocketRelay.Transport
             }
             finally
             {
+                NotifyDisconnectedIfNeeded();
                 _socket.Dispose();
             }
+        }
+
+        private void UpdateConnectionState()
+        {
+            if (_socket.IsConnected)
+                _wasConnected = true;
+            else
+                NotifyDisconnectedIfNeeded();
+        }
+
+        private void NotifyDisconnectedIfNeeded()
+        {
+            if (!_wasConnected && !_socket.IsConnected)
+                return;
+
+            _wasConnected = false;
+            _relayListener.OnDisconnectedFromRelay();
         }
 
         internal void ProcessPayload(byte[] payloadBytes)
