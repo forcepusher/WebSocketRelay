@@ -8,12 +8,12 @@ if [[ -f "$SSL_CERT" && -f "$SSL_KEY" ]]; then
     export RELAY_PORT=443
     export RELAY_TLS_CERT="$SSL_CERT"
     export RELAY_TLS_KEY="$SSL_KEY"
-    echo "SSL certificates found. Starting relay server on port 443 (wss://)"
+    echo "SSL certificates found. Starting relay server on port 443 with WSS."
 else
     export RELAY_PORT=80
     unset RELAY_TLS_CERT RELAY_TLS_KEY
-    echo "No SSL certificates found. Starting relay server on port 80 (ws://)"
+    echo "No SSL certificates found. Starting relay server on port 80 with WS."
 fi
 
 BUN_PATH="$SCRIPT_DIR/Bun/bun-linux-x64/bun"
-"$BUN_PATH" --cwd "$SCRIPT_DIR/../../.." com.bananaparty.websocketrelay/Runtime/Server~/Source/index.ts -relay-server
+"$BUN_PATH" --cwd "$SCRIPT_DIR" Source/index.ts -relay-server
