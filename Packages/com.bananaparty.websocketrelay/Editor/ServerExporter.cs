@@ -26,11 +26,12 @@ namespace BananaParty.WebSocketRelay.Editor
             if (string.IsNullOrEmpty(destinationDirectory))
                 return;
 
-            if (Directory.GetFileSystemEntries(destinationDirectory).Length > 0)
+            bool overwriteExisting = Directory.GetFileSystemEntries(destinationDirectory).Length > 0;
+            if (overwriteExisting)
             {
                 bool proceed = EditorUtility.DisplayDialog(
                     "Export Server",
-                    $"The selected folder is not empty:\n{destinationDirectory}\n\nOverwrite existing files?",
+                    $"The selected folder is not empty:\n{destinationDirectory}\n\nOverwrite matching files and folders?",
                     "Export",
                     "Cancel");
 
@@ -40,7 +41,17 @@ namespace BananaParty.WebSocketRelay.Editor
 
             try
             {
-                FileUtil.CopyFileOrDirectory(sourceDirectory, destinationDirectory);
+                foreach (string sourceEntry in Directory.GetFileSystemEntries(sourceDirectory))
+                {
+                    string entryName = Path.GetFileName(sourceEntry);
+                    string destinationEntry = Path.Combine(destinationDirectory, entryName);
+
+                    if (File.Exists(destinationEntry) || Directory.Exists(destinationEntry))
+                        FileUtil.DeleteFileOrDirectory(destinationEntry);
+
+                    FileUtil.CopyFileOrDirectory(sourceEntry, destinationEntry);
+                }
+
                 Debug.Log($"Exported relay server to: {destinationDirectory}");
                 EditorUtility.DisplayDialog(
                     "Export Server",
