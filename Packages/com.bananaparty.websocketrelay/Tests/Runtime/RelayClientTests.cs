@@ -77,7 +77,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
             _relayA.Connect();
 
-            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA);
 
             yield return TestParameters.WaitForDuration(0.25f, () => _relayA.ProcessIncomingMessages());
 
@@ -96,7 +96,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _listenerA.TopicMessageReceived += (_, _, _) => topicMessageReceived = true;
             _relayA.Connect();
 
-            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA);
 
             _relayA.SubscribeToTopic("no-ack");
             Assert.IsTrue(_relayA.SubscribedTopics.Contains("no-ack"));
@@ -115,7 +115,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
 
             _relayA.SubscribeToTopic("guid-test");
             _relayB.SubscribeToTopic("guid-test");
@@ -153,9 +153,9 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB.Connect();
             if (clientCount >= 3) _relayC.Connect();
 
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
             if (clientCount >= 3)
-                yield return new WaitWhile(() => !_relayC.IsConnected, TestParameters.ConnectTimeoutThreshold);
+                yield return TestParameters.WaitUntilRelayConnected(_relayC);
 
             _relayA.SubscribeToTopic(topic);
             _relayB.SubscribeToTopic(topic);
@@ -211,7 +211,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
 
             _relayA.SubscribeToTopic("alpha");
             _relayB.SubscribeToTopic("beta");
@@ -237,7 +237,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
 
             _relayA.SubscribeToTopic("topic-a");
             _relayB.SubscribeToTopic("topic-a");
@@ -284,7 +284,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
 
             _relayA.SubscribeToTopic("one");
             _relayB.SubscribeToTopic("two");
@@ -309,7 +309,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
 
             _relayA.SubscribeToTopic("shared");
             _relayB.SubscribeToTopic("shared");
@@ -346,7 +346,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
 
             _relayB.SubscribeToTopic("temp");
             _relayB.ProcessIncomingMessages();
@@ -367,7 +367,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
 
             _relayA.SubscribeToTopic("empty");
             _relayB.SubscribeToTopic("empty");
@@ -397,7 +397,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
 
             _relayA.SubscribeToTopic("large");
             _relayB.SubscribeToTopic("large");
@@ -428,7 +428,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayB = CreateRelay(out _listenerB);
             _relayA.Connect();
             _relayB.Connect();
-            yield return new WaitWhile(() => !_relayA.IsConnected || !_relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
 
             _relayA.SubscribeToTopic("rapid");
             _relayB.SubscribeToTopic("rapid");
@@ -462,7 +462,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
             _relayA.Connect();
 
-            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA);
             _relayA.ProcessIncomingMessages();
 
             _relayA.Dispose();
@@ -496,7 +496,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
             _relayA.Connect();
 
-            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA);
             _relayA.ProcessIncomingMessages();
 
             yield return RelayServerLauncher.StopCoroutine();
@@ -521,7 +521,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayA = CreateRelay(out _listenerA);
             _relayA.Connect();
 
-            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA);
             _relayA.ProcessIncomingMessages();
 
             yield return RelayServerLauncher.StopCoroutine();
@@ -544,7 +544,7 @@ namespace BananaParty.WebSocketRelay.Tests
             _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
             _relayA.Connect();
 
-            yield return new WaitWhile(() => !_relayA.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitUntilRelayConnected(_relayA);
             _relayA.ProcessIncomingMessages();
 
             yield return RelayServerLauncher.StopCoroutine();

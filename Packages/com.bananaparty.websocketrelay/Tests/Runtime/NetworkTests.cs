@@ -66,7 +66,10 @@ namespace BananaParty.WebSocketRelay.Tests
             Network network = new Network(ServerAddress, context);
 
             network.Connect(clientGuid);
-            yield return new WaitWhile(() => !network.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitForCondition(
+                () => network.IsConnected,
+                TestParameters.ConnectTimeoutThreshold,
+                () => network.ManualUpdate(Time.deltaTime));
             network.ManualUpdate(Time.deltaTime);
 
             GameObject localObject = new("LocalOwnedObject");
@@ -110,7 +113,10 @@ namespace BananaParty.WebSocketRelay.Tests
             Network network = new Network(ServerAddress, context);
 
             network.Connect(clientGuid);
-            yield return new WaitWhile(() => !network.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitForCondition(
+                () => network.IsConnected,
+                TestParameters.ConnectTimeoutThreshold,
+                () => network.ManualUpdate(Time.deltaTime));
             network.ManualUpdate(Time.deltaTime);
             network.ManualUpdate(Time.deltaTime);
 

@@ -6,19 +6,17 @@ namespace BananaParty.WebSocketRelay.Transport
 {
     public class RelayClient : IDisposable
     {
+        private enum ConnectionState
+        {
+            Idle,
+            Connected,
+            Disconnected
+        }
+
         private readonly Socket _socket;
         private readonly HashSet<string> _subscribedTopics = new();
 
-        public bool IsConnected
-        {
-            get
-            {
-                if (_socket.IsConnected)
-                    _wasConnected = true;
-
-                return _socket.IsConnected;
-            }
-        }
+        public bool IsConnected => _connectionState == ConnectionState.Connected;
 
         public bool HasUnreadPayloadQueue => _socket.HasUnreadPayloadQueue;
 
@@ -27,7 +25,7 @@ namespace BananaParty.WebSocketRelay.Transport
         public HashSet<string> SubscribedTopics => _subscribedTopics;
 
         private IRelayListener _relayListener;
-        private bool _wasConnected;
+        private ConnectionState _connectionState = ConnectionState.Idle;
 
         public RelayClient(string serverAddress, IRelayListener relayListener, Guid clientGuid)
         {
@@ -42,11 +40,13 @@ namespace BananaParty.WebSocketRelay.Transport
         }
 
         /// <summary>
-        /// Drains queued WebSocket frames and dispatches topic messages.
+        /// Drains queued WebSocket frames, dispatches topic messages, and updates connection state.
         /// Call this periodically (e.g. in Update).
         /// </summary>
         public void ProcessIncomingMessages()
         {
+            UpdateConnectionState();
+
             while (_socket.IsConnected && _socket.HasUnreadPayloadQueue)
             {
                 byte[] payload = _socket.ReadPayloadQueue();
@@ -98,17 +98,17 @@ namespace BananaParty.WebSocketRelay.Transport
         private void UpdateConnectionState()
         {
             if (_socket.IsConnected)
-                _wasConnected = true;
-            else
-                NotifyDisconnectedIfNeeded();
-        }
+            {
+                if (_connectionState == ConnectionState.Idle)
+                    _connectionState = ConnectionState.Connected;
 
-        private void NotifyDisconnectedIfNeeded()
-        {
-            if (!_wasConnected && !_socket.IsConnected)
+                return;
+            }
+
+            if (_connectionState != ConnectionState.Connected)
                 return;
 
-            _wasConnected = false;
+            _connectionState = ConnectionState.Disconnected;
             _relayListener.OnDisconnectedFromRelay();
         }
 

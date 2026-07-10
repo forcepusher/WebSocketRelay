@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using BananaParty.WebSocketRelay.Transport;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
@@ -31,6 +32,29 @@ namespace BananaParty.WebSocketRelay.Tests
                 yield return null;
                 elapsed += UnityEngine.Time.deltaTime;
             }
+        }
+
+        public static IEnumerator WaitUntilRelayConnected(RelayClient relay, float timeoutSeconds = ConnectTimeoutThreshold)
+        {
+            yield return WaitForCondition(
+                () => relay.IsConnected,
+                timeoutSeconds,
+                () => relay.ProcessIncomingMessages());
+        }
+
+        public static IEnumerator WaitUntilRelayConnected(
+            RelayClient relayA,
+            RelayClient relayB,
+            float timeoutSeconds = ConnectTimeoutThreshold)
+        {
+            yield return WaitForCondition(
+                () => relayA.IsConnected && relayB.IsConnected,
+                timeoutSeconds,
+                () =>
+                {
+                    relayA.ProcessIncomingMessages();
+                    relayB.ProcessIncomingMessages();
+                });
         }
     }
 }

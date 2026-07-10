@@ -44,7 +44,14 @@ namespace BananaParty.WebSocketRelay.Tests
             relayA.Connect();
             relayB.Connect();
 
-            yield return new WaitWhile(() => !relayA.IsConnected || !relayB.IsConnected, TestParameters.ConnectTimeoutThreshold);
+            yield return TestParameters.WaitForCondition(
+                () => relayA.IsConnected && relayB.IsConnected,
+                TestParameters.ConnectTimeoutThreshold,
+                () =>
+                {
+                    relayA.ProcessIncomingMessages();
+                    relayB.ProcessIncomingMessages();
+                });
             Assert.IsTrue(relayA.IsConnected && relayB.IsConnected, "Relays failed to connect.");
 
             relayA.SubscribeToTopic("state-sync");
