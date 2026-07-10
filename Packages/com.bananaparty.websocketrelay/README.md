@@ -29,7 +29,7 @@ Future plans:
 3. UDP support via HTTP/3 QUIC. At this point it's going to be just as efficient as any other non-web network library.  
   
 Not planned:  
-1. Chasing performance brownie points. If it's not spiking in a profiler, then I'm not doing anything.  
+1. Chasing performance brownie points. If something is not spiking in a profiler, then it will not be optimized.  
 2. Drag and drop garbage. Too much hassle and bloat just to get right. If you're not a programmer - don't touch it.  
 3. Deterministic prediction-rollback. Very CPU-intensive, expensive to develop, and horrible developer experience.  
   
