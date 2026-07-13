@@ -670,6 +670,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 02ff77e92be0e82458555f61ac5a0725, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.MasterClientArbiter
+  _networkContext: {fileID: 11400000, guid: 3892ff3e93f930c4082ae22a3252b126, type: 2}
 --- !u!114 &653850366
 MonoBehaviour:
   m_ObjectHideFlags: 0

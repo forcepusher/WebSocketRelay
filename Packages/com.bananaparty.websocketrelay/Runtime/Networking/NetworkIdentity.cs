@@ -19,7 +19,6 @@ namespace BananaParty.WebSocketRelay
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
         public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
-        public NetworkContext NetworkContext => _networkContext;
         public IReadOnlyList<INetworkState> NetworkStates => _networkStates;
 
         private void Awake()

@@ -7,6 +7,7 @@ namespace BananaParty.WebSocketRelay
     public class MasterClientArbiter : MonoBehaviour, INetworkState
     {
         private NetworkIdentity _networkIdentity;
+        [SerializeField]
         private NetworkContext _networkContext;
 
         private float _localPlayTime;
@@ -15,15 +16,11 @@ namespace BananaParty.WebSocketRelay
 
         public string NetworkStateName => nameof(MasterClientArbiter);
         public Guid MasterClientGuid => _masterClientGuid;
-        public bool IsMasterClient =>
-            _masterClientGuid != Guid.Empty &&
-            _networkContext != null &&
-            _masterClientGuid == _networkContext.LocalClientIdentity;
+        public bool IsMasterClient => _masterClientGuid == _networkContext.LocalClientIdentity;
 
         private void Awake()
         {
             _networkIdentity = GetComponent<NetworkIdentity>();
-            _networkContext = _networkIdentity.NetworkContext;
         }
 
         private void Update()
