@@ -38,6 +38,67 @@ namespace BananaParty.WebSocketRelay.Tests
                 BindingFlags.Instance | BindingFlags.NonPublic);
             return ((List<INetworkIdentity>)field.GetValue(context)).Count;
         }
+
+        public static int GetAuthorityOriginCount(NetworkContext context)
+        {
+            FieldInfo field = typeof(NetworkContext).GetField(
+                "_authorityOrigins",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            return ((List<IAuthorityOrigin>)field.GetValue(context)).Count;
+        }
+
+        public static void SetPrivateField(object target, string fieldName, object value)
+        {
+            FieldInfo field = target.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            field.SetValue(target, value);
+        }
+
+        public static NetworkIdentity CreatePlayerActor(
+            NetworkContext context,
+            Guid playerId,
+            Vector3 position,
+            string name = "Player")
+        {
+            GameObject gameObject = new(name);
+            gameObject.SetActive(false);
+            gameObject.transform.position = position;
+
+            NetworkIdentity networkIdentity = gameObject.AddComponent<NetworkIdentity>();
+            AuthorityOrigin authorityOrigin = gameObject.AddComponent<AuthorityOrigin>();
+
+            SetPrivateField(networkIdentity, "_networkContext", context);
+            SetPrivateField(authorityOrigin, "_networkContext", context);
+            SetPrivateField(networkIdentity, "_distanceBasedAuthority", false);
+
+            networkIdentity.NetworkOwner = playerId;
+            networkIdentity.NetworkIdentifier = Guid.NewGuid();
+
+            gameObject.SetActive(true);
+            return networkIdentity;
+        }
+
+        public static NetworkIdentity CreateDistanceBasedObject(
+            NetworkContext context,
+            Vector3 position,
+            Guid networkOwner,
+            string name = "WorldObject")
+        {
+            GameObject gameObject = new(name);
+            gameObject.SetActive(false);
+            gameObject.transform.position = position;
+
+            NetworkIdentity networkIdentity = gameObject.AddComponent<NetworkIdentity>();
+            SetPrivateField(networkIdentity, "_networkContext", context);
+            SetPrivateField(networkIdentity, "_distanceBasedAuthority", true);
+
+            networkIdentity.NetworkOwner = networkOwner;
+            networkIdentity.NetworkIdentifier = Guid.NewGuid();
+
+            gameObject.SetActive(true);
+            return networkIdentity;
+        }
     }
 
     internal sealed class StubNetworkIdentity : INetworkIdentity
