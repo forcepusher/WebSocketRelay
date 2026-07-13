@@ -23,6 +23,8 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private NetworkIdentity _networkIdentity;
 
+        private bool NetworkAuthority = false;
+
         private void Awake()
         {
             _characteController = GetComponent<CharacterController>();
@@ -51,9 +53,18 @@ namespace BananaParty.WebSocketRelay.Samples
 
             if (!_networkIdentity.NetworkAuthority)
             {
+                // When losing authority, teleport to snap into sync
+                if (NetworkAuthority)
+                {
+                    transform.position = position;
+                    _health = health;
+                }
+
                 _health = health;
                 _position = position;
             }
+
+            NetworkAuthority = _networkIdentity.NetworkAuthority;
         }
 
         private void Move()
