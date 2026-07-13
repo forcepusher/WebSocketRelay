@@ -25,19 +25,16 @@ namespace BananaParty.WebSocketRelay
 
         private void Update()
         {
-            if (_networkContext == null || _networkContext.LocalClientIdentity == Guid.Empty)
-                return;
-
             float unscaledDeltaTime = Time.unscaledDeltaTime;
             _localPlayTime += unscaledDeltaTime;
             _playTimes[_networkContext.LocalClientIdentity] = _localPlayTime;
 
-            IReadOnlyList<NetworkPlayer> alivePlayers = _networkContext.NetworkPlayers;
-            for (int playerIndex = 0; playerIndex < alivePlayers.Count; playerIndex += 1)
+            IReadOnlyList<NetworkPlayer> activePlayers = _networkContext.NetworkPlayers;
+            for (int playerIndex = 0; playerIndex < activePlayers.Count; playerIndex += 1)
             {
-                NetworkPlayer alivePlayer = alivePlayers[playerIndex];
-                _playTimes.TryGetValue(alivePlayer.Guid, out float remotePlayTime);
-                _playTimes[alivePlayer.Guid] = remotePlayTime + unscaledDeltaTime;
+                NetworkPlayer activePlayer = activePlayers[playerIndex];
+                _playTimes.TryGetValue(activePlayer.Guid, out float remotePlayTime);
+                _playTimes[activePlayer.Guid] = remotePlayTime + unscaledDeltaTime;
             }
 
             ElectMaster();
@@ -81,7 +78,7 @@ namespace BananaParty.WebSocketRelay
             List<Guid> stalePlayerGuids = null;
             foreach (KeyValuePair<Guid, float> playTime in _playTimes)
             {
-                if (IsAlive(localClientIdentity, _networkContext.NetworkPlayers, playTime.Key))
+                if (IsActive(localClientIdentity, _networkContext.NetworkPlayers, playTime.Key))
                     continue;
 
                 stalePlayerGuids ??= new List<Guid>();
@@ -116,13 +113,13 @@ namespace BananaParty.WebSocketRelay
             if (bestCandidate == Guid.Empty)
                 return Guid.Empty;
 
-            if (currentMaster == Guid.Empty || !IsAlive(localClientIdentity, alivePlayers, currentMaster))
+            if (currentMaster == Guid.Empty || !IsActive(localClientIdentity, alivePlayers, currentMaster))
                 return bestCandidate;
 
             return currentMaster;
         }
 
-        private static bool IsAlive(
+        private static bool IsActive(
             Guid localClientIdentity,
             IReadOnlyList<NetworkPlayer> alivePlayers,
             Guid playerGuid)
