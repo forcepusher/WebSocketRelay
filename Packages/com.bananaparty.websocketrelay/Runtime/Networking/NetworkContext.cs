@@ -50,6 +50,24 @@ namespace BananaParty.WebSocketRelay
             return networkIdentity;
         }
 
+        public AuthorityOrigin GetClosestAuthorityOrigin(Vector3 position)
+        {
+            AuthorityOrigin closestAuthorityOrigin = null;
+            float closestDistanceSquared = float.MaxValue;
+
+            foreach (IAuthorityOrigin authorityOrigin in _authorityOrigins)
+            {
+                float distanceSquared = (authorityOrigin.Position - position).sqrMagnitude;
+                if (distanceSquared >= closestDistanceSquared)
+                    continue;
+
+                closestDistanceSquared = distanceSquared;
+                closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
+            }
+
+            return closestAuthorityOrigin;
+        }
+
         public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
         {
             Debug.Log("Added " + networkIdentity.PrefabName + " to network context");
