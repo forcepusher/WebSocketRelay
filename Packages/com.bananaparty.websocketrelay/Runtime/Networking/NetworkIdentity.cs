@@ -14,7 +14,6 @@ namespace BananaParty.WebSocketRelay
         private bool _distanceBasedAuthority;
 
         private readonly List<INetworkState> _networkStates = new();
-        private AuthorityOrigin _authorityOrigin;
 
         public GameObject GameObject => gameObject;
         public string PrefabName => _prefabName;
@@ -37,19 +36,6 @@ namespace BananaParty.WebSocketRelay
         private void Awake()
         {
             _networkStates.AddRange(GetComponents<INetworkState>());
-            _authorityOrigin = GetComponent<AuthorityOrigin>();
-        }
-
-        private void OnEnable()
-        {
-            if (_authorityOrigin != null)
-                _networkContext.RegisterAuthorityOrigin(_authorityOrigin);
-        }
-
-        private void OnDisable()
-        {
-            if (_authorityOrigin != null)
-                _networkContext.UnregisterAuthorityOrigin(_authorityOrigin);
         }
 
         private void OnValidate()
