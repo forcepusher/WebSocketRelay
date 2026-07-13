@@ -163,6 +163,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.NetworkIdentity
   _networkContext: {fileID: 11400000, guid: 3892ff3e93f930c4082ae22a3252b126, type: 2}
+  _prefabName: BotCharacter
+  _distanceBasedAuthority: 1
 --- !u!33 &5702266865057829643
 MeshFilter:
   m_ObjectHideFlags: 0

@@ -46,8 +46,14 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void ReadNetworkState(IStateInput stateInput)
         {
-            _health = stateInput.ReadFloat(nameof(_health));
-            _position = stateInput.ReadVector3(nameof(_position));
+            float health = stateInput.ReadFloat(nameof(_health));
+            Vector3 position = stateInput.ReadVector3(nameof(_position));
+
+            if (!_networkIdentity.NetworkAuthority)
+            {
+                _health = health;
+                _position = position;
+            }
         }
 
         private void Move()
@@ -79,6 +85,8 @@ namespace BananaParty.WebSocketRelay.Samples
                 }
 
                 _characteController.Move(Vector3.up * _verticalVelocity * Time.deltaTime);
+
+                _position = transform.position;
             }
             else
             {
