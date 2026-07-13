@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class MasterClientArbiter : MonoBehaviour, INetworkState, IMasterClientArbiter
+    public class MasterClientArbiter : MonoBehaviour, INetworkState
     {
         private NetworkIdentity _networkIdentity;
         private NetworkContext _networkContext;
