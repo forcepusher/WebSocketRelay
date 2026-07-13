@@ -22,6 +22,8 @@ namespace BananaParty.WebSocketRelay
         private readonly List<INetworkIdentity> _networkIdentities = new();
         private readonly Dictionary<Guid, INetworkIdentity> _networkIdentitiesByGuid = new();
 
+        private readonly List<IAuthorityOrigin> _authorityOrigins = new();
+
         private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
 
@@ -59,6 +61,16 @@ namespace BananaParty.WebSocketRelay
         {
             _networkIdentities.Remove(networkIdentity);
             _networkIdentitiesByGuid.Remove(networkIdentity.NetworkIdentifier);
+        }
+
+        public void RegisterAuthorityOrigin(IAuthorityOrigin authorityOrigin)
+        {
+            _authorityOrigins.Add(authorityOrigin);
+        }
+
+        public void UnregisterAuthorityOrigin(IAuthorityOrigin authorityOrigin)
+        {
+            _authorityOrigins.Remove(authorityOrigin);
         }
 
         public void ClearNetworkSession()

@@ -10,6 +10,10 @@ namespace BananaParty.WebSocketRelay
 
         void UnregisterNetworkIdentity(INetworkIdentity networkIdentity);
 
+        void RegisterAuthorityOrigin(IAuthorityOrigin authorityOrigin);
+
+        void UnregisterAuthorityOrigin(IAuthorityOrigin authorityOrigin);
+
         void ReadNetworkStates(IStateInput stateInput);
 
         void WriteNetworkStates(IStateOutput stateOutput);
