@@ -20,17 +20,21 @@ namespace BananaParty.WebSocketRelay
         public string Channel { get; set; }
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
-        public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
         public IReadOnlyList<INetworkState> NetworkStates => _networkStates;
+        public bool NetworkAuthority
+        {
+            get
+            {
+                if (!_distanceBasedAuthority)
+                    return _networkContext.LocalClientIdentity == NetworkOwner;
+
+
+            }
+        }
 
         private void Awake()
         {
             _networkStates.AddRange(GetComponents<INetworkState>());
-        }
-
-        private void Update()
-        {
-            
         }
 
         private void OnValidate()
