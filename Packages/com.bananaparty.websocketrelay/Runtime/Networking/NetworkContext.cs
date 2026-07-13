@@ -19,6 +19,8 @@ namespace BananaParty.WebSocketRelay
 
         public Guid LocalClientIdentity { get; set; }
 
+        public IReadOnlyList<NetworkPlayer> NetworkPlayers => _networkPlayers;
+
         private readonly List<INetworkIdentity> _networkIdentities = new();
         private readonly Dictionary<Guid, INetworkIdentity> _networkIdentitiesByGuid = new();
 
