@@ -4,14 +4,14 @@ using NUnit.Framework;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
-    public class MasterClientElectionTests
+    public class MasterClientArbiterTests
     {
         [Test]
         public void Elect_SoloClient_BecomesMaster()
         {
             Guid localClient = Guid.NewGuid();
 
-            Guid master = MasterClientElection.Elect(
+            Guid master = MasterClientArbiter.Elect(
                 localClient,
                 playTimes: new Dictionary<Guid, float> { [localClient] = 1f },
                 alivePlayers: Array.Empty<NetworkPlayer>(),
@@ -33,7 +33,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 new NetworkPlayer(challenger),
             };
 
-            Guid master = MasterClientElection.Elect(
+            Guid master = MasterClientArbiter.Elect(
                 localClient,
                 playTimes: new Dictionary<Guid, float>
                 {
@@ -59,7 +59,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 new NetworkPlayer(lowerGuid),
             };
 
-            Guid master = MasterClientElection.Elect(
+            Guid master = MasterClientArbiter.Elect(
                 Guid.Parse("00000000-0000-0000-0000-000000000003"),
                 playTimes: new Dictionary<Guid, float>
                 {
@@ -85,7 +85,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 new NetworkPlayer(challenger),
             };
 
-            Guid master = MasterClientElection.Elect(
+            Guid master = MasterClientArbiter.Elect(
                 localClient,
                 playTimes: new Dictionary<Guid, float>
                 {
@@ -111,7 +111,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 new NetworkPlayer(nextMaster),
             };
 
-            Guid master = MasterClientElection.Elect(
+            Guid master = MasterClientArbiter.Elect(
                 localClient,
                 playTimes: new Dictionary<Guid, float>
                 {
@@ -136,7 +136,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 new NetworkPlayer(remotePlayer),
             };
 
-            Guid master = MasterClientElection.Elect(
+            Guid master = MasterClientArbiter.Elect(
                 localClient,
                 playTimes: new Dictionary<Guid, float>
                 {
