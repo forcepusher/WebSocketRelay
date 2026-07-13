@@ -637,7 +637,7 @@ GameObject:
   - component: {fileID: 653850366}
   - component: {fileID: 653850365}
   m_Layer: 0
-  m_Name: MasterClient
+  m_Name: MasterClientArtiber
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -683,7 +683,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.NetworkIdentity
   _networkContext: {fileID: 11400000, guid: 3892ff3e93f930c4082ae22a3252b126, type: 2}
-  _prefabName: MasterClient
+  _prefabName: MasterClientArtiber
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
