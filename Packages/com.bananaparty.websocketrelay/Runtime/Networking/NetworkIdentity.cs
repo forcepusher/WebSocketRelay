@@ -9,7 +9,9 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private NetworkContext _networkContext;
         [SerializeField]
-        public string _prefabName;
+        private string _prefabName;
+        [SerializeField]
+        private bool _distanceBasedAuthority;
 
         private readonly List<INetworkState> _networkStates = new();
 
@@ -24,6 +26,11 @@ namespace BananaParty.WebSocketRelay
         private void Awake()
         {
             _networkStates.AddRange(GetComponents<INetworkState>());
+        }
+
+        private void Update()
+        {
+            
         }
 
         private void OnValidate()
