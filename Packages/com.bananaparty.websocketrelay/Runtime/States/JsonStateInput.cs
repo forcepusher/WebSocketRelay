@@ -187,69 +187,49 @@ namespace BananaParty.WebSocketRelay
             return ReadBoolAtPosition();
         }
 
-        public Vector2 ReadVector2(string name)
-        {
-            AdvanceToEntry(name);
-            ReadObjectOpen();
+        public Vector2 ReadVector2(string name) =>
+            ReadInlineObject(name, () =>
+            {
+                float x = ReadObjectComponentFloat("x");
+                float y = ReadObjectComponentFloat("y");
+                return new Vector2(x, y);
+            });
 
-            float x = ReadObjectComponentFloat("x");
-            float y = ReadObjectComponentFloat("y");
+        public Vector3 ReadVector3(string name) =>
+            ReadInlineObject(name, () =>
+            {
+                float x = ReadObjectComponentFloat("x");
+                float y = ReadObjectComponentFloat("y");
+                float z = ReadObjectComponentFloat("z");
+                return new Vector3(x, y, z);
+            });
 
-            ReadObjectClose();
-            return new Vector2(x, y);
-        }
+        public Vector2Int ReadVector2Int(string name) =>
+            ReadInlineObject(name, () =>
+            {
+                int x = ReadObjectComponentInt("x");
+                int y = ReadObjectComponentInt("y");
+                return new Vector2Int(x, y);
+            });
 
-        public Vector3 ReadVector3(string name)
-        {
-            AdvanceToEntry(name);
-            ReadObjectOpen();
+        public Vector3Int ReadVector3Int(string name) =>
+            ReadInlineObject(name, () =>
+            {
+                int x = ReadObjectComponentInt("x");
+                int y = ReadObjectComponentInt("y");
+                int z = ReadObjectComponentInt("z");
+                return new Vector3Int(x, y, z);
+            });
 
-            float x = ReadObjectComponentFloat("x");
-            float y = ReadObjectComponentFloat("y");
-            float z = ReadObjectComponentFloat("z");
-
-            ReadObjectClose();
-            return new Vector3(x, y, z);
-        }
-
-        public Vector2Int ReadVector2Int(string name)
-        {
-            AdvanceToEntry(name);
-            ReadObjectOpen();
-
-            int x = ReadObjectComponentInt("x");
-            int y = ReadObjectComponentInt("y");
-
-            ReadObjectClose();
-            return new Vector2Int(x, y);
-        }
-
-        public Vector3Int ReadVector3Int(string name)
-        {
-            AdvanceToEntry(name);
-            ReadObjectOpen();
-
-            int x = ReadObjectComponentInt("x");
-            int y = ReadObjectComponentInt("y");
-            int z = ReadObjectComponentInt("z");
-
-            ReadObjectClose();
-            return new Vector3Int(x, y, z);
-        }
-
-        public Quaternion ReadQuaternion(string name)
-        {
-            AdvanceToEntry(name);
-            ReadObjectOpen();
-
-            float x = ReadObjectComponentFloat("x");
-            float y = ReadObjectComponentFloat("y");
-            float z = ReadObjectComponentFloat("z");
-            float w = ReadObjectComponentFloat("w");
-
-            ReadObjectClose();
-            return new Quaternion(x, y, z, w);
-        }
+        public Quaternion ReadQuaternion(string name) =>
+            ReadInlineObject(name, () =>
+            {
+                float x = ReadObjectComponentFloat("x");
+                float y = ReadObjectComponentFloat("y");
+                float z = ReadObjectComponentFloat("z");
+                float w = ReadObjectComponentFloat("w");
+                return new Quaternion(x, y, z, w);
+            });
 
         public Guid ReadGuid(string name)
         {
@@ -270,6 +250,19 @@ namespace BananaParty.WebSocketRelay
                 throw new KeyNotFoundException($"Expected field '{expectedName}' but found '{entryName ?? "null"}' in JSON state.");
 
             SkipColon();
+        }
+
+        private T ReadInlineObject<T>(string name, Func<T> readContent)
+        {
+            AdvanceToEntry(name);
+            ReadObjectOpen();
+            T result = readContent();
+            ReadObjectClose();
+
+            if (_objectContentStarts.Count > 0)
+                _objectContentStarts.Pop();
+
+            return result;
         }
 
         private void ReadObjectOpen()
