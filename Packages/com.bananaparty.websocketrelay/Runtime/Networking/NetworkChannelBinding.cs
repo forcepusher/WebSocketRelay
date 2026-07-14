@@ -32,6 +32,7 @@ namespace BananaParty.WebSocketRelay
             _networkIdentity.Channel = channel;
         }
 
+#if UNITY_EDITOR
         private void OnValidate()
         {
             if (string.IsNullOrEmpty(_guid))
@@ -40,5 +41,6 @@ namespace BananaParty.WebSocketRelay
                 EditorUtility.SetDirty(this);
             }
         }
+#endif
     }
 }
