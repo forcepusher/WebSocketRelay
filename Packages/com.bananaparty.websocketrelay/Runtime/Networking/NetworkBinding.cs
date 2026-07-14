@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class NetworkChannelBinding : MonoBehaviour
+    public class NetworkBinding : MonoBehaviour
     {
         [SerializeField]
         private NetworkChannel _networkChannel;

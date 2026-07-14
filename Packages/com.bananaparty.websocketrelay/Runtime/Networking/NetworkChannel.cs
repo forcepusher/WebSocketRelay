@@ -6,14 +6,14 @@ namespace BananaParty.WebSocketRelay
     [CreateAssetMenu]
     public class NetworkChannel : ScriptableObject
     {
-        public List<NetworkChannelBinding> _channelBindings;
+        public List<NetworkBinding> _channelBindings;
 
-        public void AddBinding(NetworkChannelBinding channel)
+        public void AddBinding(NetworkBinding channel)
         {
             _channelBindings.Add(channel);
         }
 
-        public void RemoveBinding(NetworkChannelBinding channel)
+        public void RemoveBinding(NetworkBinding channel)
         {
             _channelBindings.Remove(channel);
         }
@@ -22,7 +22,7 @@ namespace BananaParty.WebSocketRelay
         {
             Debug.Log("SET BINDING TO " + channel);
 
-            foreach (NetworkChannelBinding binding in _channelBindings)
+            foreach (NetworkBinding binding in _channelBindings)
                 binding.SetChannel(channel);
         }
     }
