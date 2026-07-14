@@ -278,21 +278,19 @@ namespace BananaParty.WebSocketRelay
         private void ApplyIncomingChannelState(string channel, byte[] data)
         {
             ReadOnlyMemory<byte> payload = StripMessageHeader(data);
+            string json = _useBinary ? null : Encoding.UTF8.GetString(payload.Span);
 
             IReadOnlyList<Guid> identityIds = _useBinary
                 ? BinaryStateInput.GetRootIdentityIds(payload)
-                : JsonStateInput.GetRootIdentityIds(Encoding.UTF8.GetString(payload.Span));
-
-            IStateInput stateInput = _useBinary
-                ? new BinaryStateInput(payload)
-                : new JsonStateInput(Encoding.UTF8.GetString(payload.Span));
-
-            //Debug.Log("Received " + data.Length + " " + Encoding.UTF8.GetString(payload.Span));
-
-            stateInput.BeginObjectElement();
+                : JsonStateInput.GetRootIdentityIds(json);
 
             foreach (Guid networkIdentifier in identityIds)
             {
+                IStateInput stateInput = _useBinary
+                    ? new BinaryStateInput(payload)
+                    : new JsonStateInput(json);
+
+                stateInput.BeginObjectElement();
                 stateInput.BeginObjectProperty(networkIdentifier.ToString());
 
                 if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
@@ -310,8 +308,6 @@ namespace BananaParty.WebSocketRelay
 
                 stateInput.EndObject();
             }
-
-            stateInput.EndObject();
         }
 
         private static ReadOnlyMemory<byte> StripMessageHeader(byte[] data)

@@ -278,6 +278,107 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void ShouldApplyMultipleIdentitiesWithFreshParserPerIdentity()
+        {
+            Guid botId = Guid.Parse("8e18e9b4-619b-43ed-976b-18765d6465da");
+            Guid playerId = Guid.Parse("368ab72d-dfe8-4bf2-8f26-538f5f50ae24");
+            Guid botOwner = Guid.Parse("bea8ee69-bdcf-4eda-8755-bf4c4a886c29");
+            Guid playerOwner = Guid.Parse("dcf6650b-88cb-42d7-8bda-1875e41a75fa");
+
+            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            output.BeginObjectElement();
+            WriteNetworkIdentity(output, botId, botOwner, "BotCharacter", 100, Vector3.zero);
+            WriteNetworkIdentity(output, playerId, playerOwner, "PlayerCharacter", 75, new Vector3(1f, 2f, 3f));
+            output.EndObject();
+
+            string json = output.ToString();
+            Guid[] identityIds = { botId, playerId };
+
+            foreach (Guid networkIdentifier in identityIds)
+            {
+                JsonStateInput stateInput = new(json);
+                stateInput.BeginObjectElement();
+                stateInput.BeginObjectProperty(networkIdentifier.ToString());
+                string prefabName = stateInput.ReadString("PrefabName");
+                stateInput.ReadGuid("NetworkOwner");
+                stateInput.BeginArrayProperty("NetworkStates");
+                stateInput.BeginObjectElement();
+                stateInput.ReadInt("_health");
+                stateInput.ReadVector3("_position");
+                stateInput.EndObject();
+                stateInput.EndArray();
+                stateInput.EndObject();
+
+                if (networkIdentifier == botId)
+                    Assert.AreEqual("BotCharacter", prefabName);
+                else
+                    Assert.AreEqual("PlayerCharacter", prefabName);
+            }
+        }
+
+        [Test]
+        public void ShouldApplyMultipleIdentitiesSequentiallyOnSameJsonStateInput()
+        {
+            Guid botId = Guid.Parse("8e18e9b4-619b-43ed-976b-18765d6465da");
+            Guid playerId = Guid.Parse("368ab72d-dfe8-4bf2-8f26-538f5f50ae24");
+            Guid botOwner = Guid.Parse("bea8ee69-bdcf-4eda-8755-bf4c4a886c29");
+            Guid playerOwner = Guid.Parse("dcf6650b-88cb-42d7-8bda-1875e41a75fa");
+
+            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            output.BeginObjectElement();
+            WriteNetworkIdentity(output, botId, botOwner, "BotCharacter", 100, Vector3.zero);
+            WriteNetworkIdentity(output, playerId, playerOwner, "PlayerCharacter", 75, new Vector3(1f, 2f, 3f));
+            output.EndObject();
+
+            string json = output.ToString();
+            Guid[] identityIds = { botId, playerId };
+
+            JsonStateInput stateInput = new(json);
+            stateInput.BeginObjectElement();
+
+            foreach (Guid networkIdentifier in identityIds)
+            {
+                stateInput.BeginObjectProperty(networkIdentifier.ToString());
+                string prefabName = stateInput.ReadString("PrefabName");
+                stateInput.ReadGuid("NetworkOwner");
+                stateInput.BeginArrayProperty("NetworkStates");
+                stateInput.BeginObjectElement();
+                stateInput.ReadInt("_health");
+                stateInput.ReadVector3("_position");
+                stateInput.EndObject();
+                stateInput.EndArray();
+                stateInput.EndObject();
+
+                if (networkIdentifier == botId)
+                    Assert.AreEqual("BotCharacter", prefabName);
+                else
+                    Assert.AreEqual("PlayerCharacter", prefabName);
+            }
+
+            stateInput.EndObject();
+        }
+
+        private static void WriteNetworkIdentity(
+            IStateOutput stateOutput,
+            Guid networkIdentifier,
+            Guid networkOwner,
+            string prefabName,
+            int health,
+            Vector3 position)
+        {
+            stateOutput.BeginObjectProperty(networkIdentifier.ToString());
+            stateOutput.WriteString("PrefabName", prefabName);
+            stateOutput.WriteGuid("NetworkOwner", networkOwner);
+            stateOutput.BeginArrayProperty("NetworkStates");
+            stateOutput.BeginObjectElement();
+            stateOutput.WriteInt("_health", health);
+            stateOutput.WriteVector3("_position", position);
+            stateOutput.EndObject();
+            stateOutput.EndArray();
+            stateOutput.EndObject();
+        }
+
+        [Test]
         public void ShouldRoundTripBinaryNetworkStatesWithGuidLookup()
         {
             Guid networkId1 = Guid.Parse("bf0c3839-ff9c-4ef4-9442-482648647d53");
