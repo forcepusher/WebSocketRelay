@@ -13,5 +13,6 @@ namespace BananaParty.WebSocketRelay
         Guid NetworkOwner { get; set; }
         bool NetworkAuthority { get; }
         IReadOnlyList<INetworkState> NetworkStates { get; }
+        bool DistanceBasedAuthority { get; }
     }
 }

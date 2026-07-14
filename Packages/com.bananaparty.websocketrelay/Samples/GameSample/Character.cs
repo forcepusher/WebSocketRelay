@@ -11,8 +11,6 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField] private float rotationSpeed = 10f;
         [SerializeField] private float jumpHeight = 2f;
 
-        private float _positionDecay = 7f;
-
         private CharacterController _characteController;
         private ICharacterInput _characterInput;
 
@@ -46,8 +44,20 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void ReadNetworkState(IStateInput stateInput)
         {
-            _health = stateInput.ReadFloat(nameof(_health));
-            _position = stateInput.ReadVector3(nameof(_position));
+            float health = stateInput.ReadFloat(nameof(_health));
+            Vector3 position = stateInput.ReadVector3(nameof(_position));
+
+            if (!_networkIdentity.NetworkAuthority)
+            {
+                if (GetComponent<BotCharacterInput>())
+                {
+                    Debug.Log("HELLOOO???");
+                }
+
+                _health = health;
+                _position = position;
+                transform.position = position;
+            }
         }
 
         private void Move()
@@ -79,11 +89,6 @@ namespace BananaParty.WebSocketRelay.Samples
                 }
 
                 _characteController.Move(Vector3.up * _verticalVelocity * Time.deltaTime);
-            }
-            else
-            {
-                float decay = Mathf.Exp(-_positionDecay * Time.deltaTime);
-                transform.position = _position + (transform.position - _position) * decay;
             }
         }
     }

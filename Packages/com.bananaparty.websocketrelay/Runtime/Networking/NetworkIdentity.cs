@@ -9,7 +9,9 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private NetworkContext _networkContext;
         [SerializeField]
-        public string _prefabName;
+        private string _prefabName;
+        [SerializeField]
+        private bool _distanceBasedAuthority;
 
         private readonly List<INetworkState> _networkStates = new();
 
@@ -18,8 +20,19 @@ namespace BananaParty.WebSocketRelay
         public string Channel { get; set; }
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
-        public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
         public IReadOnlyList<INetworkState> NetworkStates => _networkStates;
+        public bool NetworkAuthority
+        {
+            get
+            {
+                if (!_distanceBasedAuthority)
+                    return _networkContext.LocalClientIdentity == NetworkOwner;
+
+                AuthorityOrigin closestAuthorityOrigin = _networkContext.GetClosestAuthorityOrigin(transform.position);
+                return closestAuthorityOrigin?.NetworkIdentity.NetworkOwner == _networkContext.LocalClientIdentity;
+            }
+        }
+        public bool DistanceBasedAuthority => _distanceBasedAuthority;
 
         private void Awake()
         {

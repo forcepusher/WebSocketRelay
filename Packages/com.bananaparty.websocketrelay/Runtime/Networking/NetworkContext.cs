@@ -22,6 +22,8 @@ namespace BananaParty.WebSocketRelay
         private readonly List<INetworkIdentity> _networkIdentities = new();
         private readonly Dictionary<Guid, INetworkIdentity> _networkIdentitiesByGuid = new();
 
+        private readonly List<IAuthorityOrigin> _authorityOrigins = new();
+
         private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
 
@@ -48,6 +50,24 @@ namespace BananaParty.WebSocketRelay
             return networkIdentity;
         }
 
+        public AuthorityOrigin GetClosestAuthorityOrigin(Vector3 position)
+        {
+            AuthorityOrigin closestAuthorityOrigin = null;
+            float closestDistanceSquared = float.MaxValue;
+
+            foreach (IAuthorityOrigin authorityOrigin in _authorityOrigins)
+            {
+                float distanceSquared = (authorityOrigin.Position - position).sqrMagnitude;
+                if (distanceSquared >= closestDistanceSquared)
+                    continue;
+
+                closestDistanceSquared = distanceSquared;
+                closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
+            }
+
+            return closestAuthorityOrigin;
+        }
+
         public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
         {
             Debug.Log("Added " + networkIdentity.PrefabName + " to network context");
@@ -59,6 +79,16 @@ namespace BananaParty.WebSocketRelay
         {
             _networkIdentities.Remove(networkIdentity);
             _networkIdentitiesByGuid.Remove(networkIdentity.NetworkIdentifier);
+        }
+
+        public void RegisterAuthorityOrigin(IAuthorityOrigin authorityOrigin)
+        {
+            _authorityOrigins.Add(authorityOrigin);
+        }
+
+        public void UnregisterAuthorityOrigin(IAuthorityOrigin authorityOrigin)
+        {
+            _authorityOrigins.Remove(authorityOrigin);
         }
 
         public void ClearNetworkSession()
@@ -207,11 +237,20 @@ namespace BananaParty.WebSocketRelay
             stateOutput.BeginObjectElement();
             foreach (INetworkIdentity networkIdentity in _networkIdentities)
             {
-                if (networkIdentity.NetworkOwner != LocalClientIdentity)
+                //if (networkIdentity.DistanceBasedAuthority)
+                //    Debug.Log("1");
+
+                if (!networkIdentity.NetworkAuthority)
                     continue;
+
+                //if (networkIdentity.DistanceBasedAuthority)
+                //    Debug.Log("2");
 
                 if (networkIdentity.Channel != channel)
                     continue;
+
+                //if (networkIdentity.DistanceBasedAuthority)
+                //    Debug.Log("3");
 
                 stateOutput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
                 WriteNetworkIdentityState(networkIdentity, stateOutput);
@@ -240,36 +279,36 @@ namespace BananaParty.WebSocketRelay
         {
             ReadOnlyMemory<byte> payload = StripMessageHeader(data);
 
-            IReadOnlyList<Guid> identityIds = _useBinary
-                ? BinaryStateInput.GetRootIdentityIds(payload)
-                : JsonStateInput.GetRootIdentityIds(Encoding.UTF8.GetString(payload.Span));
-
-            IStateInput stateInput = _useBinary
-                ? new BinaryStateInput(payload)
-                : new JsonStateInput(Encoding.UTF8.GetString(payload.Span));
-
-            //Debug.Log("Received " + data.Length + " " + Encoding.UTF8.GetString(payload.Span));
-
-            stateInput.BeginObjectElement();
-
-            foreach (Guid networkIdentifier in identityIds)
+            if (_useBinary)
             {
-                stateInput.BeginObjectProperty(networkIdentifier.ToString());
+                foreach (Guid networkIdentifier in BinaryStateInput.GetRootIdentityIds(payload))
+                    ApplyIncomingNetworkIdentity(channel, networkIdentifier, new BinaryStateInput(payload));
+            }
+            else
+            {
+                string json = Encoding.UTF8.GetString(payload.Span);
 
-                if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
-                {
-                    ReadNetworkIdentityState(networkIdentity, stateInput);
-                }
-                else
-                {
-                    string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
-                    Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
+                foreach (Guid networkIdentifier in JsonStateInput.GetRootIdentityIds(json))
+                    ApplyIncomingNetworkIdentity(channel, networkIdentifier, new JsonStateInput(json));
+            }
+        }
 
-                    NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkOwner);
-                    ReadNetworkIdentityComponents(spawnedNetworkIdentity, stateInput);
-                }
+        private void ApplyIncomingNetworkIdentity(string channel, Guid networkIdentifier, IStateInput stateInput)
+        {
+            stateInput.BeginObjectElement();
+            stateInput.BeginObjectProperty(networkIdentifier.ToString());
 
-                stateInput.EndObject();
+            if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
+            {
+                ReadNetworkIdentityState(networkIdentity, stateInput);
+            }
+            else
+            {
+                string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
+                Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
+
+                NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkOwner);
+                ReadNetworkIdentityComponents(spawnedNetworkIdentity, stateInput);
             }
 
             stateInput.EndObject();
