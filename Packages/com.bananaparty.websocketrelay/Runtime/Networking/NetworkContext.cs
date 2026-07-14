@@ -237,11 +237,20 @@ namespace BananaParty.WebSocketRelay
             stateOutput.BeginObjectElement();
             foreach (INetworkIdentity networkIdentity in _networkIdentities)
             {
+                if (networkIdentity.DistanceBasedAuthority)
+                    Debug.Log("1");
+
                 if (!networkIdentity.NetworkAuthority)
                     continue;
 
+                if (networkIdentity.DistanceBasedAuthority)
+                    Debug.Log("2");
+
                 if (networkIdentity.Channel != channel)
                     continue;
+
+                if (networkIdentity.DistanceBasedAuthority)
+                    Debug.Log("3");
 
                 stateOutput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
                 WriteNetworkIdentityState(networkIdentity, stateOutput);

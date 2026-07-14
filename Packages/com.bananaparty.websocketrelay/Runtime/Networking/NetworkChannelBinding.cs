@@ -1,3 +1,4 @@
+using UnityEditor;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
@@ -6,6 +7,8 @@ namespace BananaParty.WebSocketRelay
     {
         [SerializeField]
         private NetworkChannel _networkChannel;
+        [SerializeField]
+        private string _guid;
 
         private NetworkIdentity _networkIdentity;
 
@@ -27,6 +30,15 @@ namespace BananaParty.WebSocketRelay
         public void SetChannel(string channel)
         {
             _networkIdentity.Channel = channel;
+        }
+
+        private void OnValidate()
+        {
+            if (string.IsNullOrEmpty(_guid))
+            {
+                _guid = System.Guid.NewGuid().ToString();
+                EditorUtility.SetDirty(this);
+            }
         }
     }
 }
