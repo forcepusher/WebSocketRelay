@@ -278,36 +278,40 @@ namespace BananaParty.WebSocketRelay
         private void ApplyIncomingChannelState(string channel, byte[] data)
         {
             ReadOnlyMemory<byte> payload = StripMessageHeader(data);
-            string json = _useBinary ? null : Encoding.UTF8.GetString(payload.Span);
 
-            IReadOnlyList<Guid> identityIds = _useBinary
-                ? BinaryStateInput.GetRootIdentityIds(payload)
-                : JsonStateInput.GetRootIdentityIds(json);
-
-            foreach (Guid networkIdentifier in identityIds)
+            if (_useBinary)
             {
-                IStateInput stateInput = _useBinary
-                    ? new BinaryStateInput(payload)
-                    : new JsonStateInput(json);
-
-                stateInput.BeginObjectElement();
-                stateInput.BeginObjectProperty(networkIdentifier.ToString());
-
-                if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
-                {
-                    ReadNetworkIdentityState(networkIdentity, stateInput);
-                }
-                else
-                {
-                    string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
-                    Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
-
-                    NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkOwner);
-                    ReadNetworkIdentityComponents(spawnedNetworkIdentity, stateInput);
-                }
-
-                stateInput.EndObject();
+                foreach (Guid networkIdentifier in BinaryStateInput.GetRootIdentityIds(payload))
+                    ApplyIncomingNetworkIdentity(channel, networkIdentifier, new BinaryStateInput(payload));
             }
+            else
+            {
+                string json = Encoding.UTF8.GetString(payload.Span);
+
+                foreach (Guid networkIdentifier in JsonStateInput.GetRootIdentityIds(json))
+                    ApplyIncomingNetworkIdentity(channel, networkIdentifier, new JsonStateInput(json));
+            }
+        }
+
+        private void ApplyIncomingNetworkIdentity(string channel, Guid networkIdentifier, IStateInput stateInput)
+        {
+            stateInput.BeginObjectElement();
+            stateInput.BeginObjectProperty(networkIdentifier.ToString());
+
+            if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
+            {
+                ReadNetworkIdentityState(networkIdentity, stateInput);
+            }
+            else
+            {
+                string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
+                Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
+
+                NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkOwner);
+                ReadNetworkIdentityComponents(spawnedNetworkIdentity, stateInput);
+            }
+
+            stateInput.EndObject();
         }
 
         private static ReadOnlyMemory<byte> StripMessageHeader(byte[] data)
