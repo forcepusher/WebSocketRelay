@@ -53,15 +53,15 @@ namespace BananaParty.WebSocketRelay
         public AuthorityOrigin GetClosestAuthorityOrigin(Vector3 position)
         {
             AuthorityOrigin closestAuthorityOrigin = null;
-            float closestDistanceSquared = float.MaxValue;
+            float closestDistance = float.MaxValue;
 
             foreach (IAuthorityOrigin authorityOrigin in _authorityOrigins)
             {
-                float distanceSquared = (authorityOrigin.Position - position).sqrMagnitude;
-                if (distanceSquared >= closestDistanceSquared)
+                float distance = (authorityOrigin.Position - position).magnitude;
+                if (distance >= closestDistance)
                     continue;
 
-                closestDistanceSquared = distanceSquared;
+                closestDistance = distance;
                 closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
             }
 
