@@ -23,7 +23,7 @@ namespace BananaParty.WebSocketRelay
             Debug.Log("SET BINDING TO " + channel);
 
             foreach (NetworkBinding binding in _channelBindings)
-                binding.SetChannel(channel);
+                binding.SetBinding(channel);
         }
     }
 }

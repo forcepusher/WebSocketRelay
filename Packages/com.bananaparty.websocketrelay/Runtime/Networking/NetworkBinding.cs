@@ -31,9 +31,10 @@ namespace BananaParty.WebSocketRelay
             _networkContext.UnregisterNetworkIdentity(_networkIdentity);
         }
 
-        public void SetChannel(string channel)
+        public void SetBinding(string channel)
         {
             _networkIdentity.Channel = channel;
+            _networkIdentity.NetworkIdentifier = Guid.Parse(_guid);
         }
 
 #if UNITY_EDITOR
