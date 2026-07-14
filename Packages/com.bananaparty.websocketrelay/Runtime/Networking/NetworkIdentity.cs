@@ -32,6 +32,7 @@ namespace BananaParty.WebSocketRelay
                 return closestAuthorityOrigin?.NetworkIdentity.NetworkOwner == _networkContext.LocalClientIdentity;
             }
         }
+        public bool DistanceBasedAuthority => _distanceBasedAuthority;
 
         private void Awake()
         {

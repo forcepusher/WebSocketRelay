@@ -20,6 +20,8 @@ namespace BananaParty.WebSocketRelay
 
         public void SetChannel(string channel)
         {
+            Debug.Log("SET BINDING TO " + channel);
+
             foreach (NetworkChannelBinding binding in _channelBindings)
                 binding.SetChannel(channel);
         }

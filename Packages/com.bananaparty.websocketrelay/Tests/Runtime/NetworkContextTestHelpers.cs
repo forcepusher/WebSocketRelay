@@ -124,5 +124,6 @@ namespace BananaParty.WebSocketRelay.Tests
         public Guid NetworkOwner { get; set; }
         public bool NetworkAuthority => false;
         public IReadOnlyList<INetworkState> NetworkStates => Array.Empty<INetworkState>();
+        public bool DistanceBasedAuthority => false;
     }
 }

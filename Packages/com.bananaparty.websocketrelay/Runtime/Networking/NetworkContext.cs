@@ -237,7 +237,7 @@ namespace BananaParty.WebSocketRelay
             stateOutput.BeginObjectElement();
             foreach (INetworkIdentity networkIdentity in _networkIdentities)
             {
-                if (networkIdentity.NetworkOwner != LocalClientIdentity)
+                if (!networkIdentity.NetworkAuthority)
                     continue;
 
                 if (networkIdentity.Channel != channel)
