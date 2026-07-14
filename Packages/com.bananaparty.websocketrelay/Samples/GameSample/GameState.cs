@@ -10,12 +10,15 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private Network _network;
 
-        private string _networkChannel = "game-room";
+        private string _networkChannelName = "game-room";
 
         private float _timeSinceLastFullSync = 0f;
 
         [SerializeField]
         private NetworkContext _networkContext;
+
+        [SerializeField]
+        private NetworkChannel _networkChannel;
 
         [SerializeField]
         private NetworkIdentity _playerCharacterPrefab;
@@ -88,9 +91,11 @@ namespace BananaParty.WebSocketRelay.Samples
 
             Debug.Log("Connected to relay");
 
-            _network.SubscribeToChannel(_networkChannel);
+            _network.SubscribeToChannel(_networkChannelName);
 
-            _networkContext.Instantiate(_playerCharacterPrefab, _networkChannel);
+            _networkChannel.SetChannel(_networkChannelName);
+
+            _networkContext.Instantiate(_playerCharacterPrefab, _networkChannelName);
         }
     }
 }

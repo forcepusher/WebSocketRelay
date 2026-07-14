@@ -4,23 +4,23 @@ using UnityEngine;
 namespace BananaParty.WebSocketRelay
 {
     [CreateAssetMenu]
-    public class Channel : ScriptableObject
+    public class NetworkChannel : ScriptableObject
     {
-        public List<ChannelBinding> _channelBindings;
+        public List<NetworkChannelBinding> _channelBindings;
 
-        public void AddBinding(ChannelBinding channel)
+        public void AddBinding(NetworkChannelBinding channel)
         {
             _channelBindings.Add(channel);
         }
 
-        public void RemoveBinding(ChannelBinding channel)
+        public void RemoveBinding(NetworkChannelBinding channel)
         {
             _channelBindings.Remove(channel);
         }
 
         public void SetChannel(string channel)
         {
-            foreach (ChannelBinding binding in _channelBindings)
+            foreach (NetworkChannelBinding binding in _channelBindings)
                 binding.SetChannel(channel);
         }
     }

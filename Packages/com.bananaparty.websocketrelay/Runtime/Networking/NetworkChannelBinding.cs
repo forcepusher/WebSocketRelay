@@ -2,10 +2,10 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class ChannelBinding : MonoBehaviour
+    public class NetworkChannelBinding : MonoBehaviour
     {
         [SerializeField]
-        private Channel _networkChannel;
+        private NetworkChannel _networkChannel;
 
         private NetworkIdentity _networkIdentity;
 
