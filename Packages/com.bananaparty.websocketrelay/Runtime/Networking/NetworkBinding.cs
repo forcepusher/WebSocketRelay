@@ -18,6 +18,7 @@ namespace BananaParty.WebSocketRelay
         private void Awake()
         {
             _networkIdentity = GetComponent<NetworkIdentity>();
+            _networkIdentity.NetworkIdentifier = Guid.Parse(_guid);
         }
 
         private void OnEnable()
@@ -35,7 +36,6 @@ namespace BananaParty.WebSocketRelay
         public void SetBinding(string channel)
         {
             _networkIdentity.Channel = channel;
-            _networkIdentity.NetworkIdentifier = Guid.Parse(_guid);
         }
 
 #if UNITY_EDITOR
