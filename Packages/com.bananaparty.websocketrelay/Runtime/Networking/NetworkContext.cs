@@ -33,6 +33,8 @@ namespace BananaParty.WebSocketRelay
 
         public IReadOnlyList<INetworkIdentity> NetworkIdentities => _networkIdentities;
 
+        public IReadOnlyList<IAuthorityOrigin> AuthorityOrigins => _authorityOrigins;
+
         public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, string channel)
         {
             return Instantiate(networkIdentityPrefab.PrefabName, channel, Guid.NewGuid(), LocalClientIdentity);

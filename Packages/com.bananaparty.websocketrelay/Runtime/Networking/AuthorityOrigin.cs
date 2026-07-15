@@ -1,9 +1,12 @@
+using System;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
     public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin, IRpcTarget
     {
+        private const string TakeAuthorityGuidKey = nameof(TakeAuthorityGuidKey);
+
         [SerializeField]
         private NetworkContext _networkContext;
 
@@ -33,17 +36,31 @@ namespace BananaParty.WebSocketRelay
 
         private void Update()
         {
+            AuthorityOrigin closestAuthorityOrigin = null;
+            float closestDistance = float.MaxValue;
 
+            foreach (IAuthorityOrigin authorityOrigin in _networkContext.AuthorityOrigins)
+            {
+                float distance = (authorityOrigin.Position - transform.position).magnitude;
+                if (distance >= closestDistance)
+                    continue;
+
+                closestDistance = distance;
+                closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
+            }
+
+            //closestAuthorityOrigin;
         }
 
         public void ReceiveRpc(IStateInput parametersStateInput)
         {
-
+            Guid networkIdentityToControl = parametersStateInput.ReadGuid(TakeAuthorityGuidKey);
         }
 
-        private void SendRpc()
+        private void TakeAuthority(NetworkIdentity networkIdentity)
         {
             IStateOutput parametersStateOutput = _networkContext.UseBinary ? new BinaryStateOutput() : new JsonStateOutput();
+            parametersStateOutput.WriteGuid(TakeAuthorityGuidKey, networkIdentity.NetworkIdentifier);
             _networkIdentity.SendRpc(RpcSubjectName, parametersStateOutput);
         }
 

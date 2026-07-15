@@ -12,13 +12,19 @@ namespace BananaParty.WebSocketRelay
 
         IReadOnlyList<INetworkIdentity> NetworkIdentities { get; }
 
+        IReadOnlyList<IAuthorityOrigin> AuthorityOrigins { get; }
+
         void RegisterNetworkIdentity(INetworkIdentity networkIdentity);
 
         void UnregisterNetworkIdentity(INetworkIdentity networkIdentity);
 
-        void RegisterAuthorityOrigin(IAuthorityOrigin authorityOrigin);
+        public void RegisterAuthorityOrigin(IAuthorityOrigin authorityOrigin);
 
-        void UnregisterAuthorityOrigin(IAuthorityOrigin authorityOrigin);
+        public void UnregisterAuthorityOrigin(IAuthorityOrigin authorityOrigin);
+
+        void RegisterRpcTarget(IRpcTarget rpcTarget);
+
+        void UnregisterRpcTarget(IRpcTarget rpcTarget);
 
         void ReadNetworkStates(IStateInput stateInput);
 
