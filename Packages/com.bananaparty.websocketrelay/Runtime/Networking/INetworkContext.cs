@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
@@ -9,7 +10,7 @@ namespace BananaParty.WebSocketRelay
 
         Guid LocalClientIdentity { get; set; }
 
-        AuthorityOrigin GetClosestAuthorityOrigin(Vector3 position);
+        IReadOnlyList<INetworkIdentity> NetworkIdentities { get; }
 
         void RegisterNetworkIdentity(INetworkIdentity networkIdentity);
 

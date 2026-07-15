@@ -25,11 +25,11 @@ namespace BananaParty.WebSocketRelay
         {
             get
             {
-                if (!_distanceBasedAuthority)
+                //if (!_distanceBasedAuthority)
                     return _networkContext.LocalClientIdentity == NetworkOwner;
 
-                AuthorityOrigin closestAuthorityOrigin = _networkContext.GetClosestAuthorityOrigin(transform.position);
-                return closestAuthorityOrigin?.NetworkIdentity.NetworkOwner == _networkContext.LocalClientIdentity;
+                //AuthorityOrigin closestAuthorityOrigin = _networkContext.GetClosestAuthorityOrigin(transform.position);
+                //return closestAuthorityOrigin?.NetworkIdentity.NetworkOwner == _networkContext.LocalClientIdentity;
             }
         }
         public bool DistanceBasedAuthority => _distanceBasedAuthority;

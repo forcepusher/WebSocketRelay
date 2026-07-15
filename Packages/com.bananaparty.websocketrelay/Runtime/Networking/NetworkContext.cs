@@ -31,6 +31,8 @@ namespace BananaParty.WebSocketRelay
 
         private readonly List<IRpcTarget> _rpcTargets = new();
 
+        public IReadOnlyList<INetworkIdentity> NetworkIdentities => _networkIdentities;
+
         public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, string channel)
         {
             return Instantiate(networkIdentityPrefab.PrefabName, channel, Guid.NewGuid(), LocalClientIdentity);
@@ -52,24 +54,6 @@ namespace BananaParty.WebSocketRelay
             Debug.Log($"Spawned remote network identity '{prefabName}' ({networkIdentifier}) for player {networkOwner}");
 
             return networkIdentity;
-        }
-
-        public AuthorityOrigin GetClosestAuthorityOrigin(Vector3 position)
-        {
-            AuthorityOrigin closestAuthorityOrigin = null;
-            float closestDistance = float.MaxValue;
-
-            foreach (IAuthorityOrigin authorityOrigin in _authorityOrigins)
-            {
-                float distance = (authorityOrigin.Position - position).magnitude;
-                if (distance >= closestDistance)
-                    continue;
-
-                closestDistance = distance;
-                closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
-            }
-
-            return closestAuthorityOrigin;
         }
 
         public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)

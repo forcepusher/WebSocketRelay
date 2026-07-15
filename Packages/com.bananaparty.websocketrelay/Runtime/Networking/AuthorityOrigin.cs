@@ -31,6 +31,11 @@ namespace BananaParty.WebSocketRelay
             _networkContext.UnregisterRpcTarget(this);
         }
 
+        private void Update()
+        {
+
+        }
+
         public void ReceiveRpc(IStateInput parametersStateInput)
         {
 
@@ -41,5 +46,24 @@ namespace BananaParty.WebSocketRelay
             IStateOutput parametersStateOutput = _networkContext.UseBinary ? new BinaryStateOutput() : new JsonStateOutput();
             _networkIdentity.SendRpc(RpcSubjectName, parametersStateOutput);
         }
+
+        //// THIS HAS TO BE DELETED AFTER A REFACTOR, MOVE IT TO AuthorityOrigin
+        //public AuthorityOrigin GetClosestAuthorityOrigin(Vector3 position)
+        //{
+        //    AuthorityOrigin closestAuthorityOrigin = null;
+        //    float closestDistance = float.MaxValue;
+
+        //    foreach (IAuthorityOrigin authorityOrigin in _authorityOrigins)
+        //    {
+        //        float distance = (authorityOrigin.Position - position).magnitude;
+        //        if (distance >= closestDistance)
+        //            continue;
+
+        //        closestDistance = distance;
+        //        closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
+        //    }
+
+        //    return closestAuthorityOrigin;
+        //}
     }
 }
