@@ -27,6 +27,8 @@ namespace BananaParty.WebSocketRelay
         private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
 
+        private readonly List<IRpc> _rpcTargets = new();
+
         public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, string channel)
         {
             return Instantiate(networkIdentityPrefab.PrefabName, channel, Guid.NewGuid(), LocalClientIdentity);
@@ -79,6 +81,16 @@ namespace BananaParty.WebSocketRelay
         {
             _networkIdentities.Remove(networkIdentity);
             _networkIdentitiesByGuid.Remove(networkIdentity.NetworkIdentifier);
+        }
+
+        public void RegisterRpcTarget(IRpc rpcTarget)
+        {
+            _rpcTargets.Add(rpcTarget);
+        }
+
+        public void UnregisterRpcTarget(IRpc rpcTarget)
+        {
+            _rpcTargets.Remove(rpcTarget);
         }
 
         public void RegisterAuthorityOrigin(IAuthorityOrigin authorityOrigin)

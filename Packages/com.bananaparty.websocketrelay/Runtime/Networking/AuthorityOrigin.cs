@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin
+    public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin, IRpc
     {
         [SerializeField]
         private NetworkContext _networkContext;
@@ -12,6 +12,8 @@ namespace BananaParty.WebSocketRelay
 
         public Vector3 Position => transform.position;
 
+        public string RpcSubjectName => nameof(AuthorityOrigin);
+
         private void Awake()
         {
             _networkIdentity = GetComponent<NetworkIdentity>();
@@ -20,11 +22,23 @@ namespace BananaParty.WebSocketRelay
         private void OnEnable()
         {
             _networkContext.RegisterAuthorityOrigin(this);
+            _networkContext.RegisterRpcTarget(this);
         }
 
         private void OnDisable()
         {
             _networkContext.UnregisterAuthorityOrigin(this);
+            _networkContext.UnregisterRpcTarget(this);
+        }
+
+        public void ReceiveRpc(IStateInput parametersStateInput)
+        {
+
+        }
+
+        public void SendRpc(IStateOutput parametersStateOutput)
+        {
+
         }
     }
 }
