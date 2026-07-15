@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin, IRpc
+    public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin, IRpcTarget
     {
         [SerializeField]
         private NetworkContext _networkContext;

@@ -1,6 +1,6 @@
 namespace BananaParty.WebSocketRelay
 {
-    public interface IRpc
+    public interface IRpcTarget
     {
         string RpcSubjectName { get; }
 

@@ -29,7 +29,7 @@ namespace BananaParty.WebSocketRelay
         private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
 
-        private readonly List<IRpc> _rpcTargets = new();
+        private readonly List<IRpcTarget> _rpcTargets = new();
 
         public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, string channel)
         {
@@ -85,12 +85,12 @@ namespace BananaParty.WebSocketRelay
             _networkIdentitiesByGuid.Remove(networkIdentity.NetworkIdentifier);
         }
 
-        public void RegisterRpcTarget(IRpc rpcTarget)
+        public void RegisterRpcTarget(IRpcTarget rpcTarget)
         {
             _rpcTargets.Add(rpcTarget);
         }
 
-        public void UnregisterRpcTarget(IRpc rpcTarget)
+        public void UnregisterRpcTarget(IRpcTarget rpcTarget)
         {
             _rpcTargets.Remove(rpcTarget);
         }

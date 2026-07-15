@@ -125,5 +125,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public bool NetworkAuthority => false;
         public IReadOnlyList<INetworkState> NetworkStates => Array.Empty<INetworkState>();
         public bool DistanceBasedAuthority => false;
+
+        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput) => throw new NotImplementedException();
     }
 }

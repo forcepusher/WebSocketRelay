@@ -122,6 +122,8 @@ namespace BananaParty.WebSocketRelay.Tests
                 Health = stateInput.ReadFloat(nameof(Health));
                 Position = stateInput.ReadVector3(nameof(Position));
             }
+
+            public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput) => throw new NotImplementedException();
         }
     }
 }
