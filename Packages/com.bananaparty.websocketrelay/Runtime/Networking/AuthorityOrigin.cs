@@ -51,7 +51,12 @@ namespace BananaParty.WebSocketRelay
 
                 AuthorityOrigin currentOwnerAuthorityOrigin = GetAuthorityOriginForNetworkOwner(networkIdentity.NetworkOwner);
                 if (currentOwnerAuthorityOrigin == null)
+                {
+                    if (GetClosestAuthorityOrigin(networkIdentity.GameObject.transform.position) == this)
+                        TakeAuthority((NetworkIdentity)networkIdentity);
+
                     continue;
+                }
 
                 float currentOwnerDistance = GetDistanceTo(networkIdentity.GameObject.transform.position, currentOwnerAuthorityOrigin.Position);
                 float localDistance = GetDistanceTo(networkIdentity.GameObject.transform.position, Position);
@@ -72,9 +77,6 @@ namespace BananaParty.WebSocketRelay
             {
                 if (networkIdentity.NetworkIdentifier != networkIdentityToControl)
                     continue;
-
-                if (networkIdentity.NetworkOwner != _networkContext.LocalClientIdentity)
-                    return;
 
                 networkIdentity.NetworkOwner = requesterGuid;
                 return;
@@ -97,6 +99,24 @@ namespace BananaParty.WebSocketRelay
             }
 
             return null;
+        }
+
+        private AuthorityOrigin GetClosestAuthorityOrigin(Vector3 targetPosition)
+        {
+            AuthorityOrigin closestAuthorityOrigin = null;
+            float closestDistance = float.MaxValue;
+
+            foreach (IAuthorityOrigin authorityOrigin in _networkContext.AuthorityOrigins)
+            {
+                float distance = GetDistanceTo(targetPosition, authorityOrigin.Position);
+                if (distance >= closestDistance)
+                    continue;
+
+                closestDistance = distance;
+                closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
+            }
+
+            return closestAuthorityOrigin;
         }
 
         private void TakeAuthority(NetworkIdentity networkIdentity)
