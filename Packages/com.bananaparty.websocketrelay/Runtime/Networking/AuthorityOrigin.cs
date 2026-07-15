@@ -12,8 +12,7 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private NetworkContext _networkContext;
 
-        private NetworkIdentity _networkIdentity;
-        public NetworkIdentity NetworkIdentity => _networkIdentity;
+        public NetworkIdentity NetworkIdentity { get; private set; }
 
         public Vector3 Position => transform.position;
 
@@ -21,7 +20,7 @@ namespace BananaParty.WebSocketRelay
 
         private void Awake()
         {
-            _networkIdentity = GetComponent<NetworkIdentity>();
+            NetworkIdentity = GetComponent<NetworkIdentity>();
         }
 
         private void OnEnable()
@@ -38,7 +37,7 @@ namespace BananaParty.WebSocketRelay
 
         private void Update()
         {
-            if (_networkIdentity.NetworkOwner != _networkContext.LocalClientIdentity)
+            if (NetworkIdentity.NetworkOwner != _networkContext.LocalClientIdentity)
                 return;
 
             foreach (INetworkIdentity networkIdentity in _networkContext.NetworkIdentities)
@@ -58,8 +57,8 @@ namespace BananaParty.WebSocketRelay
                     continue;
                 }
 
-                float currentOwnerDistance = GetDistanceTo(networkIdentity.GameObject.transform.position, currentOwnerAuthorityOrigin.Position);
-                float localDistance = GetDistanceTo(networkIdentity.GameObject.transform.position, Position);
+                float currentOwnerDistance = Vector3.Distance(networkIdentity.GameObject.transform.position, currentOwnerAuthorityOrigin.Position);
+                float localDistance = Vector3.Distance(networkIdentity.GameObject.transform.position, Position);
 
                 if (localDistance > currentOwnerDistance * AuthorityInterceptionThreshold)
                     continue;
@@ -83,11 +82,6 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        private static float GetDistanceTo(Vector3 targetPosition, Vector3 authorityOriginPosition)
-        {
-            return (targetPosition - authorityOriginPosition).magnitude;
-        }
-
         private AuthorityOrigin GetAuthorityOriginForNetworkOwner(Guid networkOwner)
         {
             foreach (IAuthorityOrigin authorityOrigin in _networkContext.AuthorityOrigins)
@@ -108,7 +102,7 @@ namespace BananaParty.WebSocketRelay
 
             foreach (IAuthorityOrigin authorityOrigin in _networkContext.AuthorityOrigins)
             {
-                float distance = GetDistanceTo(targetPosition, authorityOrigin.Position);
+                float distance = Vector3.Distance(targetPosition, authorityOrigin.Position);
                 if (distance >= closestDistance)
                     continue;
 
@@ -124,7 +118,7 @@ namespace BananaParty.WebSocketRelay
             IStateOutput parametersStateOutput = _networkContext.UseBinary ? new BinaryStateOutput() : new JsonStateOutput();
             parametersStateOutput.WriteGuid(TakeAuthorityGuidKey, networkIdentity.NetworkIdentifier);
             parametersStateOutput.WriteGuid(TakeAuthorityRequesterGuidKey, _networkContext.LocalClientIdentity);
-            _networkIdentity.SendRpc(RpcSubjectName, parametersStateOutput);
+            NetworkIdentity.SendRpc(RpcSubjectName, parametersStateOutput);
         }
     }
 }
