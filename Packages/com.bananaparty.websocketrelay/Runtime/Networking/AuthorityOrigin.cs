@@ -5,8 +5,9 @@ namespace BananaParty.WebSocketRelay
 {
     public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin, IRpcTarget
     {
-        private const float AuthorityInterceptionThreshold = 0.2f;
+        private const float AuthorityInterceptionThreshold = 0.8f;
         private const string TakeAuthorityGuidKey = nameof(TakeAuthorityGuidKey);
+        private const string TakeAuthorityRequesterGuidKey = nameof(TakeAuthorityRequesterGuidKey);
 
         [SerializeField]
         private NetworkContext _networkContext;
@@ -37,51 +38,73 @@ namespace BananaParty.WebSocketRelay
 
         private void Update()
         {
-            AuthorityOrigin closestAuthorityOrigin = null;
-            float closestDistance = float.MaxValue;
+            if (_networkIdentity.NetworkOwner != _networkContext.LocalClientIdentity)
+                return;
 
-            foreach (IAuthorityOrigin authorityOrigin in _networkContext.AuthorityOrigins)
+            foreach (INetworkIdentity networkIdentity in _networkContext.NetworkIdentities)
             {
-                float distance = (authorityOrigin.Position - transform.position).magnitude;
-                if (distance >= closestDistance)
+                if (!networkIdentity.DistanceBasedAuthority)
                     continue;
 
-                closestDistance = distance;
-                closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
-            }
+                if (networkIdentity.NetworkOwner == _networkContext.LocalClientIdentity)
+                    continue;
 
-            //closestAuthorityOrigin;
+                AuthorityOrigin currentOwnerAuthorityOrigin = GetAuthorityOriginForNetworkOwner(networkIdentity.NetworkOwner);
+                if (currentOwnerAuthorityOrigin == null)
+                    continue;
+
+                float currentOwnerDistance = GetDistanceTo(networkIdentity.GameObject.transform.position, currentOwnerAuthorityOrigin.Position);
+                float localDistance = GetDistanceTo(networkIdentity.GameObject.transform.position, Position);
+
+                if (localDistance > currentOwnerDistance * AuthorityInterceptionThreshold)
+                    continue;
+
+                TakeAuthority((NetworkIdentity)networkIdentity);
+            }
         }
 
         public void ReceiveRpc(IStateInput parametersStateInput)
         {
             Guid networkIdentityToControl = parametersStateInput.ReadGuid(TakeAuthorityGuidKey);
+            Guid requesterGuid = parametersStateInput.ReadGuid(TakeAuthorityRequesterGuidKey);
+
+            foreach (INetworkIdentity networkIdentity in _networkContext.NetworkIdentities)
+            {
+                if (networkIdentity.NetworkIdentifier != networkIdentityToControl)
+                    continue;
+
+                if (networkIdentity.NetworkOwner != _networkContext.LocalClientIdentity)
+                    return;
+
+                networkIdentity.NetworkOwner = requesterGuid;
+                return;
+            }
+        }
+
+        private static float GetDistanceTo(Vector3 targetPosition, Vector3 authorityOriginPosition)
+        {
+            return (targetPosition - authorityOriginPosition).magnitude;
+        }
+
+        private AuthorityOrigin GetAuthorityOriginForNetworkOwner(Guid networkOwner)
+        {
+            foreach (IAuthorityOrigin authorityOrigin in _networkContext.AuthorityOrigins)
+            {
+                if (authorityOrigin.NetworkIdentity.NetworkOwner != networkOwner)
+                    continue;
+
+                return (AuthorityOrigin)authorityOrigin;
+            }
+
+            return null;
         }
 
         private void TakeAuthority(NetworkIdentity networkIdentity)
         {
             IStateOutput parametersStateOutput = _networkContext.UseBinary ? new BinaryStateOutput() : new JsonStateOutput();
             parametersStateOutput.WriteGuid(TakeAuthorityGuidKey, networkIdentity.NetworkIdentifier);
+            parametersStateOutput.WriteGuid(TakeAuthorityRequesterGuidKey, _networkContext.LocalClientIdentity);
             _networkIdentity.SendRpc(RpcSubjectName, parametersStateOutput);
         }
-
-        //// THIS HAS TO BE DELETED AFTER A REFACTOR, MOVE IT TO AuthorityOrigin
-        //public AuthorityOrigin GetClosestAuthorityOrigin(Vector3 position)
-        //{
-        //    AuthorityOrigin closestAuthorityOrigin = null;
-        //    float closestDistance = float.MaxValue;
-
-        //    foreach (IAuthorityOrigin authorityOrigin in _authorityOrigins)
-        //    {
-        //        float distance = (authorityOrigin.Position - position).magnitude;
-        //        if (distance >= closestDistance)
-        //            continue;
-
-        //        closestDistance = distance;
-        //        closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
-        //    }
-
-        //    return closestAuthorityOrigin;
-        //}
     }
 }
