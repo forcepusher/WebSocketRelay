@@ -17,6 +17,8 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private List<NetworkIdentity> _networkPrefabs;
 
+        public bool UseBinary => _useBinary;
+
         public Guid LocalClientIdentity { get; set; }
 
         private readonly List<INetworkIdentity> _networkIdentities = new();

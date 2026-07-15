@@ -14,5 +14,6 @@ namespace BananaParty.WebSocketRelay
         bool NetworkAuthority { get; }
         IReadOnlyList<INetworkState> NetworkStates { get; }
         bool DistanceBasedAuthority { get; }
+        void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput);
     }
 }

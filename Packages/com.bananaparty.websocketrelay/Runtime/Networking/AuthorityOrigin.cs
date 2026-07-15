@@ -36,9 +36,10 @@ namespace BananaParty.WebSocketRelay
 
         }
 
-        public void SendRpc(IStateOutput parametersStateOutput)
+        private void SendRpc()
         {
-
+            IStateOutput parametersStateOutput = _networkContext.UseBinary ? new BinaryStateOutput() : new JsonStateOutput();
+            _networkIdentity.SendRpc(RpcSubjectName, parametersStateOutput);
         }
     }
 }

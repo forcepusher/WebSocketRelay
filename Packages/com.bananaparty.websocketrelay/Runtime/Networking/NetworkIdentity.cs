@@ -39,6 +39,11 @@ namespace BananaParty.WebSocketRelay
             _networkStates.AddRange(GetComponents<INetworkState>());
         }
 
+        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput)
+        {
+
+        }
+
         private void OnValidate()
         {
             _prefabName = transform.name;

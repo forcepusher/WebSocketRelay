@@ -5,6 +5,8 @@ namespace BananaParty.WebSocketRelay
 {
     public interface INetworkContext
     {
+        public bool UseBinary {  get; }
+
         Guid LocalClientIdentity { get; set; }
 
         AuthorityOrigin GetClosestAuthorityOrigin(Vector3 position);
