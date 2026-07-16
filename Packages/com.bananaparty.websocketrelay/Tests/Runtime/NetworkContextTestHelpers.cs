@@ -150,6 +150,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public string Channel { get; set; }
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
+        public int NetworkOwnerVersion { get; set; }
         public bool NetworkAuthority => false;
         public IReadOnlyList<INetworkState> NetworkStates => Array.Empty<INetworkState>();
         public bool DistanceBasedAuthority => false;

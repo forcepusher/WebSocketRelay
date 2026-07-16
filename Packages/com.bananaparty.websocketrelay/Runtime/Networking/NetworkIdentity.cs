@@ -20,6 +20,7 @@ namespace BananaParty.WebSocketRelay
         public string Channel { get; set; }
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
+        public int NetworkOwnerVersion { get; set; }
         public IReadOnlyList<INetworkState> NetworkStates => _networkStates;
         public bool NetworkAuthority
         {

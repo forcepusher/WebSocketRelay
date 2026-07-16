@@ -8,6 +8,7 @@ namespace BananaParty.WebSocketRelay
         private const float AuthorityInterceptionThreshold = 0.8f;
         private const string TakeAuthorityGuidKey = nameof(TakeAuthorityGuidKey);
         private const string TakeAuthorityRequesterGuidKey = nameof(TakeAuthorityRequesterGuidKey);
+        private const string TakeAuthorityVersionKey = nameof(TakeAuthorityVersionKey);
 
         [SerializeField]
         private NetworkContext _networkContext;
@@ -73,14 +74,16 @@ namespace BananaParty.WebSocketRelay
         {
             Guid networkIdentityToControl = parametersStateInput.ReadGuid(TakeAuthorityGuidKey);
             Guid requesterGuid = parametersStateInput.ReadGuid(TakeAuthorityRequesterGuidKey);
+            int claimVersion = parametersStateInput.ReadInt(TakeAuthorityVersionKey);
 
             foreach (INetworkIdentity networkIdentity in _networkContext.NetworkIdentities)
             {
                 if (networkIdentity.NetworkIdentifier != networkIdentityToControl)
                     continue;
 
-                Debug.Log("TAKE CONTROLS BY " + requesterGuid);
-                networkIdentity.NetworkOwner = requesterGuid;
+                if (networkIdentity.TryApplyOwnershipClaim(requesterGuid, claimVersion))
+                    Debug.Log("TAKE CONTROLS BY " + requesterGuid);
+
                 return;
             }
         }
@@ -121,6 +124,7 @@ namespace BananaParty.WebSocketRelay
             IStateOutput parametersStateOutput = _networkContext.UseBinary ? new BinaryStateOutput() : new JsonStateOutput();
             parametersStateOutput.WriteGuid(TakeAuthorityGuidKey, networkIdentity.NetworkIdentifier);
             parametersStateOutput.WriteGuid(TakeAuthorityRequesterGuidKey, _networkContext.LocalClientIdentity);
+            parametersStateOutput.WriteInt(TakeAuthorityVersionKey, networkIdentity.NetworkOwnerVersion + 1);
             NetworkIdentity.SendRpc(RpcSubjectName, parametersStateOutput);
         }
     }

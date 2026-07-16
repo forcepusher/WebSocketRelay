@@ -169,12 +169,19 @@ namespace BananaParty.WebSocketRelay
 
         private static void ReadNetworkIdentityState(INetworkIdentity networkIdentity, IStateInput stateInput)
         {
+            ReadNetworkIdentityOwnership(networkIdentity, stateInput);
+            ReadNetworkIdentityComponents(networkIdentity, stateInput);
+        }
+
+        private static void ReadNetworkIdentityOwnership(INetworkIdentity networkIdentity, IStateInput stateInput)
+        {
             string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
             if (prefabName != networkIdentity.PrefabName)
                 throw new InvalidOperationException($"Prefab name mismatch. Expected: {networkIdentity.PrefabName}, Received: {prefabName}");
 
-            networkIdentity.NetworkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
-            ReadNetworkIdentityComponents(networkIdentity, stateInput);
+            Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
+            int networkOwnerVersion = stateInput.ReadInt(nameof(NetworkIdentity.NetworkOwnerVersion));
+            networkIdentity.TryApplyOwnershipClaim(networkOwner, networkOwnerVersion);
         }
 
         private static void ReadNetworkIdentityComponents(INetworkIdentity networkIdentity, IStateInput stateInput)
@@ -193,6 +200,7 @@ namespace BananaParty.WebSocketRelay
         {
             stateOutput.WriteString(nameof(NetworkIdentity.PrefabName), networkIdentity.PrefabName);
             stateOutput.WriteGuid(nameof(NetworkIdentity.NetworkOwner), networkIdentity.NetworkOwner);
+            stateOutput.WriteInt(nameof(NetworkIdentity.NetworkOwnerVersion), networkIdentity.NetworkOwnerVersion);
             WriteNetworkIdentityComponents(networkIdentity, stateOutput);
         }
 
@@ -402,20 +410,26 @@ namespace BananaParty.WebSocketRelay
 
             if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
             {
-                // Ignore stale state from a client that is no longer the owner,
+                // Ownership is applied first so a client that missed a TakeAuthority RPC
+                // still converges on the owner carried by the owner's state broadcasts.
+                ReadNetworkIdentityOwnership(networkIdentity, stateInput);
+
+                // Ignore stale component state from a client that is no longer the owner,
                 // e.g. right after a distance-based authority transfer.
                 // The state input is per-identity, so abandoning it mid-object is safe.
                 if (senderGuid != networkIdentity.NetworkOwner)
                     return;
 
-                ReadNetworkIdentityState(networkIdentity, stateInput);
+                ReadNetworkIdentityComponents(networkIdentity, stateInput);
             }
             else
             {
                 string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
                 Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
+                int networkOwnerVersion = stateInput.ReadInt(nameof(NetworkIdentity.NetworkOwnerVersion));
 
                 NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkOwner);
+                spawnedNetworkIdentity.NetworkOwnerVersion = networkOwnerVersion;
                 ReadNetworkIdentityComponents(spawnedNetworkIdentity, stateInput);
             }
 
