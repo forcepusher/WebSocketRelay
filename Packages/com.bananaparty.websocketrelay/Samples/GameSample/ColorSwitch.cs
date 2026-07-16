@@ -23,6 +23,16 @@ namespace BananaParty.WebSocketRelay.Samples
             _networkIdentity = GetComponent<NetworkIdentity>();
         }
 
+        private void OnEnable()
+        {
+            _networkIdentity.NetworkContext.RegisterRpcTarget(this);
+        }
+
+        private void OnDisable()
+        {
+            _networkIdentity.NetworkContext.UnregisterRpcTarget(this);
+        }
+
         private void Update()
         {
             if (_networkIdentity.NetworkAuthority)
@@ -34,8 +44,6 @@ namespace BananaParty.WebSocketRelay.Samples
                     Color color = new(Random.value, Random.value, Random.value);
                     parametersOutput.WriteColor(RandomColorParametername, color);
                     _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
-
-                    SetColor(color);
                 }
 
                 if (Input.GetMouseButtonDown(1))
@@ -43,8 +51,6 @@ namespace BananaParty.WebSocketRelay.Samples
                     IStateOutput parametersOutput = _networkIdentity.NetworkContext.StateFormat.CreateOutput();
                     parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.GreyColorOnRightClick);
                     _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
-
-                    SetColor(Color.grey);
                 }
             }
         }
