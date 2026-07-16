@@ -83,19 +83,17 @@ namespace BananaParty.WebSocketRelay.Tests
             return output;
         }
 
-        public static byte[] CreateTakeAuthorityRpcParameters(Guid networkIdentityId, Guid requesterGuid, int claimVersion)
+        public static byte[] CreateTakeAuthorityRpcParameters(Guid networkIdentityId, Guid requesterGuid)
         {
             JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
             output.WriteGuid("TakeAuthorityGuidKey", networkIdentityId);
             output.WriteGuid("TakeAuthorityRequesterGuidKey", requesterGuid);
-            output.WriteInt("TakeAuthorityVersionKey", claimVersion);
             return Encoding.UTF8.GetBytes(output.ToString());
         }
 
         public static byte[] CreateSyncIdentitiesMessage(
             INetworkIdentity identity,
             Guid networkOwner,
-            int networkOwnerVersion,
             int componentValue = 0,
             bool includeComponentState = false)
         {
@@ -104,7 +102,6 @@ namespace BananaParty.WebSocketRelay.Tests
             output.BeginObjectProperty(identity.NetworkIdentifier.ToString());
             output.WriteString(nameof(NetworkIdentity.PrefabName), identity.PrefabName);
             output.WriteGuid(nameof(NetworkIdentity.NetworkOwner), networkOwner);
-            output.WriteInt(nameof(NetworkIdentity.NetworkOwnerVersion), networkOwnerVersion);
             output.BeginArrayProperty("NetworkStates");
             if (includeComponentState)
             {
@@ -194,7 +191,6 @@ namespace BananaParty.WebSocketRelay.Tests
         public string Channel { get; set; }
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
-        public int NetworkOwnerVersion { get; set; }
         public bool NetworkAuthority => false;
         public IReadOnlyList<INetworkState> NetworkStates => _networkStates;
         public bool DistanceBasedAuthority { get; set; }

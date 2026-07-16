@@ -180,8 +180,7 @@ namespace BananaParty.WebSocketRelay
                 throw new InvalidOperationException($"Prefab name mismatch. Expected: {networkIdentity.PrefabName}, Received: {prefabName}");
 
             Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
-            int networkOwnerVersion = stateInput.ReadInt(nameof(NetworkIdentity.NetworkOwnerVersion));
-            networkIdentity.TryApplyOwnershipClaim(networkOwner, networkOwnerVersion);
+            networkIdentity.NetworkOwner = networkOwner;
         }
 
         private static void ReadNetworkIdentityComponents(INetworkIdentity networkIdentity, IStateInput stateInput)
@@ -200,7 +199,6 @@ namespace BananaParty.WebSocketRelay
         {
             stateOutput.WriteString(nameof(NetworkIdentity.PrefabName), networkIdentity.PrefabName);
             stateOutput.WriteGuid(nameof(NetworkIdentity.NetworkOwner), networkIdentity.NetworkOwner);
-            stateOutput.WriteInt(nameof(NetworkIdentity.NetworkOwnerVersion), networkIdentity.NetworkOwnerVersion);
             WriteNetworkIdentityComponents(networkIdentity, stateOutput);
         }
 
@@ -426,10 +424,8 @@ namespace BananaParty.WebSocketRelay
             {
                 string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
                 Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
-                int networkOwnerVersion = stateInput.ReadInt(nameof(NetworkIdentity.NetworkOwnerVersion));
 
                 NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkOwner);
-                spawnedNetworkIdentity.NetworkOwnerVersion = networkOwnerVersion;
                 ReadNetworkIdentityComponents(spawnedNetworkIdentity, stateInput);
             }
 

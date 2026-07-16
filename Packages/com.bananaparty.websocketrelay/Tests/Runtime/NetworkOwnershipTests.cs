@@ -13,64 +13,7 @@ namespace BananaParty.WebSocketRelay.Tests
         private static readonly Guid LocalClient = Guid.Parse("00000000-0000-0000-0000-000000000099");
 
         [Test]
-        public void TryApplyOwnershipClaim_HigherVersionWins()
-        {
-            INetworkIdentity identity = CreateBotIdentity(PlayerA, networkOwnerVersion: 1);
-
-            Assert.IsTrue(identity.TryApplyOwnershipClaim(PlayerB, 2));
-            Assert.AreEqual(PlayerB, identity.NetworkOwner);
-            Assert.AreEqual(2, identity.NetworkOwnerVersion);
-        }
-
-        [Test]
-        public void TryApplyOwnershipClaim_LowerVersionRejected()
-        {
-            INetworkIdentity identity = CreateBotIdentity(PlayerB, networkOwnerVersion: 2);
-
-            Assert.IsFalse(identity.TryApplyOwnershipClaim(PlayerA, 1));
-            Assert.AreEqual(PlayerB, identity.NetworkOwner);
-            Assert.AreEqual(2, identity.NetworkOwnerVersion);
-        }
-
-        [Test]
-        public void TryApplyOwnershipClaim_EqualVersionLowerGuidWins()
-        {
-            INetworkIdentity identity = CreateBotIdentity(PlayerB, networkOwnerVersion: 1);
-
-            Assert.IsTrue(identity.TryApplyOwnershipClaim(PlayerA, 1));
-            Assert.AreEqual(PlayerA, identity.NetworkOwner);
-            Assert.AreEqual(1, identity.NetworkOwnerVersion);
-        }
-
-        [Test]
-        public void TryApplyOwnershipClaim_EqualVersionHigherGuidRejected()
-        {
-            INetworkIdentity identity = CreateBotIdentity(PlayerA, networkOwnerVersion: 1);
-
-            Assert.IsFalse(identity.TryApplyOwnershipClaim(PlayerB, 1));
-            Assert.AreEqual(PlayerA, identity.NetworkOwner);
-            Assert.AreEqual(1, identity.NetworkOwnerVersion);
-        }
-
-        [Test]
-        public void ConcurrentClaims_DifferentArrivalOrder_ConvergeToSameOwner()
-        {
-            Assert.Less(PlayerA.CompareTo(PlayerB), 0);
-
-            INetworkIdentity claimPlayerAFirst = CreateBotIdentity(PlayerB);
-            claimPlayerAFirst.TryApplyOwnershipClaim(PlayerA, 1);
-            claimPlayerAFirst.TryApplyOwnershipClaim(PlayerB, 1);
-
-            INetworkIdentity claimPlayerBFirst = CreateBotIdentity(PlayerB);
-            claimPlayerBFirst.TryApplyOwnershipClaim(PlayerB, 1);
-            claimPlayerBFirst.TryApplyOwnershipClaim(PlayerA, 1);
-
-            Assert.AreEqual(PlayerA, claimPlayerAFirst.NetworkOwner);
-            Assert.AreEqual(PlayerA, claimPlayerBFirst.NetworkOwner);
-        }
-
-        [Test]
-        public void TakeAuthorityRpc_AppliesOwnershipClaim()
+        public void TakeAuthorityRpc_AppliesOwnership()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
@@ -81,12 +24,11 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] rpcMessage = NetworkContextTestHelpers.CreateRpcMessage(
                 authorityPlayer.NetworkIdentifier,
                 nameof(AuthorityOrigin),
-                NetworkContextTestHelpers.CreateTakeAuthorityRpcParameters(bot.NetworkIdentifier, PlayerA, 1));
+                NetworkContextTestHelpers.CreateTakeAuthorityRpcParameters(bot.NetworkIdentifier, PlayerA));
 
             context.ProcessChannelMessage(PlayerA, "room", rpcMessage);
 
             Assert.AreEqual(PlayerA, bot.NetworkOwner);
-            Assert.AreEqual(1, bot.NetworkOwnerVersion);
 
             UnityEngine.Object.DestroyImmediate(authorityPlayer.gameObject);
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
@@ -102,13 +44,11 @@ namespace BananaParty.WebSocketRelay.Tests
 
             byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
                 bot,
-                PlayerA,
-                networkOwnerVersion: 1);
+                PlayerA);
 
             context.ProcessChannelMessage(PlayerA, "room", message);
 
             Assert.AreEqual(PlayerA, bot.NetworkOwner);
-            Assert.AreEqual(1, bot.NetworkOwnerVersion);
 
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
             UnityEngine.Object.DestroyImmediate(context);
@@ -125,14 +65,12 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
                 bot,
                 PlayerA,
-                networkOwnerVersion: 1,
                 componentValue: 42,
                 includeComponentState: true);
 
             context.ProcessChannelMessage(PlayerA, "room", message);
 
             Assert.AreEqual(PlayerA, bot.NetworkOwner);
-            Assert.AreEqual(1, bot.NetworkOwnerVersion);
             Assert.AreEqual(42, networkState.LastReadValue);
 
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
@@ -146,36 +84,20 @@ namespace BananaParty.WebSocketRelay.Tests
             context.LocalClientIdentity = LocalClient;
             StubNetworkState networkState = new();
             StubNetworkIdentity bot = CreateRegisteredBot(context, PlayerB, networkState);
-            bot.NetworkOwnerVersion = 1;
 
             byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
                 bot,
                 PlayerB,
-                networkOwnerVersion: 1,
                 componentValue: 99,
                 includeComponentState: true);
 
             context.ProcessChannelMessage(PlayerA, "room", message);
 
             Assert.AreEqual(PlayerB, bot.NetworkOwner);
-            Assert.AreEqual(1, bot.NetworkOwnerVersion);
             Assert.AreEqual(0, networkState.LastReadValue);
 
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
             UnityEngine.Object.DestroyImmediate(context);
-        }
-
-        private static StubNetworkIdentity CreateBotIdentity(Guid networkOwner, int networkOwnerVersion = 0)
-        {
-            return new StubNetworkIdentity(
-                new GameObject("Bot"),
-                "BotCharacter",
-                networkOwner,
-                Guid.NewGuid())
-            {
-                NetworkOwnerVersion = networkOwnerVersion,
-                DistanceBasedAuthority = true
-            };
         }
 
         private static StubNetworkIdentity CreateRegisteredBot(
