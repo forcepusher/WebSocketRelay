@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class NetworkIdentity : MonoBehaviour, INetworkIdentity
+    public class NetworkIdentity : MonoBehaviour, INetworkIdentity, INetworkState
     {
         [SerializeField]
         private NetworkContext _networkContext;
@@ -34,6 +34,8 @@ namespace BananaParty.WebSocketRelay
         }
         public bool DistanceBasedAuthority => _distanceBasedAuthority;
 
+        public string NetworkStateName => throw new NotImplementedException();
+
         private void Awake()
         {
             _networkStates.AddRange(GetComponents<INetworkState>());
@@ -47,6 +49,16 @@ namespace BananaParty.WebSocketRelay
         private void OnValidate()
         {
             _prefabName = transform.name;
+        }
+
+        public void WriteNetworkState(IStateOutput stateOutput)
+        {
+
+        }
+
+        public void ReadNetworkState(IStateInput stateInput)
+        {
+
         }
     }
 }
