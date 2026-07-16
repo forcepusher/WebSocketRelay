@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 1896007682246360707}
   - component: {fileID: 4763608854326616019}
   - component: {fileID: 916078405900279995}
+  - component: {fileID: 602518579499806144}
   - component: {fileID: 3152618152874331923}
   - component: {fileID: 6874780850883058954}
   - component: {fileID: 3865023339077881690}
@@ -67,6 +68,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.AuthorityOrigin
   _networkContext: {fileID: 11400000, guid: 3892ff3e93f930c4082ae22a3252b126, type: 2}
+--- !u!114 &602518579499806144
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4279236908898922413}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 000d63b82795a4d4f9aa1883185474db, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.ColorSwitch
 --- !u!33 &3152618152874331923
 MeshFilter:
   m_ObjectHideFlags: 0

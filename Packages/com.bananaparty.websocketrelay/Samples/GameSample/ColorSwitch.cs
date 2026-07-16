@@ -31,7 +31,7 @@ namespace BananaParty.WebSocketRelay.Samples
                 {
                     IStateOutput parametersOutput = _networkIdentity.NetworkContext.StateFormat.CreateOutput();
                     parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.RandomColorOnLeftClick);
-                    Color color = new Color(Random.value, Random.value, Random.value);
+                    Color color = new(Random.value, Random.value, Random.value);
                     parametersOutput.WriteColor(RandomColorParametername, color);
                     _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
 
@@ -44,7 +44,7 @@ namespace BananaParty.WebSocketRelay.Samples
                     parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.GreyColorOnRightClick);
                     _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
 
-                    SetColor(new Color(0.5f, 0.5f, 0.5f));
+                    SetColor(Color.grey);
                 }
             }
         }
@@ -64,7 +64,7 @@ namespace BananaParty.WebSocketRelay.Samples
                     SetColor(color);
                     break;
                 case RpcType.GreyColorOnRightClick:
-                    SetColor(new Color(0.5f, 0.5f, 0.5f));
+                    SetColor(Color.grey);
                     break;
             }
         }
