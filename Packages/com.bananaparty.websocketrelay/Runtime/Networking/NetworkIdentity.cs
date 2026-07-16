@@ -41,7 +41,7 @@ namespace BananaParty.WebSocketRelay
 
         public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput)
         {
-
+            _networkContext.SendRpc(rpcSubjectName, parametersStateOutput, Channel);
         }
 
         private void OnValidate()

@@ -67,10 +67,20 @@ namespace BananaParty.WebSocketRelay
         {
             _relayClient?.ProcessIncomingMessages();
             _networkContext.ManualUpdate(unscaledDeltaTime);
+            SendQueuedRpcMessages();
 
             //var jsonStateOutput = new JsonStateOutput();
             //_networkContext.WriteNetworkStates(jsonStateOutput);
             //Debug.Log(jsonStateOutput.ToString());
+        }
+
+        private void SendQueuedRpcMessages()
+        {
+            if (_relayClient == null || !_relayClient.IsConnected)
+                return;
+
+            while (_networkContext.TryDequeueOutgoingRpcMessage(out string channel, out byte[] message))
+                _relayClient.Send(channel, message);
         }
 
         public void SendSyncIdentities()

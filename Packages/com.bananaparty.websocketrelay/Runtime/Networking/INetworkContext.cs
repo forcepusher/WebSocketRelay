@@ -26,6 +26,8 @@ namespace BananaParty.WebSocketRelay
 
         void UnregisterRpcTarget(IRpcTarget rpcTarget);
 
+        void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, string channel);
+
         void ReadNetworkStates(IStateInput stateInput);
 
         void WriteNetworkStates(IStateOutput stateOutput);

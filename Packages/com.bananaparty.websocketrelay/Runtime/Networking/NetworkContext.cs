@@ -31,6 +31,8 @@ namespace BananaParty.WebSocketRelay
 
         private readonly List<IRpcTarget> _rpcTargets = new();
 
+        private readonly Queue<(string channel, byte[] message)> _outgoingRpcMessages = new();
+
         public IReadOnlyList<INetworkIdentity> NetworkIdentities => _networkIdentities;
 
         public IReadOnlyList<IAuthorityOrigin> AuthorityOrigins => _authorityOrigins;
@@ -104,6 +106,7 @@ namespace BananaParty.WebSocketRelay
 
             _networkPlayers.Clear();
             _networkPlayersByGuid.Clear();
+            _outgoingRpcMessages.Clear();
             LocalClientIdentity = Guid.Empty;
         }
 
@@ -229,7 +232,80 @@ namespace BananaParty.WebSocketRelay
             if (data == null || data.Length == 0)
                 throw new InvalidOperationException("Channel message data is null or empty");
 
-            ApplyIncomingChannelState(channel, data);
+            if (data[0] == NetworkMessage.Rpc)
+                ProcessIncomingRpcMessage(data);
+            else
+                ApplyIncomingChannelState(channel, data);
+        }
+
+        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, string channel)
+        {
+            byte[] parametersPayload = SerializeRpcParameters(parametersStateOutput);
+            _outgoingRpcMessages.Enqueue((channel, CreateRpcMessage(rpcSubjectName, parametersPayload)));
+            DispatchRpc(rpcSubjectName, parametersPayload);
+        }
+
+        public bool TryDequeueOutgoingRpcMessage(out string channel, out byte[] message)
+        {
+            if (_outgoingRpcMessages.Count == 0)
+            {
+                channel = null;
+                message = null;
+                return false;
+            }
+
+            (channel, message) = _outgoingRpcMessages.Dequeue();
+            return true;
+        }
+
+        private byte[] SerializeRpcParameters(IStateOutput parametersStateOutput)
+        {
+            if (parametersStateOutput is BinaryStateOutput binaryStateOutput)
+                return binaryStateOutput.ToArray();
+
+            return Encoding.UTF8.GetBytes(parametersStateOutput.ToString());
+        }
+
+        private static byte[] CreateRpcMessage(string rpcSubjectName, byte[] parametersPayload)
+        {
+            byte[] subjectNameBytes = Encoding.UTF8.GetBytes(rpcSubjectName);
+            byte[] message = new byte[3 + subjectNameBytes.Length + parametersPayload.Length];
+            message[0] = NetworkMessage.Rpc;
+            message[1] = (byte)subjectNameBytes.Length;
+            message[2] = (byte)(subjectNameBytes.Length >> 8);
+            Buffer.BlockCopy(subjectNameBytes, 0, message, 3, subjectNameBytes.Length);
+            Buffer.BlockCopy(parametersPayload, 0, message, 3 + subjectNameBytes.Length, parametersPayload.Length);
+            return message;
+        }
+
+        private void ProcessIncomingRpcMessage(byte[] data)
+        {
+            int subjectNameLength = data[1] | (data[2] << 8);
+            string rpcSubjectName = Encoding.UTF8.GetString(data, 3, subjectNameLength);
+
+            byte[] parametersPayload = new byte[data.Length - 3 - subjectNameLength];
+            Buffer.BlockCopy(data, 3 + subjectNameLength, parametersPayload, 0, parametersPayload.Length);
+
+            DispatchRpc(rpcSubjectName, parametersPayload);
+        }
+
+        private void DispatchRpc(string rpcSubjectName, byte[] parametersPayload)
+        {
+            foreach (IRpcTarget rpcTarget in _rpcTargets)
+            {
+                if (rpcTarget.RpcSubjectName != rpcSubjectName)
+                    continue;
+
+                rpcTarget.ReceiveRpc(CreateRpcParametersStateInput(parametersPayload));
+            }
+        }
+
+        private IStateInput CreateRpcParametersStateInput(byte[] parametersPayload)
+        {
+            if (_useBinary)
+                return new BinaryStateInput(parametersPayload);
+
+            return new JsonStateInput(Encoding.UTF8.GetString(parametersPayload));
         }
 
         private void WriteOwnedNetworkStates(IStateOutput stateOutput, string channel)
