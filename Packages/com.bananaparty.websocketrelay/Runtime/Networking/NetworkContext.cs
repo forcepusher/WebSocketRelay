@@ -361,7 +361,8 @@ namespace BananaParty.WebSocketRelay
 
             if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
             {
-                networkIdentity.ReadNetworkState(stateInput, senderGuid);
+                if (!networkIdentity.ReadNetworkState(stateInput, senderGuid))
+                    return;
             }
             else
             {

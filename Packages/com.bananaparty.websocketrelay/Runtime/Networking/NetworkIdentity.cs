@@ -67,7 +67,7 @@ namespace BananaParty.WebSocketRelay
             ReadComponentStates(stateInput);
         }
 
-        public void ReadNetworkState(IStateInput stateInput, Guid senderGuid)
+        public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
         {
             // Ownership is applied first so a client that missed a TakeAuthority RPC
             // still converges on the owner carried by the owner's state broadcasts.
@@ -77,9 +77,10 @@ namespace BananaParty.WebSocketRelay
             // e.g. right after a distance-based authority transfer.
             // The state input is per-identity, so abandoning it mid-object is safe.
             if (senderGuid != NetworkOwner)
-                return;
+                return false;
 
             ReadComponentStates(stateInput);
+            return true;
         }
 
         internal void ReadComponentStates(IStateInput stateInput)

@@ -122,7 +122,11 @@ namespace BananaParty.WebSocketRelay.Tests
                 Position = stateInput.ReadVector3(nameof(Position));
             }
 
-            public void ReadNetworkState(IStateInput stateInput, Guid senderGuid) => ReadNetworkState(stateInput);
+            public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
+            {
+                ReadNetworkState(stateInput);
+                return true;
+            }
 
             public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput) => throw new NotImplementedException();
         }

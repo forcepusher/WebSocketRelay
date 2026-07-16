@@ -5,7 +5,7 @@ namespace BananaParty.WebSocketRelay
 {
     public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin, IRpcTarget
     {
-        private const float AuthorityInterceptionThreshold = 0.8f;
+        private const float AuthorityInterceptionThreshold = 0.5f;
         private const string TakeAuthorityGuidKey = nameof(TakeAuthorityGuidKey);
         private const string TakeAuthorityRequesterGuidKey = nameof(TakeAuthorityRequesterGuidKey);
 
