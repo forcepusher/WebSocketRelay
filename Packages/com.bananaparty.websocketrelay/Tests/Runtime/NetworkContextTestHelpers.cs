@@ -26,26 +26,17 @@ namespace BananaParty.WebSocketRelay.Tests
 
         public static int GetNetworkPlayerCount(NetworkContext context)
         {
-            FieldInfo field = typeof(NetworkContext).GetField(
-                "_networkPlayers",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            return ((List<NetworkPlayer>)field.GetValue(context)).Count;
+            return context.NetworkPlayers.Count;
         }
 
         public static int GetNetworkIdentityCount(NetworkContext context)
         {
-            FieldInfo field = typeof(NetworkContext).GetField(
-                "_networkIdentities",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            return ((List<INetworkIdentity>)field.GetValue(context)).Count;
+            return context.NetworkIdentities.Count;
         }
 
         public static int GetAuthorityOriginCount(NetworkContext context)
         {
-            FieldInfo field = typeof(NetworkContext).GetField(
-                "_authorityOrigins",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            return ((List<IAuthorityOrigin>)field.GetValue(context)).Count;
+            return context.AuthorityOrigins.Count;
         }
 
         public static void SetPrivateField(object target, string fieldName, object value)
