@@ -20,17 +20,8 @@ namespace BananaParty.WebSocketRelay
         public string Channel { get; set; }
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
-        public bool NetworkAuthority
-        {
-            get
-            {
-                //if (!_distanceBasedAuthority)
-                    return _networkContext.LocalClientIdentity == NetworkOwner;
+        public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
 
-                //AuthorityOrigin closestAuthorityOrigin = _networkContext.GetClosestAuthorityOrigin(transform.position);
-                //return closestAuthorityOrigin?.NetworkIdentity.NetworkOwner == _networkContext.LocalClientIdentity;
-            }
-        }
         public bool DistanceBasedAuthority => _distanceBasedAuthority;
 
         public string NetworkStateName => _prefabName;
