@@ -31,8 +31,8 @@ namespace BananaParty.WebSocketRelay.Samples
                 {
                     IStateOutput parametersOutput = _networkIdentity.NetworkContext.StateFormat.CreateOutput();
                     parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.RandomColorOnLeftClick);
-                    Vector3 color = new Vector3(Random.value, Random.value, Random.value);
-                    parametersOutput.WriteVector3(RandomColorParametername, color);
+                    Color color = new Color(Random.value, Random.value, Random.value);
+                    parametersOutput.WriteColor(RandomColorParametername, color);
                     _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
 
                     SetColor(color);
@@ -44,14 +44,14 @@ namespace BananaParty.WebSocketRelay.Samples
                     parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.GreyColorOnRightClick);
                     _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
 
-                    SetColor(new Vector3(0.5f, 0.5f, 0.5f));
+                    SetColor(new Color(0.5f, 0.5f, 0.5f));
                 }
             }
         }
 
-        private void SetColor(Vector3 color)
+        private void SetColor(Color color)
         {
-            GetComponent<Renderer>().material.color = new Color(color.x, color.y, color.z);
+            GetComponent<Renderer>().material.color = color;
         }
 
         public void ReceiveRpc(IStateInput parametersStateInput)
@@ -60,11 +60,11 @@ namespace BananaParty.WebSocketRelay.Samples
             switch (rpcType)
             {
                 case RpcType.RandomColorOnLeftClick:
-                    Vector3 color = parametersStateInput.ReadVector3(RandomColorParametername);
+                    Color color = parametersStateInput.ReadColor(RandomColorParametername);
                     SetColor(color);
                     break;
                 case RpcType.GreyColorOnRightClick:
-                    SetColor(new Vector3(0.5f, 0.5f, 0.5f));
+                    SetColor(new Color(0.5f, 0.5f, 0.5f));
                     break;
             }
         }

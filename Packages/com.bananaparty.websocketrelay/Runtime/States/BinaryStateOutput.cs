@@ -121,6 +121,15 @@ namespace BananaParty.WebSocketRelay
             _activeWriter.Write(value.w);
         }
 
+        public void WriteColor(string name, Color value)
+        {
+            WriteNameHash(name);
+            _activeWriter.Write(value.r);
+            _activeWriter.Write(value.g);
+            _activeWriter.Write(value.b);
+            _activeWriter.Write(value.a);
+        }
+
         public void WriteGuid(string name, Guid value) => WriteEntry(name, value);
 
         public byte[] ToArray() => _stream.ToArray();

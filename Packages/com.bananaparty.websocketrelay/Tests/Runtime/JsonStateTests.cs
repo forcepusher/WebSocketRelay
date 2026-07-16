@@ -33,6 +33,17 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void ShouldWriteAndReadColor()
+        {
+            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            output.WriteColor("Tint", new Color(0.25f, 0.5f, 0.75f, 1f));
+
+            var input = new JsonStateInput(output.ToString());
+
+            Assert.AreEqual(new Color(0.25f, 0.5f, 0.75f, 1f), input.ReadColor("Tint"));
+        }
+
+        [Test]
         public void ShouldHandlePrettyPrint()
         {
             var output = new JsonStateOutput(prettyPrint: true, bracesOnNewLine: true);
@@ -412,11 +423,13 @@ namespace BananaParty.WebSocketRelay.Tests
             using var output = new BinaryStateOutput();
             output.WriteInt("Score", 10);
             output.WriteVector3("Position", new Vector3(1, 2, 3));
+            output.WriteColor("Tint", new Color(0.25f, 0.5f, 0.75f, 1f));
 
             var input = new BinaryStateInput(output.GetBuffer());
 
             Assert.AreEqual(10, input.ReadInt("Score"));
             Assert.AreEqual(new Vector3(1, 2, 3), input.ReadVector3("Position"));
+            Assert.AreEqual(new Color(0.25f, 0.5f, 0.75f, 1f), input.ReadColor("Tint"));
         }
     }
 }

@@ -231,6 +231,16 @@ namespace BananaParty.WebSocketRelay
                 return new Quaternion(x, y, z, w);
             });
 
+        public Color ReadColor(string name) =>
+            ReadInlineObject(name, () =>
+            {
+                float r = ReadObjectComponentFloat("r");
+                float g = ReadObjectComponentFloat("g");
+                float b = ReadObjectComponentFloat("b");
+                float a = ReadObjectComponentFloat("a");
+                return new Color(r, g, b, a);
+            });
+
         public Guid ReadGuid(string name)
         {
             string value = ReadString(name);

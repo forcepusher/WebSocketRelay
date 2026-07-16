@@ -23,6 +23,7 @@ namespace BananaParty.WebSocketRelay
         void WriteVector2Int(string name, Vector2Int value);
         void WriteVector3Int(string name, Vector3Int value);
         void WriteQuaternion(string name, Quaternion value);
+        void WriteColor(string name, Color value);
         void WriteGuid(string name, Guid value);
     }
 }

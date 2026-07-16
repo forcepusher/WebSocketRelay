@@ -176,6 +176,16 @@ namespace BananaParty.WebSocketRelay
                 _reader.ReadFloat32());
         }
 
+        public Color ReadColor(string name)
+        {
+            _reader.VerifyEntryName(name);
+            return new Color(
+                _reader.ReadFloat32(),
+                _reader.ReadFloat32(),
+                _reader.ReadFloat32(),
+                _reader.ReadFloat32());
+        }
+
         public Guid ReadGuid(string name)
         {
             _reader.VerifyEntryName(name);

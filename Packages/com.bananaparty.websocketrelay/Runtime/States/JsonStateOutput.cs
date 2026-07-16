@@ -72,6 +72,15 @@ namespace BananaParty.WebSocketRelay
             WriteObjectEntry(name, $"{{\"x\":{x},\"y\":{y},\"z\":{z},\"w\":{w}}}");
         }
 
+        public void WriteColor(string name, Color value)
+        {
+            string r = value.r.ToString(CultureInfo.InvariantCulture);
+            string g = value.g.ToString(CultureInfo.InvariantCulture);
+            string b = value.b.ToString(CultureInfo.InvariantCulture);
+            string a = value.a.ToString(CultureInfo.InvariantCulture);
+            WriteObjectEntry(name, $"{{\"r\":{r},\"g\":{g},\"b\":{b},\"a\":{a}}}");
+        }
+
         public void BeginArrayProperty(string name)
         {
             EnsureStarted('{', '}');

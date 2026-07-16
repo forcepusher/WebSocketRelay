@@ -23,6 +23,7 @@ namespace BananaParty.WebSocketRelay
         Vector2Int ReadVector2Int(string name);
         Vector3Int ReadVector3Int(string name);
         Quaternion ReadQuaternion(string name);
+        Color ReadColor(string name);
         Guid ReadGuid(string name);
     }
 }
