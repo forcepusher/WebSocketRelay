@@ -19,7 +19,7 @@ namespace BananaParty.WebSocketRelay.Tests
             context.LocalClientIdentity = LocalClient;
 
             NetworkIdentity authorityPlayer = NetworkContextTestHelpers.CreatePlayerActor(context, PlayerA, Vector3.zero);
-            StubNetworkIdentity bot = CreateRegisteredBot(context, PlayerB);
+            NetworkIdentity bot = CreateRegisteredBot(context, PlayerB);
 
             byte[] rpcMessage = NetworkContextTestHelpers.CreateRpcMessage(
                 authorityPlayer.NetworkIdentifier,
@@ -40,7 +40,7 @@ namespace BananaParty.WebSocketRelay.Tests
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
-            StubNetworkIdentity bot = CreateRegisteredBot(context, PlayerB);
+            NetworkIdentity bot = CreateRegisteredBot(context, PlayerB);
 
             byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
                 bot,
@@ -59,8 +59,7 @@ namespace BananaParty.WebSocketRelay.Tests
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
-            StubNetworkState networkState = new();
-            StubNetworkIdentity bot = CreateRegisteredBot(context, PlayerB, networkState);
+            NetworkIdentity bot = CreateRegisteredBot(context, PlayerB, out StubNetworkState networkState);
 
             byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
                 bot,
@@ -82,8 +81,7 @@ namespace BananaParty.WebSocketRelay.Tests
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
-            StubNetworkState networkState = new();
-            StubNetworkIdentity bot = CreateRegisteredBot(context, PlayerB, networkState);
+            NetworkIdentity bot = CreateRegisteredBot(context, PlayerB, out StubNetworkState networkState);
 
             byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
                 bot,
@@ -100,31 +98,45 @@ namespace BananaParty.WebSocketRelay.Tests
             UnityEngine.Object.DestroyImmediate(context);
         }
 
-        private static StubNetworkIdentity CreateRegisteredBot(
+        private static NetworkIdentity CreateRegisteredBot(NetworkContext context, Guid networkOwner)
+        {
+            return CreateRegisteredBot(context, networkOwner, withNetworkState: false, out _);
+        }
+
+        private static NetworkIdentity CreateRegisteredBot(
             NetworkContext context,
             Guid networkOwner,
-            StubNetworkState networkState = null)
+            out StubNetworkState networkState)
         {
-            IReadOnlyList<INetworkState> networkStates = networkState == null
-                ? null
-                : new INetworkState[] { networkState };
+            return CreateRegisteredBot(context, networkOwner, withNetworkState: true, out networkState);
+        }
 
-            StubNetworkIdentity bot = new(
-                new GameObject("Bot"),
-                "BotCharacter",
-                networkOwner,
-                Guid.NewGuid(),
-                channel: "room",
-                networkStates: networkStates)
-            {
-                DistanceBasedAuthority = true
-            };
+        private static NetworkIdentity CreateRegisteredBot(
+            NetworkContext context,
+            Guid networkOwner,
+            bool withNetworkState,
+            out StubNetworkState networkState)
+        {
+            GameObject gameObject = new("Bot");
+            gameObject.SetActive(false);
 
+            networkState = withNetworkState ? gameObject.AddComponent<StubNetworkState>() : null;
+
+            NetworkIdentity bot = gameObject.AddComponent<NetworkIdentity>();
+            NetworkContextTestHelpers.SetPrivateField(bot, "_networkContext", context);
+            NetworkContextTestHelpers.SetPrivateField(bot, "_prefabName", "BotCharacter");
+            NetworkContextTestHelpers.SetPrivateField(bot, "_distanceBasedAuthority", true);
+
+            bot.NetworkOwner = networkOwner;
+            bot.NetworkIdentifier = Guid.NewGuid();
+            bot.Channel = "room";
+
+            gameObject.SetActive(true);
             context.RegisterNetworkIdentity(bot);
             return bot;
         }
 
-        private sealed class StubNetworkState : INetworkState
+        private sealed class StubNetworkState : MonoBehaviour, INetworkState
         {
             public string NetworkStateName => nameof(StubNetworkState);
 

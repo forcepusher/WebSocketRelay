@@ -192,8 +192,40 @@ namespace BananaParty.WebSocketRelay.Tests
         public Guid NetworkIdentifier { get; set; }
         public Guid NetworkOwner { get; set; }
         public bool NetworkAuthority => false;
-        public IReadOnlyList<INetworkState> NetworkStates => _networkStates;
         public bool DistanceBasedAuthority { get; set; }
+        public string NetworkStateName => PrefabName;
+
+        public void WriteNetworkState(IStateOutput stateOutput)
+        {
+            stateOutput.WriteString(nameof(PrefabName), PrefabName);
+            stateOutput.WriteGuid(nameof(NetworkOwner), NetworkOwner);
+
+            stateOutput.BeginArrayProperty("NetworkStates");
+            foreach (INetworkState networkState in _networkStates)
+            {
+                stateOutput.BeginObjectElement();
+                networkState.WriteNetworkState(stateOutput);
+                stateOutput.EndObject();
+            }
+            stateOutput.EndArray();
+        }
+
+        public void ReadNetworkState(IStateInput stateInput)
+        {
+            stateInput.ReadString(nameof(PrefabName));
+            NetworkOwner = stateInput.ReadGuid(nameof(NetworkOwner));
+
+            stateInput.BeginArrayProperty("NetworkStates");
+            foreach (INetworkState networkState in _networkStates)
+            {
+                stateInput.BeginObjectElement();
+                networkState.ReadNetworkState(stateInput);
+                stateInput.EndObject();
+            }
+            stateInput.EndArray();
+        }
+
+        public void ReadNetworkState(IStateInput stateInput, Guid senderGuid) => ReadNetworkState(stateInput);
 
         public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput) => throw new NotImplementedException();
     }

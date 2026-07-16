@@ -1,10 +1,9 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public interface INetworkIdentity
+    public interface INetworkIdentity : INetworkState
     {
         string PrefabName { get; }
         GameObject GameObject { get; }
@@ -12,8 +11,8 @@ namespace BananaParty.WebSocketRelay
         Guid NetworkIdentifier { get; set; }
         Guid NetworkOwner { get; set; }
         bool NetworkAuthority { get; }
-        IReadOnlyList<INetworkState> NetworkStates { get; }
         bool DistanceBasedAuthority { get; }
+        void ReadNetworkState(IStateInput stateInput, Guid senderGuid);
         void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput);
     }
 }
