@@ -48,10 +48,17 @@ namespace BananaParty.WebSocketRelay
             if (prefab == null)
                 throw new InvalidOperationException($"No network prefab registered with name {prefabName}");
 
+            // Instantiate deactivated so Awake/OnEnable run after identity fields are assigned,
+            // otherwise components register themselves using an empty NetworkIdentifier.
+            bool prefabWasActive = prefab.gameObject.activeSelf;
+            prefab.gameObject.SetActive(false);
             NetworkIdentity networkIdentity = GameObject.Instantiate(prefab);
+            prefab.gameObject.SetActive(prefabWasActive);
+
             networkIdentity.NetworkIdentifier = networkIdentifier;
             networkIdentity.NetworkOwner = networkOwner;
             networkIdentity.Channel = channel;
+            networkIdentity.gameObject.SetActive(prefabWasActive);
 
             RegisterNetworkIdentity(networkIdentity);
 
@@ -249,7 +256,7 @@ namespace BananaParty.WebSocketRelay
             if (data[0] == NetworkMessage.Rpc)
                 ProcessIncomingRpcMessage(data);
             else
-                ApplyIncomingChannelState(channel, data);
+                ApplyIncomingChannelState(senderGuid, channel, data);
         }
 
         public void SendRpc(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel)
@@ -370,31 +377,37 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        private void ApplyIncomingChannelState(string channel, byte[] data)
+        private void ApplyIncomingChannelState(Guid senderGuid, string channel, byte[] data)
         {
             ReadOnlyMemory<byte> payload = StripMessageHeader(data);
 
             if (_useBinary)
             {
                 foreach (Guid networkIdentifier in BinaryStateInput.GetRootIdentityIds(payload))
-                    ApplyIncomingNetworkIdentity(channel, networkIdentifier, new BinaryStateInput(payload));
+                    ApplyIncomingNetworkIdentity(senderGuid, channel, networkIdentifier, new BinaryStateInput(payload));
             }
             else
             {
                 string json = Encoding.UTF8.GetString(payload.Span);
 
                 foreach (Guid networkIdentifier in JsonStateInput.GetRootIdentityIds(json))
-                    ApplyIncomingNetworkIdentity(channel, networkIdentifier, new JsonStateInput(json));
+                    ApplyIncomingNetworkIdentity(senderGuid, channel, networkIdentifier, new JsonStateInput(json));
             }
         }
 
-        private void ApplyIncomingNetworkIdentity(string channel, Guid networkIdentifier, IStateInput stateInput)
+        private void ApplyIncomingNetworkIdentity(Guid senderGuid, string channel, Guid networkIdentifier, IStateInput stateInput)
         {
             stateInput.BeginObjectElement();
             stateInput.BeginObjectProperty(networkIdentifier.ToString());
 
             if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
             {
+                // Ignore stale state from a client that is no longer the owner,
+                // e.g. right after a distance-based authority transfer.
+                // The state input is per-identity, so abandoning it mid-object is safe.
+                if (senderGuid != networkIdentity.NetworkOwner)
+                    return;
+
                 ReadNetworkIdentityState(networkIdentity, stateInput);
             }
             else

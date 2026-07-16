@@ -79,6 +79,7 @@ namespace BananaParty.WebSocketRelay
                 if (networkIdentity.NetworkIdentifier != networkIdentityToControl)
                     continue;
 
+                Debug.Log("TAKE CONTROLS BY " + requesterGuid);
                 networkIdentity.NetworkOwner = requesterGuid;
                 return;
             }
