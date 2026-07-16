@@ -83,6 +83,46 @@ namespace BananaParty.WebSocketRelay.Tests
             return output;
         }
 
+        public static byte[] CreateTakeAuthorityRpcParameters(Guid networkIdentityId, Guid requesterGuid, int claimVersion)
+        {
+            JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
+            output.WriteGuid("TakeAuthorityGuidKey", networkIdentityId);
+            output.WriteGuid("TakeAuthorityRequesterGuidKey", requesterGuid);
+            output.WriteInt("TakeAuthorityVersionKey", claimVersion);
+            return Encoding.UTF8.GetBytes(output.ToString());
+        }
+
+        public static byte[] CreateSyncIdentitiesMessage(
+            INetworkIdentity identity,
+            Guid networkOwner,
+            int networkOwnerVersion,
+            int componentValue = 0,
+            bool includeComponentState = false)
+        {
+            JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
+            output.BeginObjectElement();
+            output.BeginObjectProperty(identity.NetworkIdentifier.ToString());
+            output.WriteString(nameof(NetworkIdentity.PrefabName), identity.PrefabName);
+            output.WriteGuid(nameof(NetworkIdentity.NetworkOwner), networkOwner);
+            output.WriteInt(nameof(NetworkIdentity.NetworkOwnerVersion), networkOwnerVersion);
+            output.BeginArrayProperty("NetworkStates");
+            if (includeComponentState)
+            {
+                output.BeginObjectElement();
+                output.WriteInt("value", componentValue);
+                output.EndObject();
+            }
+            output.EndArray();
+            output.EndObject();
+            output.EndObject();
+
+            byte[] payload = Encoding.UTF8.GetBytes(output.ToString());
+            byte[] message = new byte[payload.Length + 1];
+            message[0] = NetworkMessage.SyncIdentities;
+            Buffer.BlockCopy(payload, 0, message, 1, payload.Length);
+            return message;
+        }
+
         public static NetworkIdentity CreatePlayerActor(
             NetworkContext context,
             Guid playerId,
@@ -131,18 +171,22 @@ namespace BananaParty.WebSocketRelay.Tests
 
     internal sealed class StubNetworkIdentity : INetworkIdentity
     {
+        private readonly IReadOnlyList<INetworkState> _networkStates;
+
         public StubNetworkIdentity(
             GameObject gameObject,
             string prefabName,
             Guid networkOwner,
             Guid networkIdentifier,
-            string channel = "test-channel")
+            string channel = "test-channel",
+            IReadOnlyList<INetworkState> networkStates = null)
         {
             GameObject = gameObject;
             PrefabName = prefabName;
             NetworkOwner = networkOwner;
             NetworkIdentifier = networkIdentifier;
             Channel = channel;
+            _networkStates = networkStates ?? Array.Empty<INetworkState>();
         }
 
         public string PrefabName { get; }
@@ -152,8 +196,8 @@ namespace BananaParty.WebSocketRelay.Tests
         public Guid NetworkOwner { get; set; }
         public int NetworkOwnerVersion { get; set; }
         public bool NetworkAuthority => false;
-        public IReadOnlyList<INetworkState> NetworkStates => Array.Empty<INetworkState>();
-        public bool DistanceBasedAuthority => false;
+        public IReadOnlyList<INetworkState> NetworkStates => _networkStates;
+        public bool DistanceBasedAuthority { get; set; }
 
         public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput) => throw new NotImplementedException();
     }
