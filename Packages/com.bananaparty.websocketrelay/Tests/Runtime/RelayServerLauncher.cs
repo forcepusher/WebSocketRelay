@@ -50,7 +50,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 if (_serverProcess != null && _serverProcess.IsRunning)
                     return await WaitForPortAsync(TestParameters.RelayServerPort, ServerStartupTimeoutMs).ConfigureAwait(false);
 
-                RelayServerProcess.KillAllRelayServers();
+                RelayServerProcess.KillAll();
 
                 try
                 {

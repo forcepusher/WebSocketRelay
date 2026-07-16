@@ -1,5 +1,4 @@
 using System;
-using UnityEditor;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
@@ -43,8 +42,8 @@ namespace BananaParty.WebSocketRelay
         {
             if (string.IsNullOrEmpty(_guid))
             {
-                _guid = System.Guid.NewGuid().ToString();
-                EditorUtility.SetDirty(this);
+                _guid = Guid.NewGuid().ToString();
+                UnityEditor.EditorUtility.SetDirty(this);
             }
         }
 #endif

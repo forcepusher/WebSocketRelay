@@ -86,7 +86,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: afcb542baf6bb5c4c85a47f7aeb6a989, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BananaParty.WebSocketRelay.Samples.Character
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.Character
   moveSpeed: 5
   rotationSpeed: 10
   jumpHeight: 2
@@ -101,7 +101,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e98a5b28bf195064987984e6cf16639d, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BananaParty.WebSocketRelay.Samples.KeyboardCharacterInput
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.KeyboardCharacterInput
 --- !u!23 &6102253713068797882
 MeshRenderer:
   m_ObjectHideFlags: 0

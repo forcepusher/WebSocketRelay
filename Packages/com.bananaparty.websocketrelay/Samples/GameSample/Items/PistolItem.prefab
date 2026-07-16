@@ -43,4 +43,4 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6bad2c31d9a1a3d40b3c7b42ffa9ae8a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BananaParty.WebSocketRelay.Samples.Item
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.Item

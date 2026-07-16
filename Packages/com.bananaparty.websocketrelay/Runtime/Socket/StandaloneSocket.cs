@@ -11,7 +11,7 @@ namespace BananaParty.WebSocketRelay
 {
     public class StandaloneSocket : ISocket
     {
-        private const int MaxPayloadChunkSize = 65536;
+        private const int ReceiveChunkSize = 65536;
 
         private readonly Uri _serverUri;
 
@@ -20,20 +20,33 @@ namespace BananaParty.WebSocketRelay
 
         private readonly Queue<byte[]> _payloadQueue = new();
 
-        public bool IsConnected => _clientWebSocket.State == WebSocketState.Open;
-
-        public bool HasUnreadPayloadQueue => _payloadQueue.Count > 0;
-
-        public byte[] ReadPayloadQueue() => _payloadQueue.Dequeue();
+        private Task _lastSend = Task.CompletedTask;
 
         public StandaloneSocket(string serverAddress)
         {
             _serverUri = new Uri(serverAddress);
         }
 
+        public bool IsConnected => _clientWebSocket.State == WebSocketState.Open;
+
+        public bool HasUnreadPayloadQueue => _payloadQueue.Count > 0;
+
+        public byte[] ReadPayloadQueue() => _payloadQueue.Dequeue();
+
         public void Connect()
         {
             ConnectAndReceiveLoopAsync();
+        }
+
+        public void Send(byte[] payloadBytes)
+        {
+            if (!IsConnected)
+                throw new InvalidOperationException($"Connection is not open. State = {_clientWebSocket.State}");
+
+            // Sends are chained because ClientWebSocket forbids concurrent SendAsync calls.
+            // The token is captured now because the token source is disposed on disconnect.
+            _lastSend = SendAsync(_lastSend, payloadBytes, _disconnectTokenSource.Token);
+            ObserveSend(_lastSend);
         }
 
         public void Disconnect()
@@ -47,113 +60,127 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        public void Send(byte[] payloadBytes)
+        public void Dispose()
         {
-            SendAsync(payloadBytes);
+            Disconnect();
         }
 
-        private async void SendAsync(byte[] payloadBytes)
+        private async Task SendAsync(Task previousSend, byte[] payloadBytes, CancellationToken cancellationToken)
         {
-            if (!IsConnected)
-                throw new InvalidOperationException($"Connection is not open. State = {_clientWebSocket.State}");
+            // A failed previous send is observed by its own ObserveSend call.
+            await previousSend.ContinueWith(_ => { });
+            await _clientWebSocket.SendAsync(
+                new ArraySegment<byte>(payloadBytes),
+                WebSocketMessageType.Binary,
+                endOfMessage: true,
+                cancellationToken);
+        }
 
-            int payloadBytesSent = 0;
-            while (payloadBytesSent < payloadBytes.Length)
+        /// <summary>
+        /// Surfaces send failures on the main thread like a fire-and-forget async void would.
+        /// Sends interrupted by a disconnect are expected and not reported.
+        /// </summary>
+        private async void ObserveSend(Task sendTask)
+        {
+            try
             {
-                var payloadBytesSegment = new ArraySegment<byte>(payloadBytes, payloadBytesSent, Math.Min(payloadBytes.Length - payloadBytesSent, MaxPayloadChunkSize));
-                bool isFinalChunk = payloadBytesSegment.Offset + payloadBytesSegment.Count >= payloadBytes.Length;
-                await _clientWebSocket.SendAsync(payloadBytesSegment, WebSocketMessageType.Binary, isFinalChunk, _disconnectTokenSource.Token);
-                payloadBytesSent += payloadBytesSegment.Count;
+                await sendTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
             }
         }
 
         private async void ConnectAndReceiveLoopAsync()
         {
+            try
+            {
+                if (await TryConnectAsync())
+                    await ReceiveUntilClosedAsync();
+            }
+            finally
+            {
+                _disconnectTokenSource.Dispose();
+                _clientWebSocket.Dispose();
+            }
+        }
+
+        private async Task<bool> TryConnectAsync()
+        {
             Task connectTask = _clientWebSocket.ConnectAsync(_serverUri, _disconnectTokenSource.Token);
 
-            // Workaround for "ObjectDisposedException: Cannot access a disposed object".
+            // Polled instead of awaited so a disconnect request during the handshake
+            // does not surface as "Cannot access a disposed object".
             while (!connectTask.IsCompleted)
             {
                 await Task.Yield();
 
                 if (_disconnectTokenSource.IsCancellationRequested)
-                    goto ConnectionAborted;
+                    return false;
             }
 
-            if (!connectTask.IsCompletedSuccessfully)
-                goto ConnectionAborted;
-
-            byte[] payloadBytesBuffer = new byte[MaxPayloadChunkSize];
-            WebSocketReceiveResult result;
-            do
-            {
-                var payloadWriter = new ArrayBufferWriter<byte>();
-                do
-                {
-                    Task<WebSocketReceiveResult> receiveTask = _clientWebSocket.ReceiveAsync(payloadBytesBuffer, _disconnectTokenSource.Token);
-                    // Workaround for bug where it awaits forever if server connection is gone.
-                    while (!receiveTask.IsCompleted)
-                    {
-                        await Task.Yield();
-
-                        // Workaround for "The WebSocket is in an invalid state ('Aborted') for this operation".
-                        if (_clientWebSocket.State == WebSocketState.Aborted)
-                            goto ConnectionAborted;
-                    }
-
-                    // Workaround for "Operation was cancelled".
-                    if (_disconnectTokenSource.IsCancellationRequested)
-                        goto DisconnectRequested;
-
-                    try
-                    {
-                        result = receiveTask.Result;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        goto DisconnectRequested;
-                    }
-                    catch (IOException)
-                    {
-                        goto ConnectionAborted;
-                    }
-                    catch (SocketException)
-                    {
-                        goto ConnectionAborted;
-                    }
-
-                    payloadWriter.Write(new ArraySegment<byte>(payloadBytesBuffer, 0, result.Count));
-                }
-                while (!result.EndOfMessage);
-
-                _payloadQueue.Enqueue(payloadWriter.WrittenSpan.ToArray());
-            }
-            while (result.MessageType != WebSocketMessageType.Close);
-
-        DisconnectRequested:
-            await _clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
-
-        ConnectionAborted:
-            try
-            {
-                _disconnectTokenSource.Dispose();
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-
-            try
-            {
-                _clientWebSocket.Dispose();
-            }
-            catch (ObjectDisposedException)
-            {
-            }
+            return connectTask.IsCompletedSuccessfully;
         }
 
-        public void Dispose()
+        private async Task ReceiveUntilClosedAsync()
         {
-            Disconnect();
+            byte[] chunkBuffer = new byte[ReceiveChunkSize];
+            var payloadWriter = new ArrayBufferWriter<byte>();
+
+            while (true)
+            {
+                Task<WebSocketReceiveResult> receiveTask = _clientWebSocket.ReceiveAsync(chunkBuffer, _disconnectTokenSource.Token);
+
+                // Polled instead of awaited because ReceiveAsync can hang forever when the server is gone.
+                while (!receiveTask.IsCompleted)
+                {
+                    await Task.Yield();
+
+                    if (_clientWebSocket.State == WebSocketState.Aborted)
+                        return;
+                }
+
+                if (_disconnectTokenSource.IsCancellationRequested)
+                    break;
+
+                WebSocketReceiveResult result;
+                try
+                {
+                    result = await receiveTask;
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (WebSocketException)
+                {
+                    return;
+                }
+                catch (IOException)
+                {
+                    return;
+                }
+                catch (SocketException)
+                {
+                    return;
+                }
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                    break;
+
+                payloadWriter.Write(new ArraySegment<byte>(chunkBuffer, 0, result.Count));
+
+                if (result.EndOfMessage)
+                {
+                    _payloadQueue.Enqueue(payloadWriter.WrittenSpan.ToArray());
+                    payloadWriter = new ArrayBufferWriter<byte>();
+                }
+            }
+
+            await _clientWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
         }
     }
 }

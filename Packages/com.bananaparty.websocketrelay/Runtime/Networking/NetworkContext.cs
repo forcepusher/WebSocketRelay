@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
     [CreateAssetMenu]
-    public class NetworkContext : ScriptableObject, INetworkContext
+    public class NetworkContext : ScriptableObject
     {
         [SerializeField]
         private float _playerTimeoutSeconds = 5f;
@@ -17,15 +16,27 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private List<NetworkIdentity> _networkPrefabs;
 
-        public Guid LocalClientIdentity { get; set; }
-
-        private readonly List<INetworkIdentity> _networkIdentities = new();
-        private readonly Dictionary<Guid, INetworkIdentity> _networkIdentitiesByGuid = new();
-
+        private readonly NetworkIdentityRegistry _identityRegistry = new();
+        private readonly NetworkPlayerRoster _playerRoster = new();
         private readonly List<IAuthorityOrigin> _authorityOrigins = new();
 
-        private readonly List<NetworkPlayer> _networkPlayers = new();
-        private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
+        private IStateFormat _stateFormat;
+        private RpcRouter _rpcRouter;
+
+        public bool UseBinary => _useBinary;
+
+        public Guid LocalClientIdentity { get; set; }
+
+        public IReadOnlyList<INetworkIdentity> NetworkIdentities => _identityRegistry.Identities;
+
+        public IReadOnlyList<NetworkPlayer> NetworkPlayers => _playerRoster.Players;
+
+        public IReadOnlyList<IAuthorityOrigin> AuthorityOrigins => _authorityOrigins;
+
+        // Created lazily because serialized fields are not assigned yet during field initialization.
+        private IStateFormat StateFormat => _stateFormat ??= _useBinary ? new BinaryStateFormat() : new JsonStateFormat();
+
+        private RpcRouter RpcRouter => _rpcRouter ??= new RpcRouter(StateFormat);
 
         public NetworkIdentity Instantiate(NetworkIdentity networkIdentityPrefab, string channel)
         {
@@ -38,181 +49,72 @@ namespace BananaParty.WebSocketRelay
             if (prefab == null)
                 throw new InvalidOperationException($"No network prefab registered with name {prefabName}");
 
+            // Instantiate deactivated so Awake/OnEnable run after identity fields are assigned,
+            // otherwise components register themselves using an empty NetworkIdentifier.
+            bool prefabWasActive = prefab.gameObject.activeSelf;
+            prefab.gameObject.SetActive(false);
             NetworkIdentity networkIdentity = GameObject.Instantiate(prefab);
+            prefab.gameObject.SetActive(prefabWasActive);
+
             networkIdentity.NetworkIdentifier = networkIdentifier;
             networkIdentity.NetworkOwner = networkOwner;
             networkIdentity.Channel = channel;
+            networkIdentity.gameObject.SetActive(prefabWasActive);
 
             RegisterNetworkIdentity(networkIdentity);
 
-            Debug.Log($"Spawned remote network identity '{prefabName}' ({networkIdentifier}) for player {networkOwner}");
+            Debug.Log($"Spawned network identity '{prefabName}' ({networkIdentifier}) owned by {networkOwner}");
 
             return networkIdentity;
         }
 
-        public AuthorityOrigin GetClosestAuthorityOrigin(Vector3 position)
-        {
-            AuthorityOrigin closestAuthorityOrigin = null;
-            float closestDistanceSquared = float.MaxValue;
+        public void RegisterNetworkIdentity(INetworkIdentity networkIdentity) => _identityRegistry.Register(networkIdentity);
 
-            foreach (IAuthorityOrigin authorityOrigin in _authorityOrigins)
-            {
-                float distanceSquared = (authorityOrigin.Position - position).sqrMagnitude;
-                if (distanceSquared >= closestDistanceSquared)
-                    continue;
+        public void UnregisterNetworkIdentity(INetworkIdentity networkIdentity) => _identityRegistry.Unregister(networkIdentity);
 
-                closestDistanceSquared = distanceSquared;
-                closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
-            }
+        public void RegisterRpcTarget(IRpcTarget rpcTarget) => RpcRouter.RegisterTarget(rpcTarget);
 
-            return closestAuthorityOrigin;
-        }
+        public void UnregisterRpcTarget(IRpcTarget rpcTarget) => RpcRouter.UnregisterTarget(rpcTarget);
 
-        public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
-        {
-            Debug.Log("Added " + networkIdentity.PrefabName + " to network context");
-            _networkIdentities.Add(networkIdentity);
-            _networkIdentitiesByGuid[networkIdentity.NetworkIdentifier] = networkIdentity;
-        }
+        public void RegisterAuthorityOrigin(IAuthorityOrigin authorityOrigin) => _authorityOrigins.Add(authorityOrigin);
 
-        public void UnregisterNetworkIdentity(INetworkIdentity networkIdentity)
-        {
-            _networkIdentities.Remove(networkIdentity);
-            _networkIdentitiesByGuid.Remove(networkIdentity.NetworkIdentifier);
-        }
-
-        public void RegisterAuthorityOrigin(IAuthorityOrigin authorityOrigin)
-        {
-            _authorityOrigins.Add(authorityOrigin);
-        }
-
-        public void UnregisterAuthorityOrigin(IAuthorityOrigin authorityOrigin)
-        {
-            _authorityOrigins.Remove(authorityOrigin);
-        }
+        public void UnregisterAuthorityOrigin(IAuthorityOrigin authorityOrigin) => _authorityOrigins.Remove(authorityOrigin);
 
         public void ClearNetworkSession()
         {
-            for (int identityIndex = _networkIdentities.Count - 1; identityIndex >= 0; identityIndex--)
+            for (int identityIndex = NetworkIdentities.Count - 1; identityIndex >= 0; identityIndex--)
             {
-                INetworkIdentity networkIdentity = _networkIdentities[identityIndex];
+                INetworkIdentity networkIdentity = NetworkIdentities[identityIndex];
                 UnregisterNetworkIdentity(networkIdentity);
 
                 if (networkIdentity.GameObject != null)
                     Destroy(networkIdentity.GameObject);
             }
 
-            _networkPlayers.Clear();
-            _networkPlayersByGuid.Clear();
+            _playerRoster.Clear();
+            RpcRouter.ClearOutgoingMessages();
             LocalClientIdentity = Guid.Empty;
-        }
-
-        private void AddNetworkPlayer(NetworkPlayer networkPlayer)
-        {
-            _networkPlayers.Add(networkPlayer);
-            _networkPlayersByGuid[networkPlayer.Guid] = networkPlayer;
-        }
-
-        private void RemoveNetworkPlayer(NetworkPlayer networkPlayer)
-        {
-            _networkPlayers.Remove(networkPlayer);
-            _networkPlayersByGuid.Remove(networkPlayer.Guid);
-        }
-
-        public void ReadNetworkStates(IStateInput stateInput)
-        {
-            stateInput.BeginObjectElement();
-            foreach (INetworkIdentity networkIdentity in _networkIdentities)
-            {
-                stateInput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
-                ReadNetworkIdentityState(networkIdentity, stateInput);
-                stateInput.EndObject();
-            }
-            stateInput.EndObject();
-        }
-
-        public void WriteNetworkStates(IStateOutput stateOutput)
-        {
-            stateOutput.BeginObjectElement();
-            foreach (INetworkIdentity networkIdentity in _networkIdentities)
-            {
-                stateOutput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
-                WriteNetworkIdentityState(networkIdentity, stateOutput);
-                stateOutput.EndObject();
-            }
-            stateOutput.EndObject();
-        }
-
-        private static void ReadNetworkIdentityState(INetworkIdentity networkIdentity, IStateInput stateInput)
-        {
-            string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
-            if (prefabName != networkIdentity.PrefabName)
-                throw new InvalidOperationException($"Prefab name mismatch. Expected: {networkIdentity.PrefabName}, Received: {prefabName}");
-
-            networkIdentity.NetworkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
-            ReadNetworkIdentityComponents(networkIdentity, stateInput);
-        }
-
-        private static void ReadNetworkIdentityComponents(INetworkIdentity networkIdentity, IStateInput stateInput)
-        {
-            stateInput.BeginArrayProperty("NetworkStates");
-            foreach (INetworkState networkState in networkIdentity.NetworkStates)
-            {
-                stateInput.BeginObjectElement();
-                networkState.ReadNetworkState(stateInput);
-                stateInput.EndObject();
-            }
-            stateInput.EndArray();
-        }
-
-        private static void WriteNetworkIdentityState(INetworkIdentity networkIdentity, IStateOutput stateOutput)
-        {
-            stateOutput.WriteString(nameof(NetworkIdentity.PrefabName), networkIdentity.PrefabName);
-            stateOutput.WriteGuid(nameof(NetworkIdentity.NetworkOwner), networkIdentity.NetworkOwner);
-            WriteNetworkIdentityComponents(networkIdentity, stateOutput);
-        }
-
-        private static void WriteNetworkIdentityComponents(INetworkIdentity networkIdentity, IStateOutput stateOutput)
-        {
-            stateOutput.BeginArrayProperty("NetworkStates");
-            foreach (INetworkState networkState in networkIdentity.NetworkStates)
-            {
-                stateOutput.BeginObjectElement();
-                networkState.WriteNetworkState(stateOutput);
-                stateOutput.EndObject();
-            }
-            stateOutput.EndArray();
         }
 
         public void ManualUpdate(float unscaledDeltaTime)
         {
-            TickPlayers(unscaledDeltaTime);
+            foreach (Guid playerGuid in _playerRoster.RemoveTimedOut(unscaledDeltaTime, _playerTimeoutSeconds))
+            {
+                DestroyIdentitiesOwnedBy(playerGuid);
+                Debug.Log($"Removed timed out player {playerGuid}");
+            }
         }
 
-        private void TickPlayers(float unscaledDeltaTime)
+        private void DestroyIdentitiesOwnedBy(Guid networkOwner)
         {
-            for (int networkPlayerIndex = _networkPlayers.Count - 1; networkPlayerIndex >= 0; networkPlayerIndex -= 1)
+            for (int identityIndex = NetworkIdentities.Count - 1; identityIndex >= 0; identityIndex--)
             {
-                NetworkPlayer networkPlayer = _networkPlayers[networkPlayerIndex];
-                networkPlayer.TimeSinceLastMessage += unscaledDeltaTime;
-
-                if (networkPlayer.TimeSinceLastMessage < _playerTimeoutSeconds)
+                INetworkIdentity networkIdentity = NetworkIdentities[identityIndex];
+                if (networkIdentity.NetworkOwner != networkOwner)
                     continue;
 
-                Guid playerGuid = networkPlayer.Guid;
-
-                for (int identityIndex = _networkIdentities.Count - 1; identityIndex >= 0; identityIndex -= 1)
-                {
-                    INetworkIdentity networkIdentity = _networkIdentities[identityIndex];
-                    if (networkIdentity.NetworkOwner != playerGuid)
-                        continue;
-
-                    UnregisterNetworkIdentity(networkIdentity);
-                    Destroy(networkIdentity.GameObject);
-                }
-
-                RemoveNetworkPlayer(networkPlayer);
-                Debug.Log($"Removed timed out player {playerGuid}");
+                UnregisterNetworkIdentity(networkIdentity);
+                Destroy(networkIdentity.GameObject);
             }
         }
 
@@ -221,105 +123,84 @@ namespace BananaParty.WebSocketRelay
             if (senderGuid == LocalClientIdentity)
                 return;
 
-            if (_networkPlayersByGuid.TryGetValue(senderGuid, out NetworkPlayer networkPlayer))
-                networkPlayer.TimeSinceLastMessage = 0f;
-            else
-                AddNetworkPlayer(new NetworkPlayer(senderGuid));
-
             if (data == null || data.Length == 0)
                 throw new InvalidOperationException("Channel message data is null or empty");
 
-            ApplyIncomingChannelState(channel, data);
+            _playerRoster.RecordMessage(senderGuid);
+
+            switch (data[0])
+            {
+                case NetworkMessage.Rpc:
+                    RpcRouter.ProcessIncomingMessage(data);
+                    break;
+                case NetworkMessage.SyncIdentities:
+                    ApplyIncomingChannelState(senderGuid, channel, data.AsMemory(1));
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown network message type {data[0]}");
+            }
+        }
+
+        public void SendRpc(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel)
+        {
+            RpcRouter.Send(networkIdentifier, rpcSubjectName, parametersStateOutput, channel);
+        }
+
+        public bool TryDequeueOutgoingRpcMessage(out string channel, out byte[] message)
+        {
+            return RpcRouter.TryDequeueOutgoingMessage(out channel, out message);
+        }
+
+        public byte[] GetOwnedNetworkIdentitiesPayload(string channel)
+        {
+            IStateOutput stateOutput = StateFormat.CreateOutput();
+            WriteOwnedNetworkStates(stateOutput, channel);
+            return StateFormat.ToPayload(stateOutput);
         }
 
         private void WriteOwnedNetworkStates(IStateOutput stateOutput, string channel)
         {
             stateOutput.BeginObjectElement();
-            foreach (INetworkIdentity networkIdentity in _networkIdentities)
+            foreach (INetworkIdentity networkIdentity in NetworkIdentities)
             {
-                //if (networkIdentity.DistanceBasedAuthority)
-                //    Debug.Log("1");
-
-                if (!networkIdentity.NetworkAuthority)
+                if (!networkIdentity.NetworkAuthority || networkIdentity.Channel != channel)
                     continue;
-
-                //if (networkIdentity.DistanceBasedAuthority)
-                //    Debug.Log("2");
-
-                if (networkIdentity.Channel != channel)
-                    continue;
-
-                //if (networkIdentity.DistanceBasedAuthority)
-                //    Debug.Log("3");
 
                 stateOutput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
-                WriteNetworkIdentityState(networkIdentity, stateOutput);
+                networkIdentity.WriteNetworkState(stateOutput);
                 stateOutput.EndObject();
             }
             stateOutput.EndObject();
         }
 
-        public byte[] GetOwnedNetworkIdentitiesPayload(string channel)
+        private void ApplyIncomingChannelState(Guid senderGuid, string channel, ReadOnlyMemory<byte> payload)
         {
-            if (_useBinary)
-            {
-                using BinaryStateOutput stateOutput = new();
-                WriteOwnedNetworkStates(stateOutput, channel);
-                return stateOutput.GetBuffer().ToArray();
-            }
-            else
-            {
-                JsonStateOutput jsonStateOutput = new(prettyPrint: false, bracesOnNewLine: false);
-                WriteOwnedNetworkStates(jsonStateOutput, channel);
-                return Encoding.UTF8.GetBytes(jsonStateOutput.ToString());
-            }
+            foreach (Guid networkIdentifier in StateFormat.GetRootIdentityIds(payload))
+                ApplyIncomingNetworkIdentity(senderGuid, channel, networkIdentifier, StateFormat.CreateInput(payload));
         }
 
-        private void ApplyIncomingChannelState(string channel, byte[] data)
-        {
-            ReadOnlyMemory<byte> payload = StripMessageHeader(data);
-
-            if (_useBinary)
-            {
-                foreach (Guid networkIdentifier in BinaryStateInput.GetRootIdentityIds(payload))
-                    ApplyIncomingNetworkIdentity(channel, networkIdentifier, new BinaryStateInput(payload));
-            }
-            else
-            {
-                string json = Encoding.UTF8.GetString(payload.Span);
-
-                foreach (Guid networkIdentifier in JsonStateInput.GetRootIdentityIds(json))
-                    ApplyIncomingNetworkIdentity(channel, networkIdentifier, new JsonStateInput(json));
-            }
-        }
-
-        private void ApplyIncomingNetworkIdentity(string channel, Guid networkIdentifier, IStateInput stateInput)
+        private void ApplyIncomingNetworkIdentity(Guid senderGuid, string channel, Guid networkIdentifier, IStateInput stateInput)
         {
             stateInput.BeginObjectElement();
             stateInput.BeginObjectProperty(networkIdentifier.ToString());
 
-            if (_networkIdentitiesByGuid.TryGetValue(networkIdentifier, out INetworkIdentity networkIdentity))
+            if (_identityRegistry.TryGet(networkIdentifier, out INetworkIdentity networkIdentity))
             {
-                ReadNetworkIdentityState(networkIdentity, stateInput);
+                if (!networkIdentity.ReadNetworkState(stateInput, senderGuid))
+                    return;
             }
             else
             {
+                // The prefab name and owner are consumed here because the identity
+                // cannot read its own state before the prefab to spawn is known.
                 string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
                 Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
 
                 NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkOwner);
-                ReadNetworkIdentityComponents(spawnedNetworkIdentity, stateInput);
+                spawnedNetworkIdentity.ReadComponentStates(stateInput);
             }
 
             stateInput.EndObject();
-        }
-
-        private static ReadOnlyMemory<byte> StripMessageHeader(byte[] data)
-        {
-            if (data[0] == NetworkMessage.SyncIdentities)
-                return data.AsMemory(1);
-
-            return data.AsMemory();
         }
     }
 }

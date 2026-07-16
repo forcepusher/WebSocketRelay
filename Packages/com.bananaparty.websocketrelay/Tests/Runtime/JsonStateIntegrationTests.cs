@@ -104,7 +104,6 @@ namespace BananaParty.WebSocketRelay.Tests
             public Guid NetworkOwner { get; set; } = Guid.NewGuid();
             public bool NetworkAuthority { get; set; }
             public bool DistanceBasedAuthority { get; set; } = false;
-            public IReadOnlyList<INetworkState> NetworkStates => Array.Empty<INetworkState>();
             public int PlayTime { get; set; }
             public float Health { get; set; }
             public Vector3 Position { get; set; }
@@ -122,6 +121,14 @@ namespace BananaParty.WebSocketRelay.Tests
                 Health = stateInput.ReadFloat(nameof(Health));
                 Position = stateInput.ReadVector3(nameof(Position));
             }
+
+            public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
+            {
+                ReadNetworkState(stateInput);
+                return true;
+            }
+
+            public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput) => throw new NotImplementedException();
         }
     }
 }

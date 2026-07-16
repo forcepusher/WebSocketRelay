@@ -3,49 +3,41 @@
 namespace BananaParty.WebSocketRelay
 {
     /// <summary>
-    /// Universal default implementation of <see cref="ISocket"/>.
+    /// Universal default implementation of <see cref="ISocket"/> that picks
+    /// the platform-specific implementation on <see cref="Connect"/>.
     /// </summary>
-    /// <remarks>
-    /// Internally is an <see cref="ISocket"/> Proxy for <see cref="StandaloneSocket"/> and <see cref="BrowserSocket"/>.
-    /// </remarks>
-    public class Socket : IDisposable
+    public class Socket : ISocket
     {
         private readonly string _serverAddress;
 
-        private ISocket _webSocketClient;
+        private ISocket _platformSocket;
 
         public Socket(string serverAddress)
         {
             _serverAddress = serverAddress;
         }
 
-        public bool IsConnected => _webSocketClient != null && _webSocketClient.IsConnected;
+        public bool IsConnected => _platformSocket != null && _platformSocket.IsConnected;
 
-        public bool HasUnreadPayloadQueue => _webSocketClient?.HasUnreadPayloadQueue ?? false;
+        public bool HasUnreadPayloadQueue => _platformSocket != null && _platformSocket.HasUnreadPayloadQueue;
 
         public byte[] ReadPayloadQueue()
         {
-            if (_webSocketClient == null)
+            if (_platformSocket == null)
                 throw new InvalidOperationException($"Trying to use {nameof(ReadPayloadQueue)} before calling {nameof(Connect)}.");
 
-            if (!IsConnected)
-                throw new InvalidOperationException($"Trying to use {nameof(ReadPayloadQueue)} while not {nameof(IsConnected)}.");
-
-            return _webSocketClient.ReadPayloadQueue();
+            return _platformSocket.ReadPayloadQueue();
         }
 
-        /// <remarks>
-        /// This is not a Factory Method anti-pattern, since it doesn't return anything.
-        /// </remarks>
         public void Connect()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            _webSocketClient = new BrowserSocket(_serverAddress);
+            _platformSocket = new BrowserSocket(_serverAddress);
 #else
-            _webSocketClient = new StandaloneSocket(_serverAddress);
+            _platformSocket = new StandaloneSocket(_serverAddress);
 #endif
 
-            _webSocketClient.Connect();
+            _platformSocket.Connect();
         }
 
         public void Send(byte[] payloadBytes)
@@ -53,26 +45,20 @@ namespace BananaParty.WebSocketRelay
             if (!IsConnected)
                 throw new InvalidOperationException($"Trying to use {nameof(Send)} while not {nameof(IsConnected)}.");
 
-            _webSocketClient.Send(payloadBytes);
+            _platformSocket.Send(payloadBytes);
         }
 
         public void Disconnect()
         {
-            if (_webSocketClient == null)
+            if (_platformSocket == null)
                 throw new InvalidOperationException($"Trying to use {nameof(Disconnect)} before calling {nameof(Connect)}.");
 
-            _webSocketClient.Disconnect();
+            _platformSocket.Disconnect();
         }
 
         public void Dispose()
         {
-            if (_webSocketClient != null)
-            {
-                if (_webSocketClient.IsConnected)
-                    _webSocketClient.Disconnect();
-
-                _webSocketClient.Dispose();
-            }
+            _platformSocket?.Dispose();
         }
     }
 }

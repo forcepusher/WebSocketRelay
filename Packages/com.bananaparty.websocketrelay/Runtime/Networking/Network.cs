@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
 
@@ -13,9 +12,8 @@ namespace BananaParty.WebSocketRelay
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
 
-        public bool IsConnected => _relayClient?.IsConnected ?? false;
+        public bool IsConnected => _relayClient != null && _relayClient.IsConnected;
         public bool HasRelayClient => _relayClient != null;
-        public HashSet<string> SubscribedChannels => _relayClient?.SubscribedChannels;
 
         public Network(string address, NetworkContext context)
         {
@@ -60,30 +58,28 @@ namespace BananaParty.WebSocketRelay
                 throw new InvalidOperationException("Not connected to disconnect");
 
             _networkContext.ClearNetworkSession();
-            DisposeRelayClient();
+            _relayClient.Dispose();
+            _relayClient = null;
         }
 
         public void ManualUpdate(float unscaledDeltaTime)
         {
             _relayClient?.ProcessIncomingMessages();
             _networkContext.ManualUpdate(unscaledDeltaTime);
-
-            //var jsonStateOutput = new JsonStateOutput();
-            //_networkContext.WriteNetworkStates(jsonStateOutput);
-            //Debug.Log(jsonStateOutput.ToString());
+            SendQueuedRpcMessages();
         }
 
         public void SendSyncIdentities()
         {
-            if (_relayClient == null)
+            if (!IsConnected)
                 return;
 
-            foreach (string channel in SubscribedChannels)
+            foreach (string channel in _relayClient.SubscribedChannels)
             {
                 byte[] payload = _networkContext.GetOwnedNetworkIdentitiesPayload(channel);
                 byte[] message = new byte[payload.Length + 1];
                 message[0] = NetworkMessage.SyncIdentities;
-                Buffer.BlockCopy(payload, 0, message, 1, payload.Length);
+                payload.CopyTo(message, 1);
                 _relayClient.Send(channel, message);
             }
         }
@@ -109,34 +105,26 @@ namespace BananaParty.WebSocketRelay
             _relayServerProcess?.Stop();
 
             if (_relayClient != null)
-            {
-                _networkContext.ClearNetworkSession();
-                DisposeRelayClient();
-            }
-        }
-
-        public void OnConnectedToRelay()
-        {
+                Disconnect();
         }
 
         public void OnDisconnectedFromRelay()
         {
-            _networkContext.ClearNetworkSession();
-            DisposeRelayClient();
-        }
-
-        private void DisposeRelayClient()
-        {
-            if (_relayClient == null)
-                return;
-
-            _relayClient.Dispose();
-            _relayClient = null;
+            Disconnect();
         }
 
         public void OnChannelMessage(Guid senderGuid, string channel, byte[] data)
         {
             _networkContext.ProcessChannelMessage(senderGuid, channel, data);
+        }
+
+        private void SendQueuedRpcMessages()
+        {
+            if (!IsConnected)
+                return;
+
+            while (_networkContext.TryDequeueOutgoingRpcMessage(out string channel, out byte[] message))
+                _relayClient.Send(channel, message);
         }
     }
 }

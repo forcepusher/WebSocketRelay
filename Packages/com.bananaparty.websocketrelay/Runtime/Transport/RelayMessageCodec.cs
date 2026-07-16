@@ -48,8 +48,6 @@ namespace BananaParty.WebSocketRelay.Transport
             return BinaryPrimitives.ReadUInt16LittleEndian(message.Slice(channelLengthOffset, 2));
         }
 
-        public static int GetPayloadOffset(int channelLength) => ChannelOffset + channelLength;
-
         public static int GetChannelMessagePayloadOffset(int channelLength) => ChannelMessageChannelOffset + channelLength;
 
         public static string ReadChannel(ReadOnlySpan<byte> message, int channelLengthOffset = ChannelLengthOffset)
@@ -67,29 +65,24 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public static Guid ReadGuid(ReadOnlySpan<byte> message, int offset = 1)
         {
-            ReadOnlySpan<byte> bytes = message.Slice(offset, GuidSize);
-            int a = BinaryPrimitives.ReadInt32BigEndian(bytes);
-            short b = BinaryPrimitives.ReadInt16BigEndian(bytes.Slice(4));
-            short c = BinaryPrimitives.ReadInt16BigEndian(bytes.Slice(6));
-            return new Guid(a, b, c, bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]);
+            Span<byte> bytes = stackalloc byte[GuidSize];
+            message.Slice(offset, GuidSize).CopyTo(bytes);
+            SwapGuidEndianness(bytes);
+            return new Guid(bytes);
         }
 
         public static void WriteGuid(Span<byte> destination, Guid guid)
         {
-            ReadOnlySpan<char> hex = guid.ToString("N");
-
-            for (int i = 0; i < GuidSize; i++)
-            {
-                destination[i] = (byte)((FromHex(hex[i * 2]) << 4) | FromHex(hex[i * 2 + 1]));
-            }
+            guid.TryWriteBytes(destination);
+            SwapGuidEndianness(destination);
         }
 
-        private static int FromHex(char c)
+        // The wire format is big-endian, while Guid stores its first three fields little-endian.
+        private static void SwapGuidEndianness(Span<byte> bytes)
         {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-            throw new ArgumentException($"Invalid hex character: {c}");
+            bytes.Slice(0, 4).Reverse();
+            bytes.Slice(4, 2).Reverse();
+            bytes.Slice(6, 2).Reverse();
         }
     }
 }

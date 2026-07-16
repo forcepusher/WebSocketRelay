@@ -26,8 +26,6 @@ namespace BananaParty.WebSocketRelay.Transport
                 "Runtime",
                 "RelayServer~"));
 
-        public static void KillAllRelayServers() => KillAll();
-
         public void Start(bool verboseDebug = false, bool createNoWindow = false, int? relayPort = null)
         {
             if (IsRunning)
@@ -89,7 +87,7 @@ namespace BananaParty.WebSocketRelay.Transport
             process.WaitForExit(5000);
         }
 
-        private static void KillAll()
+        public static void KillAll()
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 KillAllWindows();
