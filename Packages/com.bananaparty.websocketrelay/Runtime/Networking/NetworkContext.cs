@@ -142,30 +142,6 @@ namespace BananaParty.WebSocketRelay
             _networkPlayersByGuid.Remove(networkPlayer.Guid);
         }
 
-        public void ReadNetworkStates(IStateInput stateInput)
-        {
-            stateInput.BeginObjectElement();
-            foreach (INetworkIdentity networkIdentity in _networkIdentities)
-            {
-                stateInput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
-                networkIdentity.ReadNetworkState(stateInput);
-                stateInput.EndObject();
-            }
-            stateInput.EndObject();
-        }
-
-        public void WriteNetworkStates(IStateOutput stateOutput)
-        {
-            stateOutput.BeginObjectElement();
-            foreach (INetworkIdentity networkIdentity in _networkIdentities)
-            {
-                stateOutput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
-                networkIdentity.WriteNetworkState(stateOutput);
-                stateOutput.EndObject();
-            }
-            stateOutput.EndObject();
-        }
-
         public void ManualUpdate(float unscaledDeltaTime)
         {
             for (int networkPlayerIndex = _networkPlayers.Count - 1; networkPlayerIndex >= 0; networkPlayerIndex -= 1)
