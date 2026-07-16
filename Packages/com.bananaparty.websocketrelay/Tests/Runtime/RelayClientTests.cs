@@ -25,7 +25,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
         [UnityTest] public IEnumerator ClientHasGuidOnCreation() => TestClientHasGuidOnCreation();
         [UnityTest] public IEnumerator ClientUsesProvidedGuid() => TestClientUsesProvidedGuid();
-        [UnityTest] public IEnumerator Connect_NoServerHandshakeMessages() => TestConnectNoServerHandshakeMessages();
+        [UnityTest] public IEnumerator Connect_NoServerHandshakeChannelMessages() => TestConnectNoServerHandshakeChannelMessages();
         [UnityTest] public IEnumerator Subscribe_NoServerConfirmation() => TestSubscribeNoServerConfirmation();
         [UnityTest] public IEnumerator ChannelMessageIncludesSenderGuid() => TestChannelMessageIncludesSenderGuid();
         [UnityTest] public IEnumerator TwoClients_MessageRelay() => TestChannelMessage("relay-100", 2);
@@ -65,13 +65,11 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
         }
 
-        private IEnumerator TestConnectNoServerHandshakeMessages()
+        private IEnumerator TestConnectNoServerHandshakeChannelMessages()
         {
-            bool connectedCallback = false;
             bool channelMessageReceived = false;
 
             _listenerA = new TestRelayListener();
-            _listenerA.Connected += () => connectedCallback = true;
             _listenerA.ChannelMessageReceived += (_, _, _) => channelMessageReceived = true;
 
             _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
@@ -81,7 +79,6 @@ namespace BananaParty.WebSocketRelay.Tests
 
             yield return TestParameters.WaitForDuration(0.25f, () => _relayA.ProcessIncomingMessages());
 
-            Assert.IsFalse(connectedCallback);
             Assert.IsFalse(channelMessageReceived);
 
             Cleanup();

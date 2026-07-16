@@ -5,12 +5,8 @@ namespace BananaParty.WebSocketRelay.Tests
 {
     public class TestRelayListener : IRelayListener
     {
-        public event Action Connected;
         public event Action Disconnected;
         public event Action<Guid, string, byte[]> ChannelMessageReceived;
-
-        public void OnConnectedToRelay()
-            => Connected?.Invoke();
 
         public void OnDisconnectedFromRelay()
             => Disconnected?.Invoke();

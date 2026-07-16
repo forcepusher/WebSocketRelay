@@ -6,22 +6,21 @@ namespace BananaParty.WebSocketRelay
     [CreateAssetMenu]
     public class NetworkChannel : ScriptableObject
     {
-        public List<NetworkBinding> _channelBindings;
+        // Runtime-only. Scene bindings must not be serialized into the asset.
+        private readonly List<NetworkBinding> _channelBindings = new();
 
-        public void AddBinding(NetworkBinding channel)
+        public void AddBinding(NetworkBinding binding)
         {
-            _channelBindings.Add(channel);
+            _channelBindings.Add(binding);
         }
 
-        public void RemoveBinding(NetworkBinding channel)
+        public void RemoveBinding(NetworkBinding binding)
         {
-            _channelBindings.Remove(channel);
+            _channelBindings.Remove(binding);
         }
 
         public void SetChannel(string channel)
         {
-            Debug.Log("SET BINDING TO " + channel);
-
             foreach (NetworkBinding binding in _channelBindings)
                 binding.SetBinding(channel);
         }

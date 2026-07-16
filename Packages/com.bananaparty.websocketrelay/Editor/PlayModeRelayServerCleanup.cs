@@ -14,7 +14,7 @@ namespace BananaParty.WebSocketRelay.Editor
         private static void OnPlayModeStateChanged(PlayModeStateChange state)
         {
             if (state == PlayModeStateChange.ExitingPlayMode)
-                RelayServerProcess.KillAllRelayServers();
+                RelayServerProcess.KillAll();
         }
     }
 }

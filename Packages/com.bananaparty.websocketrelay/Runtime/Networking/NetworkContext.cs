@@ -6,7 +6,7 @@ using UnityEngine;
 namespace BananaParty.WebSocketRelay
 {
     [CreateAssetMenu]
-    public class NetworkContext : ScriptableObject, INetworkContext
+    public class NetworkContext : ScriptableObject
     {
         [SerializeField]
         private float _playerTimeoutSeconds = 5f;
@@ -62,14 +62,13 @@ namespace BananaParty.WebSocketRelay
 
             RegisterNetworkIdentity(networkIdentity);
 
-            Debug.Log($"Spawned remote network identity '{prefabName}' ({networkIdentifier}) for player {networkOwner}");
+            Debug.Log($"Spawned network identity '{prefabName}' ({networkIdentifier}) owned by {networkOwner}");
 
             return networkIdentity;
         }
 
         public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
         {
-            Debug.Log("Added " + networkIdentity.PrefabName + " to network context");
             _networkIdentities.Add(networkIdentity);
             _networkIdentitiesByGuid[networkIdentity.NetworkIdentifier] = networkIdentity;
         }
@@ -169,11 +168,6 @@ namespace BananaParty.WebSocketRelay
 
         public void ManualUpdate(float unscaledDeltaTime)
         {
-            TickPlayers(unscaledDeltaTime);
-        }
-
-        private void TickPlayers(float unscaledDeltaTime)
-        {
             for (int networkPlayerIndex = _networkPlayers.Count - 1; networkPlayerIndex >= 0; networkPlayerIndex -= 1)
             {
                 NetworkPlayer networkPlayer = _networkPlayers[networkPlayerIndex];
@@ -204,18 +198,25 @@ namespace BananaParty.WebSocketRelay
             if (senderGuid == LocalClientIdentity)
                 return;
 
+            if (data == null || data.Length == 0)
+                throw new InvalidOperationException("Channel message data is null or empty");
+
             if (_networkPlayersByGuid.TryGetValue(senderGuid, out NetworkPlayer networkPlayer))
                 networkPlayer.TimeSinceLastMessage = 0f;
             else
                 AddNetworkPlayer(new NetworkPlayer(senderGuid));
 
-            if (data == null || data.Length == 0)
-                throw new InvalidOperationException("Channel message data is null or empty");
-
-            if (data[0] == NetworkMessage.Rpc)
-                ProcessIncomingRpcMessage(data);
-            else
-                ApplyIncomingChannelState(senderGuid, channel, data);
+            switch (data[0])
+            {
+                case NetworkMessage.Rpc:
+                    ProcessIncomingRpcMessage(data);
+                    break;
+                case NetworkMessage.SyncIdentities:
+                    ApplyIncomingChannelState(senderGuid, channel, data.AsMemory(1));
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown network message type {data[0]}");
+            }
         }
 
         public void SendRpc(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel)
@@ -246,27 +247,31 @@ namespace BananaParty.WebSocketRelay
             return Encoding.UTF8.GetBytes(parametersStateOutput.ToString());
         }
 
+        // Rpc message layout: [type:1][subjectNameLength:2][subjectName][networkIdentifier:16][parameters].
+        private const int RpcSubjectNameOffset = 3;
+        private const int RpcHeaderSize = RpcSubjectNameOffset + 16;
+
         private static byte[] CreateRpcMessage(Guid networkIdentifier, string rpcSubjectName, byte[] parametersPayload)
         {
             byte[] subjectNameBytes = Encoding.UTF8.GetBytes(rpcSubjectName);
-            byte[] message = new byte[19 + subjectNameBytes.Length + parametersPayload.Length];
+            byte[] message = new byte[RpcHeaderSize + subjectNameBytes.Length + parametersPayload.Length];
             message[0] = NetworkMessage.Rpc;
             message[1] = (byte)subjectNameBytes.Length;
             message[2] = (byte)(subjectNameBytes.Length >> 8);
-            Buffer.BlockCopy(subjectNameBytes, 0, message, 3, subjectNameBytes.Length);
-            Buffer.BlockCopy(networkIdentifier.ToByteArray(), 0, message, 3 + subjectNameBytes.Length, 16);
-            Buffer.BlockCopy(parametersPayload, 0, message, 19 + subjectNameBytes.Length, parametersPayload.Length);
+            Buffer.BlockCopy(subjectNameBytes, 0, message, RpcSubjectNameOffset, subjectNameBytes.Length);
+            Buffer.BlockCopy(networkIdentifier.ToByteArray(), 0, message, RpcSubjectNameOffset + subjectNameBytes.Length, 16);
+            Buffer.BlockCopy(parametersPayload, 0, message, RpcHeaderSize + subjectNameBytes.Length, parametersPayload.Length);
             return message;
         }
 
         private void ProcessIncomingRpcMessage(byte[] data)
         {
             int subjectNameLength = data[1] | (data[2] << 8);
-            string rpcSubjectName = Encoding.UTF8.GetString(data, 3, subjectNameLength);
-            Guid networkIdentifier = new Guid(data.AsSpan(3 + subjectNameLength, 16));
+            string rpcSubjectName = Encoding.UTF8.GetString(data, RpcSubjectNameOffset, subjectNameLength);
+            Guid networkIdentifier = new Guid(data.AsSpan(RpcSubjectNameOffset + subjectNameLength, 16));
 
-            byte[] parametersPayload = new byte[data.Length - 19 - subjectNameLength];
-            Buffer.BlockCopy(data, 19 + subjectNameLength, parametersPayload, 0, parametersPayload.Length);
+            byte[] parametersPayload = new byte[data.Length - RpcHeaderSize - subjectNameLength];
+            Buffer.BlockCopy(data, RpcHeaderSize + subjectNameLength, parametersPayload, 0, parametersPayload.Length);
 
             DispatchRpc(networkIdentifier, rpcSubjectName, parametersPayload);
         }
@@ -298,20 +303,8 @@ namespace BananaParty.WebSocketRelay
             stateOutput.BeginObjectElement();
             foreach (INetworkIdentity networkIdentity in _networkIdentities)
             {
-                //if (networkIdentity.DistanceBasedAuthority)
-                //    Debug.Log("1");
-
-                if (!networkIdentity.NetworkAuthority)
+                if (!networkIdentity.NetworkAuthority || networkIdentity.Channel != channel)
                     continue;
-
-                //if (networkIdentity.DistanceBasedAuthority)
-                //    Debug.Log("2");
-
-                if (networkIdentity.Channel != channel)
-                    continue;
-
-                //if (networkIdentity.DistanceBasedAuthority)
-                //    Debug.Log("3");
 
                 stateOutput.BeginObjectProperty(networkIdentity.NetworkIdentifier.ToString());
                 networkIdentity.WriteNetworkState(stateOutput);
@@ -336,10 +329,8 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        private void ApplyIncomingChannelState(Guid senderGuid, string channel, byte[] data)
+        private void ApplyIncomingChannelState(Guid senderGuid, string channel, ReadOnlyMemory<byte> payload)
         {
-            ReadOnlyMemory<byte> payload = StripMessageHeader(data);
-
             if (_useBinary)
             {
                 foreach (Guid networkIdentifier in BinaryStateInput.GetRootIdentityIds(payload))
@@ -376,14 +367,6 @@ namespace BananaParty.WebSocketRelay
             }
 
             stateInput.EndObject();
-        }
-
-        private static ReadOnlyMemory<byte> StripMessageHeader(byte[] data)
-        {
-            if (data[0] == NetworkMessage.SyncIdentities)
-                return data.AsMemory(1);
-
-            return data.AsMemory();
         }
     }
 }

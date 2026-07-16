@@ -6,26 +6,16 @@ namespace BananaParty.WebSocketRelay.Transport
 {
     public class RelayClient : IDisposable
     {
-        private enum ConnectionState
-        {
-            Idle,
-            Connected,
-            Disconnected
-        }
-
         private readonly Socket _socket;
-        private readonly HashSet<string> _subscribedChannels = new();
+        private readonly IRelayListener _relayListener;
 
-        public bool IsConnected => _connectionState == ConnectionState.Connected;
-
-        public bool HasUnreadPayloadQueue => _socket.HasUnreadPayloadQueue;
+        private bool _wasConnected;
 
         public Guid ClientGuid { get; }
 
-        public HashSet<string> SubscribedChannels => _subscribedChannels;
+        public HashSet<string> SubscribedChannels { get; } = new();
 
-        private IRelayListener _relayListener;
-        private ConnectionState _connectionState = ConnectionState.Idle;
+        public bool IsConnected => _socket.IsConnected;
 
         public RelayClient(string serverAddress, IRelayListener relayListener, Guid clientGuid)
         {
@@ -40,25 +30,20 @@ namespace BananaParty.WebSocketRelay.Transport
         }
 
         /// <summary>
-        /// Drains queued WebSocket frames, dispatches channel messages, and updates connection state.
+        /// Drains queued WebSocket frames, dispatches channel messages, and reports disconnection.
         /// Call this periodically (e.g. in Update).
         /// </summary>
         public void ProcessIncomingMessages()
         {
-            UpdateConnectionState();
+            while (_socket.HasUnreadPayloadQueue)
+                ProcessPayload(_socket.ReadPayloadQueue());
 
-            while (_socket.IsConnected && _socket.HasUnreadPayloadQueue)
-            {
-                byte[] payload = _socket.ReadPayloadQueue();
-                ProcessPayload(payload);
-            }
-
-            UpdateConnectionState();
+            NotifyIfDisconnected();
         }
 
         public void SubscribeToChannel(string channel)
         {
-            if (!_subscribedChannels.Add(channel))
+            if (!SubscribedChannels.Add(channel))
                 return;
 
             _socket.Send(RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Subscribe, channel));
@@ -66,7 +51,7 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public void UnsubscribeFromChannel(string channel)
         {
-            if (!_subscribedChannels.Remove(channel))
+            if (!SubscribedChannels.Remove(channel))
                 throw new KeyNotFoundException($"Not subscribed to channel '{channel}'.");
 
             _socket.Send(RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Unsubscribe, channel));
@@ -74,7 +59,7 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public void Send(string channel, byte[] data)
         {
-            if (!_subscribedChannels.Contains(channel))
+            if (!SubscribedChannels.Contains(channel))
                 throw new KeyNotFoundException($"Not subscribed to channel '{channel}'.");
 
             _socket.Send(RelayMessageCodec.CreateChannelMessage(ClientGuid, channel, data));
@@ -82,88 +67,45 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public void Dispose()
         {
-            _subscribedChannels.Clear();
-
-            try
-            {
-                if (_socket.IsConnected)
-                    _socket.Disconnect();
-            }
-            finally
-            {
-                _socket.Dispose();
-            }
+            _socket.Dispose();
         }
 
-        private void UpdateConnectionState()
+        private void NotifyIfDisconnected()
         {
             if (_socket.IsConnected)
             {
-                if (_connectionState == ConnectionState.Idle)
-                    _connectionState = ConnectionState.Connected;
-
+                _wasConnected = true;
                 return;
             }
 
-            if (_connectionState != ConnectionState.Connected)
+            if (!_wasConnected)
                 return;
 
-            _connectionState = ConnectionState.Disconnected;
+            _wasConnected = false;
             _relayListener.OnDisconnectedFromRelay();
         }
 
         internal void ProcessPayload(byte[] payloadBytes)
         {
-            while (payloadBytes.Length > 0)
-            {
-                int processedLength;
-                byte type = payloadBytes[0];
+            if (payloadBytes.Length == 0 || payloadBytes[0] != RelayMessageType.ChannelMessage)
+                return;
 
-                switch (type)
-                {
-                    case RelayMessageType.ChannelMessage:
-                        processedLength = ProcessChannelMessage(payloadBytes);
-                        break;
-                    default:
-                        processedLength = SkipUnknownMessage(payloadBytes);
-                        break;
-                }
-
-                if (processedLength >= payloadBytes.Length)
-                    return;
-
-                byte[] remaining = new byte[payloadBytes.Length - processedLength];
-                Array.Copy(payloadBytes, processedLength, remaining, 0, remaining.Length);
-                payloadBytes = remaining;
-            }
-        }
-
-        private int ProcessChannelMessage(byte[] data)
-        {
-            int channelLength = RelayMessageCodec.ReadChannelLength(data, RelayMessageCodec.ChannelMessageChannelLengthOffset);
+            int channelLength = RelayMessageCodec.ReadChannelLength(payloadBytes, RelayMessageCodec.ChannelMessageChannelLengthOffset);
             if (channelLength < 0)
                 throw new InvalidDataException("Incomplete channel message.");
 
-            Guid senderId = RelayMessageCodec.ReadGuid(data, RelayMessageCodec.ChannelMessageGuidOffset);
-            string channel = RelayMessageCodec.ReadChannel(data, RelayMessageCodec.ChannelMessageChannelLengthOffset);
             int payloadOffset = RelayMessageCodec.GetChannelMessagePayloadOffset(channelLength);
-
-            if (data.Length < payloadOffset)
+            if (payloadBytes.Length < payloadOffset)
                 throw new InvalidDataException("Incomplete channel message.");
 
-            if (!_subscribedChannels.Contains(channel))
-                return data.Length;
+            string channel = RelayMessageCodec.ReadChannel(payloadBytes, RelayMessageCodec.ChannelMessageChannelLengthOffset);
+            if (!SubscribedChannels.Contains(channel))
+                return;
 
-            byte[] messageData = new byte[data.Length - payloadOffset];
-            Array.Copy(data, payloadOffset, messageData, 0, messageData.Length);
-            _relayListener.OnChannelMessage(senderId, channel, messageData);
-
-            return data.Length;
-        }
-
-        private static int SkipUnknownMessage(byte[] data)
-        {
-            return data.Length;
+            Guid senderGuid = RelayMessageCodec.ReadGuid(payloadBytes, RelayMessageCodec.ChannelMessageGuidOffset);
+            byte[] messageData = new byte[payloadBytes.Length - payloadOffset];
+            Array.Copy(payloadBytes, payloadOffset, messageData, 0, messageData.Length);
+            _relayListener.OnChannelMessage(senderGuid, channel, messageData);
         }
     }
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Text;
 using BananaParty.WebSocketRelay;
 using NUnit.Framework;
 using UnityEngine;
@@ -16,7 +15,7 @@ namespace BananaParty.WebSocketRelay.Tests
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = Guid.NewGuid();
 
-            context.ProcessChannelMessage(context.LocalClientIdentity, "room", Encoding.UTF8.GetBytes("{}"));
+            context.ProcessChannelMessage(context.LocalClientIdentity, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
 
             Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
             UnityEngine.Object.DestroyImmediate(context);
@@ -29,7 +28,7 @@ namespace BananaParty.WebSocketRelay.Tests
             context.LocalClientIdentity = Guid.NewGuid();
             Guid remotePlayer = Guid.NewGuid();
 
-            context.ProcessChannelMessage(remotePlayer, "room", Encoding.UTF8.GetBytes("{}"));
+            context.ProcessChannelMessage(remotePlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
 
             Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
             UnityEngine.Object.DestroyImmediate(context);
@@ -42,7 +41,7 @@ namespace BananaParty.WebSocketRelay.Tests
             context.LocalClientIdentity = Guid.NewGuid();
             Guid remotePlayer = Guid.NewGuid();
 
-            context.ProcessChannelMessage(remotePlayer, "room", Encoding.UTF8.GetBytes("{}"));
+            context.ProcessChannelMessage(remotePlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
 
             GameObject remoteObject = new("RemoteOwnedObject");
             StubNetworkIdentity remoteIdentity = new(
@@ -70,8 +69,8 @@ namespace BananaParty.WebSocketRelay.Tests
             Guid timingOutPlayer = Guid.NewGuid();
             Guid activePlayer = Guid.NewGuid();
 
-            context.ProcessChannelMessage(timingOutPlayer, "room", Encoding.UTF8.GetBytes("{}"));
-            context.ProcessChannelMessage(activePlayer, "room", Encoding.UTF8.GetBytes("{}"));
+            context.ProcessChannelMessage(timingOutPlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
+            context.ProcessChannelMessage(activePlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
 
             GameObject timingOutObject = new("TimingOutObject");
             GameObject activeObject = new("ActiveObject");
@@ -87,7 +86,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 Guid.NewGuid()));
 
             context.ManualUpdate(1.1f);
-            context.ProcessChannelMessage(activePlayer, "room", Encoding.UTF8.GetBytes("{}"));
+            context.ProcessChannelMessage(activePlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
             context.ManualUpdate(1.1f);
             yield return null;
 
@@ -107,7 +106,7 @@ namespace BananaParty.WebSocketRelay.Tests
             context.LocalClientIdentity = Guid.NewGuid();
             Guid remotePlayer = Guid.NewGuid();
 
-            context.ProcessChannelMessage(remotePlayer, "room", Encoding.UTF8.GetBytes("{}"));
+            context.ProcessChannelMessage(remotePlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
 
             GameObject remoteObject = new("RemoteOwnedObject");
             context.RegisterNetworkIdentity(new StubNetworkIdentity(
@@ -117,7 +116,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 Guid.NewGuid()));
 
             context.ManualUpdate(1.5f);
-            context.ProcessChannelMessage(remotePlayer, "room", Encoding.UTF8.GetBytes("{}"));
+            context.ProcessChannelMessage(remotePlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
             context.ManualUpdate(1.5f);
             yield return null;
 
@@ -137,7 +136,7 @@ namespace BananaParty.WebSocketRelay.Tests
             Guid remotePlayer = Guid.NewGuid();
             context.LocalClientIdentity = localPlayer;
 
-            context.ProcessChannelMessage(remotePlayer, "room", Encoding.UTF8.GetBytes("{}"));
+            context.ProcessChannelMessage(remotePlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
 
             GameObject localObject = new("LocalOwnedObject");
             GameObject remoteObject = new("RemoteOwnedObject");
@@ -178,6 +177,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 Guid.NewGuid()));
 
             Network network = new Network("ws://127.0.0.1:1", context);
+            network.Connect(context.LocalClientIdentity);
             network.OnDisconnectedFromRelay();
             yield return null;
 

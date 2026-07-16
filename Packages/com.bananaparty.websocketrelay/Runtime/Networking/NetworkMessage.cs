@@ -1,6 +1,6 @@
 namespace BananaParty.WebSocketRelay
 {
-    public class NetworkMessage
+    public static class NetworkMessage
     {
         public const byte SyncIdentities = 1;
         public const byte Rpc = 2;

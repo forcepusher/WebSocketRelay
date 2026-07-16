@@ -91,6 +91,15 @@ namespace BananaParty.WebSocketRelay.Tests
             return Encoding.UTF8.GetBytes(output.ToString());
         }
 
+        public static byte[] CreateEmptySyncIdentitiesMessage()
+        {
+            byte[] payload = Encoding.UTF8.GetBytes("{}");
+            byte[] message = new byte[payload.Length + 1];
+            message[0] = NetworkMessage.SyncIdentities;
+            payload.CopyTo(message, 1);
+            return message;
+        }
+
         public static byte[] CreateSyncIdentitiesMessage(
             INetworkIdentity identity,
             Guid networkOwner,

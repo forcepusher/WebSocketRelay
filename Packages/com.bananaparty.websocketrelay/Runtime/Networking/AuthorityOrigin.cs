@@ -80,8 +80,6 @@ namespace BananaParty.WebSocketRelay
                     continue;
 
                 networkIdentity.NetworkOwner = requesterGuid;
-                Debug.Log("TAKE CONTROLS BY " + requesterGuid);
-
                 return;
             }
         }
