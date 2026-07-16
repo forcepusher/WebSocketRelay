@@ -194,6 +194,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public bool NetworkAuthority => false;
         public bool DistanceBasedAuthority { get; set; }
         public string NetworkStateName => PrefabName;
+        public NetworkContext NetworkContext => throw new NotImplementedException();
 
         public void WriteNetworkState(IStateOutput stateOutput)
         {

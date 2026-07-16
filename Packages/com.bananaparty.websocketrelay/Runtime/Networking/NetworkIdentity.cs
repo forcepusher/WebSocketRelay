@@ -23,6 +23,7 @@ namespace BananaParty.WebSocketRelay
         public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
 
         public bool DistanceBasedAuthority => _distanceBasedAuthority;
+        public NetworkContext NetworkContext => _networkContext;
 
         public string NetworkStateName => _prefabName;
 

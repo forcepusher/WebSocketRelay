@@ -3,9 +3,21 @@ using UnityEngine;
 namespace BananaParty.WebSocketRelay.Samples
 {
     [RequireComponent(typeof(CharacterController))]
-    public class Character : MonoBehaviour, INetworkState
+    public class Character : MonoBehaviour, INetworkState, IRpcTarget
     {
+        private const string RandomColorParametername = "RandomColor";
+
+        private enum RpcType
+        {
+            RandomColorOnLeftClick,
+            GreyColorOnRightClick
+        }
+
         public string NetworkStateName => nameof(Character);
+
+        public string RpcSubjectName => nameof(Character);
+
+        public INetworkIdentity NetworkIdentity => _networkIdentity;
 
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float rotationSpeed = 10f;
@@ -34,6 +46,14 @@ namespace BananaParty.WebSocketRelay.Samples
             _characterInput.PollInput();
 
             Move();
+
+            if (Input.GetMouseButton(0))
+            {
+                IStateOutput parametersOutput = _networkIdentity.NetworkContext.StateFormat.CreateOutput();
+                parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.RandomColorOnLeftClick);
+                parametersOutput.WriteVector3(RandomColorParametername, new Vector3(Random.value, Random.value, Random.value));
+                _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
+            }
         }
 
         public void WriteNetworkState(IStateOutput stateOutput)
@@ -91,5 +111,7 @@ namespace BananaParty.WebSocketRelay.Samples
                 _characteController.Move(Vector3.up * _verticalVelocity * Time.deltaTime);
             }
         }
+
+        public void ReceiveRpc(IStateInput parametersStateInput) => throw new System.NotImplementedException();
     }
 }

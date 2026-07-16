@@ -34,7 +34,7 @@ namespace BananaParty.WebSocketRelay
         public IReadOnlyList<IAuthorityOrigin> AuthorityOrigins => _authorityOrigins;
 
         // Created lazily because serialized fields are not assigned yet during field initialization.
-        private IStateFormat StateFormat => _stateFormat ??= _useBinary ? new BinaryStateFormat() : new JsonStateFormat();
+        public IStateFormat StateFormat => _stateFormat ??= _useBinary ? new BinaryStateFormat() : new JsonStateFormat();
 
         private RpcRouter RpcRouter => _rpcRouter ??= new RpcRouter(StateFormat);
 
