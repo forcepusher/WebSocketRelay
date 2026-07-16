@@ -43,11 +43,13 @@ namespace BananaParty.WebSocketRelay
                 _targetsByIdentity.Remove(networkIdentifier);
         }
 
-        public void Send(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel)
+        public void Send(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel, bool invokeLocally = true)
         {
             byte[] parametersPayload = _stateFormat.ToPayload(parametersStateOutput);
             _outgoingMessages.Enqueue((channel, CreateMessage(networkIdentifier, rpcSubjectName, parametersPayload)));
-            Dispatch(networkIdentifier, rpcSubjectName, parametersPayload);
+
+            if (invokeLocally)
+                Dispatch(networkIdentifier, rpcSubjectName, parametersPayload);
         }
 
         public bool TryDequeueOutgoingMessage(out string channel, out byte[] message)

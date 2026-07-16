@@ -97,6 +97,28 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void SendRpc_WithInvokeLocallyFalse_DoesNotDispatchLocally()
+        {
+            NetworkContext context = NetworkContextTestHelpers.CreateContext();
+            StubNetworkIdentity networkIdentity = CreateRegisteredIdentity(context);
+            StubRpcTarget rpcTarget = new(networkIdentity, "TestSubject");
+            context.RegisterRpcTarget(rpcTarget);
+
+            context.SendRpc(
+                networkIdentity.NetworkIdentifier,
+                "TestSubject",
+                NetworkContextTestHelpers.CreateRpcParameters(42),
+                "room",
+                invokeLocally: false);
+
+            Assert.AreEqual(0, rpcTarget.ReceiveCount);
+            Assert.IsTrue(context.TryDequeueOutgoingRpcMessage(out _, out _));
+
+            UnityEngine.Object.DestroyImmediate(networkIdentity.GameObject);
+            UnityEngine.Object.DestroyImmediate(context);
+        }
+
+        [Test]
         public void ProcessChannelMessage_DispatchesIncomingRpcToMatchingIdentity()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();

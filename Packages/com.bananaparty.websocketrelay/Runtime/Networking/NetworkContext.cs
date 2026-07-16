@@ -141,9 +141,9 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        public void SendRpc(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel)
+        public void SendRpc(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel, bool invokeLocally = true)
         {
-            RpcRouter.Send(networkIdentifier, rpcSubjectName, parametersStateOutput, channel);
+            RpcRouter.Send(networkIdentifier, rpcSubjectName, parametersStateOutput, channel, invokeLocally);
         }
 
         public bool TryDequeueOutgoingRpcMessage(out string channel, out byte[] message)

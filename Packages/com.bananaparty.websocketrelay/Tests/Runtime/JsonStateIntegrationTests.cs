@@ -130,7 +130,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 return true;
             }
 
-            public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput) => throw new NotImplementedException();
+            public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true) => throw new NotImplementedException();
         }
     }
 }

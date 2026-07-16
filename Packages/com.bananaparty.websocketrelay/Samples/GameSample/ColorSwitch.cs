@@ -55,11 +55,6 @@ namespace BananaParty.WebSocketRelay.Samples
             }
         }
 
-        private void SetColor(Color color)
-        {
-            GetComponent<Renderer>().material.color = color;
-        }
-
         public void ReceiveRpc(IStateInput parametersStateInput)
         {
             RpcType rpcType = (RpcType)parametersStateInput.ReadInt(nameof(RpcType));
@@ -73,6 +68,11 @@ namespace BananaParty.WebSocketRelay.Samples
                     SetColor(Color.grey);
                     break;
             }
+        }
+
+        private void SetColor(Color color)
+        {
+            GetComponent<Renderer>().material.color = color;
         }
     }
 }

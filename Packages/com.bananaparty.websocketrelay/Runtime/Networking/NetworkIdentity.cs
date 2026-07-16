@@ -96,9 +96,9 @@ namespace BananaParty.WebSocketRelay
             NetworkOwner = stateInput.ReadGuid(nameof(NetworkOwner));
         }
 
-        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput)
+        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true)
         {
-            _networkContext.SendRpc(NetworkIdentifier, rpcSubjectName, parametersStateOutput, Channel);
+            _networkContext.SendRpc(NetworkIdentifier, rpcSubjectName, parametersStateOutput, Channel, invokeLocally);
         }
 
         private void OnValidate()

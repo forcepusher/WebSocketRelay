@@ -13,7 +13,7 @@ namespace BananaParty.WebSocketRelay
         bool NetworkAuthority { get; }
         bool DistanceBasedAuthority { get; }
         bool ReadNetworkState(IStateInput stateInput, Guid senderGuid);
-        void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput);
+        void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true);
         NetworkContext NetworkContext { get; }
     }
 }
