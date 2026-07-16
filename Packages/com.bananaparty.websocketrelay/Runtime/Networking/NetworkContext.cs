@@ -29,7 +29,7 @@ namespace BananaParty.WebSocketRelay
         private readonly List<NetworkPlayer> _networkPlayers = new();
         private readonly Dictionary<Guid, NetworkPlayer> _networkPlayersByGuid = new();
 
-        private readonly List<IRpcTarget> _rpcTargets = new();
+        private readonly Dictionary<Guid, List<IRpcTarget>> _rpcTargetsByIdentity = new();
 
         private readonly Queue<(string channel, byte[] message)> _outgoingRpcMessages = new();
 
@@ -75,12 +75,26 @@ namespace BananaParty.WebSocketRelay
 
         public void RegisterRpcTarget(IRpcTarget rpcTarget)
         {
-            _rpcTargets.Add(rpcTarget);
+            Guid networkIdentifier = rpcTarget.NetworkIdentity.NetworkIdentifier;
+            if (!_rpcTargetsByIdentity.TryGetValue(networkIdentifier, out List<IRpcTarget> rpcTargets))
+            {
+                rpcTargets = new List<IRpcTarget>();
+                _rpcTargetsByIdentity[networkIdentifier] = rpcTargets;
+            }
+
+            rpcTargets.Add(rpcTarget);
         }
 
         public void UnregisterRpcTarget(IRpcTarget rpcTarget)
         {
-            _rpcTargets.Remove(rpcTarget);
+            Guid networkIdentifier = rpcTarget.NetworkIdentity.NetworkIdentifier;
+            if (!_rpcTargetsByIdentity.TryGetValue(networkIdentifier, out List<IRpcTarget> rpcTargets))
+                return;
+
+            rpcTargets.Remove(rpcTarget);
+
+            if (rpcTargets.Count == 0)
+                _rpcTargetsByIdentity.Remove(networkIdentifier);
         }
 
         public void RegisterAuthorityOrigin(IAuthorityOrigin authorityOrigin)
@@ -238,11 +252,11 @@ namespace BananaParty.WebSocketRelay
                 ApplyIncomingChannelState(channel, data);
         }
 
-        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, string channel)
+        public void SendRpc(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel)
         {
             byte[] parametersPayload = SerializeRpcParameters(parametersStateOutput);
-            _outgoingRpcMessages.Enqueue((channel, CreateRpcMessage(rpcSubjectName, parametersPayload)));
-            DispatchRpc(rpcSubjectName, parametersPayload);
+            _outgoingRpcMessages.Enqueue((channel, CreateRpcMessage(networkIdentifier, rpcSubjectName, parametersPayload)));
+            DispatchRpc(networkIdentifier, rpcSubjectName, parametersPayload);
         }
 
         public bool TryDequeueOutgoingRpcMessage(out string channel, out byte[] message)
@@ -266,15 +280,16 @@ namespace BananaParty.WebSocketRelay
             return Encoding.UTF8.GetBytes(parametersStateOutput.ToString());
         }
 
-        private static byte[] CreateRpcMessage(string rpcSubjectName, byte[] parametersPayload)
+        private static byte[] CreateRpcMessage(Guid networkIdentifier, string rpcSubjectName, byte[] parametersPayload)
         {
             byte[] subjectNameBytes = Encoding.UTF8.GetBytes(rpcSubjectName);
-            byte[] message = new byte[3 + subjectNameBytes.Length + parametersPayload.Length];
+            byte[] message = new byte[19 + subjectNameBytes.Length + parametersPayload.Length];
             message[0] = NetworkMessage.Rpc;
             message[1] = (byte)subjectNameBytes.Length;
             message[2] = (byte)(subjectNameBytes.Length >> 8);
             Buffer.BlockCopy(subjectNameBytes, 0, message, 3, subjectNameBytes.Length);
-            Buffer.BlockCopy(parametersPayload, 0, message, 3 + subjectNameBytes.Length, parametersPayload.Length);
+            Buffer.BlockCopy(networkIdentifier.ToByteArray(), 0, message, 3 + subjectNameBytes.Length, 16);
+            Buffer.BlockCopy(parametersPayload, 0, message, 19 + subjectNameBytes.Length, parametersPayload.Length);
             return message;
         }
 
@@ -282,16 +297,20 @@ namespace BananaParty.WebSocketRelay
         {
             int subjectNameLength = data[1] | (data[2] << 8);
             string rpcSubjectName = Encoding.UTF8.GetString(data, 3, subjectNameLength);
+            Guid networkIdentifier = new Guid(data.AsSpan(3 + subjectNameLength, 16));
 
-            byte[] parametersPayload = new byte[data.Length - 3 - subjectNameLength];
-            Buffer.BlockCopy(data, 3 + subjectNameLength, parametersPayload, 0, parametersPayload.Length);
+            byte[] parametersPayload = new byte[data.Length - 19 - subjectNameLength];
+            Buffer.BlockCopy(data, 19 + subjectNameLength, parametersPayload, 0, parametersPayload.Length);
 
-            DispatchRpc(rpcSubjectName, parametersPayload);
+            DispatchRpc(networkIdentifier, rpcSubjectName, parametersPayload);
         }
 
-        private void DispatchRpc(string rpcSubjectName, byte[] parametersPayload)
+        private void DispatchRpc(Guid networkIdentifier, string rpcSubjectName, byte[] parametersPayload)
         {
-            foreach (IRpcTarget rpcTarget in _rpcTargets)
+            if (!_rpcTargetsByIdentity.TryGetValue(networkIdentifier, out List<IRpcTarget> rpcTargets))
+                return;
+
+            foreach (IRpcTarget rpcTarget in rpcTargets)
             {
                 if (rpcTarget.RpcSubjectName != rpcSubjectName)
                     continue;

@@ -14,6 +14,8 @@ namespace BananaParty.WebSocketRelay
 
         public NetworkIdentity NetworkIdentity { get; private set; }
 
+        INetworkIdentity IRpcTarget.NetworkIdentity => NetworkIdentity;
+
         public Vector3 Position => transform.position;
 
         public string RpcSubjectName => nameof(AuthorityOrigin);
