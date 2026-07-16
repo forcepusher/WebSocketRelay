@@ -383,7 +383,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 785604b5a364ec74c9a1363d923a180a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GameState
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.GameState
   _networkContext: {fileID: 11400000, guid: 3892ff3e93f930c4082ae22a3252b126, type: 2}
   _networkChannel: {fileID: 11400000, guid: 4031f307a119f414aa736f59d43f4f9e, type: 2}
   _playerCharacterPrefab: {fileID: 4763608854326616019, guid: e0b504692cc65ab448036b1fc974dd2d, type: 3}

@@ -2,8 +2,7 @@
     "name": "BananaParty.WebSocketRelay.Samples",
     "rootNamespace": "BananaParty.WebSocketRelay.Samples",
     "references": [
-        "BananaParty.WebSocketRelay",
-        "Unity.InputSystem"
+        "BananaParty.WebSocketRelay"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

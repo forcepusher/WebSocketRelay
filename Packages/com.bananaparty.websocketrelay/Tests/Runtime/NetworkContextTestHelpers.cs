@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using BananaParty.WebSocketRelay;
 using UnityEngine;
 
@@ -53,6 +54,33 @@ namespace BananaParty.WebSocketRelay.Tests
                 fieldName,
                 BindingFlags.Instance | BindingFlags.NonPublic);
             field.SetValue(target, value);
+        }
+
+        public static byte[] CreateRpcMessage(Guid networkIdentifier, string rpcSubjectName, byte[] parametersPayload)
+        {
+            byte[] subjectNameBytes = Encoding.UTF8.GetBytes(rpcSubjectName);
+            byte[] message = new byte[19 + subjectNameBytes.Length + parametersPayload.Length];
+            message[0] = NetworkMessage.Rpc;
+            message[1] = (byte)subjectNameBytes.Length;
+            message[2] = (byte)(subjectNameBytes.Length >> 8);
+            Buffer.BlockCopy(subjectNameBytes, 0, message, 3, subjectNameBytes.Length);
+            Buffer.BlockCopy(networkIdentifier.ToByteArray(), 0, message, 3 + subjectNameBytes.Length, 16);
+            Buffer.BlockCopy(parametersPayload, 0, message, 19 + subjectNameBytes.Length, parametersPayload.Length);
+            return message;
+        }
+
+        public static byte[] CreateRpcParametersPayload(int value)
+        {
+            JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
+            output.WriteInt("value", value);
+            return Encoding.UTF8.GetBytes(output.ToString());
+        }
+
+        public static JsonStateOutput CreateRpcParameters(int value)
+        {
+            JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
+            output.WriteInt("value", value);
+            return output;
         }
 
         public static NetworkIdentity CreatePlayerActor(
@@ -127,5 +155,28 @@ namespace BananaParty.WebSocketRelay.Tests
         public bool DistanceBasedAuthority => false;
 
         public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput) => throw new NotImplementedException();
+    }
+
+    internal sealed class StubRpcTarget : IRpcTarget
+    {
+        public StubRpcTarget(INetworkIdentity networkIdentity, string rpcSubjectName)
+        {
+            NetworkIdentity = networkIdentity;
+            RpcSubjectName = rpcSubjectName;
+        }
+
+        public INetworkIdentity NetworkIdentity { get; }
+
+        public string RpcSubjectName { get; }
+
+        public int ReceiveCount { get; private set; }
+
+        public int LastReceivedValue { get; private set; }
+
+        public void ReceiveRpc(IStateInput parametersStateInput)
+        {
+            ReceiveCount++;
+            LastReceivedValue = parametersStateInput.ReadInt("value");
+        }
     }
 }
