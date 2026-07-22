@@ -56,8 +56,7 @@ namespace BananaParty.WebSocketRelay
 
             _networkContext.LocalClientIdentity = clientGuid;
 
-            ISocket socket = _offlineMode ? new OfflineSocket() : new Socket(_serverAddress);
-            _relayClient = new RelayClient(socket, this, clientGuid);
+            _relayClient = new RelayClient(_serverAddress, this, clientGuid, _offlineMode);
             _relayClient.Connect();
             Debug.Log(_offlineMode
                 ? "Started offline mode session"

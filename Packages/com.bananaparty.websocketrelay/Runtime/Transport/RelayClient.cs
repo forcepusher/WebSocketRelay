@@ -17,15 +17,10 @@ namespace BananaParty.WebSocketRelay.Transport
 
         public bool IsConnected => _socket.IsConnected;
 
-        public RelayClient(string serverAddress, IRelayListener relayListener, Guid clientGuid)
-            : this(new Socket(serverAddress), relayListener, clientGuid)
-        {
-        }
-
-        public RelayClient(ISocket socket, IRelayListener relayListener, Guid clientGuid)
+        public RelayClient(string serverAddress, IRelayListener relayListener, Guid clientGuid, bool offlineMode = false)
         {
             ClientGuid = clientGuid;
-            _socket = socket;
+            _socket = offlineMode ? new OfflineSocket() : new Socket(serverAddress);
             _relayListener = relayListener;
         }
 
