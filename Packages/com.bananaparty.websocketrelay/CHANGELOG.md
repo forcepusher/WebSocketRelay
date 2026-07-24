@@ -6,9 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
 ## [2.1.1] - 2026-07-25  
 ### Fixed  
-- Distance-based authority transfers no longer flicker or lose component state when the previous owner's in-flight sync arrives after a claim. Authority claims and state broadcasts now carry a version so stale ownership is discarded; concurrent claims with the same version converge on the smaller owner guid.  
-- Scene-bound identities can persist when their authority owner disconnects via `DestroyWhenAuthorityOwnerLeaves`.  
-- Game sample ClickObjective now synchronizes click count correctly over the network.  
+- A ton of authority ownership bugs.  
   
 ## [2.1.0] - 2026-07-22  
 ### Added  
