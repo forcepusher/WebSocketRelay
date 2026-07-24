@@ -11,9 +11,14 @@ See minimum required Unity version in the `package.json` file.
   
 ---  
   
-Networking as simple as it gets (for programmers though).  
+Networking as simple as it gets (for programmers though), with wss:// support out of the box.  
 It's basically a peer-to-peer networking through a relay server.  
 The goal is to provide bare minimum to get things done and to ship the game ASAP.  
+  
+Key differences from Photon PUN:
+1. No master client. Authority is either based on distance to the target or claimed manually.  
+2. You host your own relay server and have full control of everything. I host mine on personal home server.  
+3. It's based on [Bun's pub/sub](https://bun.com/docs/guides/websocket/pubsub) messaging channels, not rooms. You can subscribe to multiple channels.  
   
 Key priorities:  
 1. Developer Experience - JSON data stream for developing. Binary stream for shipping.  
