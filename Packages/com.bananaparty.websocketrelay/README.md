@@ -11,9 +11,9 @@ See minimum required Unity version in the `package.json` file.
   
 ---  
   
-Networking as simple as it gets (for programmers though), with wss:// support out of the box.  
-It's basically a peer-to-peer networking through a relay server.  
-The goal is to provide bare minimum to get things done and to ship the game ASAP.  
+Networking as simple as it gets (for programmers though).  
+It's basically a peer-to-peer networking through a relay server, with wss:// support out of the box.  
+The goal is to provide bare minimum to get things done while owning the entire backend stack.  
   
 Key differences from Photon PUN:
 1. No master client. Authority is either based on distance to the target or claimed manually.  
