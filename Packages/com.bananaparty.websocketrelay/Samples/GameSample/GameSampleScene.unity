@@ -1500,6 +1500,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1325037796}
+  - component: {fileID: 1325037798}
+  - component: {fileID: 1325037799}
   - component: {fileID: 1325037797}
   - component: {fileID: 1325037795}
   - component: {fileID: 1325037794}
@@ -1617,6 +1619,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 538811c931359c047ab2d4a5ed3373d5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.ClickObjective
+--- !u!114 &1325037798
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1325037792}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3dd45d081402c7d458a543c0a676949d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.NetworkIdentity
+  _networkContext: {fileID: 11400000, guid: 3892ff3e93f930c4082ae22a3252b126, type: 2}
+  _prefabName: ClickObjective
+  _distanceBasedAuthority: 0
+  _destroyWhenAuthorityOwnerLeaves: 0
+--- !u!114 &1325037799
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1325037792}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec4e38dd825c554419b400122a40e6c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.NetworkBinding
+  _networkChannel: {fileID: 11400000, guid: 4031f307a119f414aa736f59d43f4f9e, type: 2}
+  _networkContext: {fileID: 11400000, guid: 3892ff3e93f930c4082ae22a3252b126, type: 2}
+  _guid: 7c4a2e91-5b8d-4f3a-9e16-2d8f0a1b6c45
 --- !u!1 &1415664420
 GameObject:
   m_ObjectHideFlags: 0
