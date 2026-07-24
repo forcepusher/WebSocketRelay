@@ -2111,7 +2111,7 @@ GameObject:
   - component: {fileID: 2122646714}
   - component: {fileID: 2122646713}
   - component: {fileID: 2122646712}
-  m_Layer: 0
+  m_Layer: 2
   m_Name: RightWall (2)
   m_TagString: Untagged
   m_Icon: {fileID: 0}
