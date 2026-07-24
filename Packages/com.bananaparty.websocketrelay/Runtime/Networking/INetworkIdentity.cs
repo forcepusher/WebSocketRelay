@@ -11,6 +11,7 @@ namespace BananaParty.WebSocketRelay
         Guid NetworkIdentifier { get; set; }
         Guid NetworkAuthorityOwner { get; set; }
         bool NetworkAuthority { get; }
+        bool HasAuthorityOwner { get; }
         bool DistanceBasedAuthority { get; }
         bool DestroyWhenAuthorityOwnerLeaves { get; }
         bool ReadNetworkState(IStateInput stateInput, Guid senderGuid);

@@ -47,7 +47,7 @@ namespace BananaParty.WebSocketRelay.Samples
         {
             // An unowned objective (e.g. before any player claimed it) has no client
             // to apply click RPCs, so the first clicker takes ownership.
-            if (_networkIdentity.NetworkAuthorityOwner == Guid.Empty)
+            if (!_networkIdentity.HasAuthorityOwner)
                 _networkIdentity.ClaimAuthority();
 
             IStateOutput parametersOutput = _networkIdentity.NetworkContext.StateFormat.CreateOutput();

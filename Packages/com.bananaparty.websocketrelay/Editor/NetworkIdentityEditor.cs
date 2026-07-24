@@ -50,6 +50,7 @@ namespace BananaParty.WebSocketRelay.Editor
                 EditorGUIUtility.labelWidth = LabelWidth;
 
                 DrawLine(ref y, content, lineHeight, spacing, "Has Authority", FormatAuthority(networkIdentity.NetworkAuthority, hasContext));
+                DrawLine(ref y, content, lineHeight, spacing, "Has Authority Owner", networkIdentity.HasAuthorityOwner ? "Yes" : "No");
                 DrawLine(ref y, content, lineHeight, spacing, "Authority Owner", FormatGuid(networkIdentity.NetworkAuthorityOwner, localClient));
                 DrawLine(ref y, content, lineHeight, spacing, "Local Client", FormatGuid(localClient));
                 DrawLine(ref y, content, lineHeight, spacing, "Network Identifier", FormatGuid(networkIdentity.NetworkIdentifier));

@@ -30,6 +30,7 @@ namespace BananaParty.WebSocketRelay
         // and component state written by a previous owner after an authority transfer.
         public long NetworkAuthorityVersion { get; set; }
         public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkAuthorityOwner;
+        public bool HasAuthorityOwner => NetworkAuthorityOwner != Guid.Empty;
 
         public bool DistanceBasedAuthority => _distanceBasedAuthority;
         public bool DestroyWhenAuthorityOwnerLeaves => _destroyWhenAuthorityOwnerLeaves;

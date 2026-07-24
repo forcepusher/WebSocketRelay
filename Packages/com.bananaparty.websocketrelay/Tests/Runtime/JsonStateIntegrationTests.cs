@@ -103,6 +103,7 @@ namespace BananaParty.WebSocketRelay.Tests
             public Guid NetworkIdentifier { get; set; } = Guid.NewGuid();
             public Guid NetworkAuthorityOwner { get; set; } = Guid.NewGuid();
             public bool NetworkAuthority { get; set; }
+            public bool HasAuthorityOwner => NetworkAuthorityOwner != Guid.Empty;
             public bool DistanceBasedAuthority { get; set; } = false;
             public bool DestroyWhenAuthorityOwnerLeaves { get; set; } = true;
 
