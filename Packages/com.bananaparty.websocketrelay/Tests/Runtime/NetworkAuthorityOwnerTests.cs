@@ -6,14 +6,14 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
-    public class NetworkOwnershipTests
+    public class NetworkAuthorityOwnerTests
     {
         private static readonly Guid PlayerA = Guid.Parse("00000000-0000-0000-0000-000000000001");
         private static readonly Guid PlayerB = Guid.Parse("00000000-0000-0000-0000-000000000002");
         private static readonly Guid LocalClient = Guid.Parse("00000000-0000-0000-0000-000000000099");
 
         [Test]
-        public void ClaimAuthorityRpc_AppliesOwnership()
+        public void ClaimAuthorityRpc_AppliesNetworkAuthorityOwner()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
@@ -27,14 +27,14 @@ namespace BananaParty.WebSocketRelay.Tests
 
             context.ProcessChannelMessage(PlayerA, "room", rpcMessage);
 
-            Assert.AreEqual(PlayerA, bot.NetworkOwner);
+            Assert.AreEqual(PlayerA, bot.NetworkAuthorityOwner);
 
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
             UnityEngine.Object.DestroyImmediate(context);
         }
 
         [Test]
-        public void ChannelStateSync_AppliesNetworkOwnerFromPayload()
+        public void ChannelStateSync_AppliesNetworkAuthorityOwnerFromPayload()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
@@ -46,14 +46,14 @@ namespace BananaParty.WebSocketRelay.Tests
 
             context.ProcessChannelMessage(PlayerA, "room", message);
 
-            Assert.AreEqual(PlayerA, bot.NetworkOwner);
+            Assert.AreEqual(PlayerA, bot.NetworkAuthorityOwner);
 
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
             UnityEngine.Object.DestroyImmediate(context);
         }
 
         [Test]
-        public void ChannelStateSync_RecoversMissedRpcViaOwnerBroadcast()
+        public void ChannelStateSync_RecoversMissedRpcViaAuthorityOwnerBroadcast()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
@@ -67,7 +67,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             context.ProcessChannelMessage(PlayerA, "room", message);
 
-            Assert.AreEqual(PlayerA, bot.NetworkOwner);
+            Assert.AreEqual(PlayerA, bot.NetworkAuthorityOwner);
             Assert.AreEqual(42, networkState.LastReadValue);
 
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
@@ -75,7 +75,7 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
-        public void ChannelStateSync_RejectsStaleComponentStateAfterOwnershipTransfer()
+        public void ChannelStateSync_RejectsStaleComponentStateAfterAuthorityOwnerTransfer()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
@@ -89,29 +89,29 @@ namespace BananaParty.WebSocketRelay.Tests
 
             context.ProcessChannelMessage(PlayerA, "room", message);
 
-            Assert.AreEqual(PlayerB, bot.NetworkOwner);
+            Assert.AreEqual(PlayerB, bot.NetworkAuthorityOwner);
             Assert.AreEqual(0, networkState.LastReadValue);
 
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
             UnityEngine.Object.DestroyImmediate(context);
         }
 
-        private static NetworkIdentity CreateRegisteredBot(NetworkContext context, Guid networkOwner)
+        private static NetworkIdentity CreateRegisteredBot(NetworkContext context, Guid networkAuthorityOwner)
         {
-            return CreateRegisteredBot(context, networkOwner, withNetworkState: false, out _);
+            return CreateRegisteredBot(context, networkAuthorityOwner, withNetworkState: false, out _);
         }
 
         private static NetworkIdentity CreateRegisteredBot(
             NetworkContext context,
-            Guid networkOwner,
+            Guid networkAuthorityOwner,
             out StubNetworkState networkState)
         {
-            return CreateRegisteredBot(context, networkOwner, withNetworkState: true, out networkState);
+            return CreateRegisteredBot(context, networkAuthorityOwner, withNetworkState: true, out networkState);
         }
 
         private static NetworkIdentity CreateRegisteredBot(
             NetworkContext context,
-            Guid networkOwner,
+            Guid networkAuthorityOwner,
             bool withNetworkState,
             out StubNetworkState networkState)
         {
@@ -125,7 +125,7 @@ namespace BananaParty.WebSocketRelay.Tests
             NetworkContextTestHelpers.SetPrivateField(bot, "_prefabName", "BotCharacter");
             NetworkContextTestHelpers.SetPrivateField(bot, "_distanceBasedAuthority", true);
 
-            bot.NetworkOwner = networkOwner;
+            bot.NetworkAuthorityOwner = networkAuthorityOwner;
             bot.NetworkIdentifier = Guid.NewGuid();
             bot.Channel = "room";
 

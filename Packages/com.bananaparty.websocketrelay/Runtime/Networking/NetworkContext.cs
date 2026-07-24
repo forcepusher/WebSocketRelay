@@ -43,7 +43,7 @@ namespace BananaParty.WebSocketRelay
             return Instantiate(networkIdentityPrefab.PrefabName, channel, Guid.NewGuid(), LocalClientIdentity);
         }
 
-        private NetworkIdentity Instantiate(string prefabName, string channel, Guid networkIdentifier, Guid networkOwner)
+        private NetworkIdentity Instantiate(string prefabName, string channel, Guid networkIdentifier, Guid networkAuthorityOwner)
         {
             NetworkIdentity prefab = _networkPrefabs.Find(networkPrefab => networkPrefab.PrefabName == prefabName);
             if (prefab == null)
@@ -57,13 +57,13 @@ namespace BananaParty.WebSocketRelay
             prefab.gameObject.SetActive(prefabWasActive);
 
             networkIdentity.NetworkIdentifier = networkIdentifier;
-            networkIdentity.NetworkOwner = networkOwner;
+            networkIdentity.NetworkAuthorityOwner = networkAuthorityOwner;
             networkIdentity.Channel = channel;
             networkIdentity.gameObject.SetActive(prefabWasActive);
 
             RegisterNetworkIdentity(networkIdentity);
 
-            Debug.Log($"Spawned network identity '{prefabName}' ({networkIdentifier}) owned by {networkOwner}");
+            Debug.Log($"Spawned network identity '{prefabName}' ({networkIdentifier}) owned by {networkAuthorityOwner}");
 
             return networkIdentity;
         }
@@ -112,20 +112,20 @@ namespace BananaParty.WebSocketRelay
         {
             foreach (Guid playerGuid in _playerRoster.RemoveTimedOut(unscaledDeltaTime, _playerTimeoutSeconds))
             {
-                DestroyIdentitiesOwnedBy(playerGuid);
+                DestroyIdentitiesOwnedByAuthorityOwner(playerGuid);
                 Debug.Log($"Removed timed out player {playerGuid}");
             }
         }
 
-        private void DestroyIdentitiesOwnedBy(Guid networkOwner)
+        private void DestroyIdentitiesOwnedByAuthorityOwner(Guid networkAuthorityOwner)
         {
             for (int identityIndex = NetworkIdentities.Count - 1; identityIndex >= 0; identityIndex--)
             {
                 INetworkIdentity networkIdentity = NetworkIdentities[identityIndex];
-                if (networkIdentity.NetworkOwner != networkOwner)
+                if (networkIdentity.NetworkAuthorityOwner != networkAuthorityOwner)
                     continue;
 
-                if (!networkIdentity.DestroyWhenOwnerLeaves)
+                if (!networkIdentity.DestroyWhenAuthorityOwnerLeaves)
                     continue;
 
                 UnregisterNetworkIdentity(networkIdentity);
@@ -206,12 +206,12 @@ namespace BananaParty.WebSocketRelay
             }
             else
             {
-                // The prefab name and owner are consumed here because the identity
+                // The prefab name and authority owner are consumed here because the identity
                 // cannot read its own state before the prefab to spawn is known.
                 string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
-                Guid networkOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkOwner));
+                Guid networkAuthorityOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkAuthorityOwner));
 
-                NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkOwner);
+                NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkAuthorityOwner);
                 spawnedNetworkIdentity.ReadComponentStates(stateInput);
             }
 

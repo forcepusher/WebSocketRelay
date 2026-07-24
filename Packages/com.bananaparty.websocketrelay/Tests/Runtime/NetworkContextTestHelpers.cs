@@ -92,7 +92,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
         public static byte[] CreateSyncIdentitiesMessage(
             INetworkIdentity identity,
-            Guid networkOwner,
+            Guid networkAuthorityOwner,
             int componentValue = 0,
             bool includeComponentState = false)
         {
@@ -100,7 +100,7 @@ namespace BananaParty.WebSocketRelay.Tests
             output.BeginObjectElement();
             output.BeginObjectProperty(identity.NetworkIdentifier.ToString());
             output.WriteString(nameof(NetworkIdentity.PrefabName), identity.PrefabName);
-            output.WriteGuid(nameof(NetworkIdentity.NetworkOwner), networkOwner);
+            output.WriteGuid(nameof(NetworkIdentity.NetworkAuthorityOwner), networkAuthorityOwner);
             output.BeginArrayProperty("NetworkStates");
             if (includeComponentState)
             {
@@ -136,7 +136,7 @@ namespace BananaParty.WebSocketRelay.Tests
             SetPrivateField(authorityOrigin, "_networkContext", context);
             SetPrivateField(networkIdentity, "_distanceBasedAuthority", false);
 
-            networkIdentity.NetworkOwner = playerId;
+            networkIdentity.NetworkAuthorityOwner = playerId;
             networkIdentity.NetworkIdentifier = Guid.NewGuid();
 
             gameObject.SetActive(true);
@@ -146,7 +146,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public static NetworkIdentity CreateDistanceBasedObject(
             NetworkContext context,
             Vector3 position,
-            Guid networkOwner,
+            Guid networkAuthorityOwner,
             string name = "WorldObject")
         {
             GameObject gameObject = new(name);
@@ -157,7 +157,7 @@ namespace BananaParty.WebSocketRelay.Tests
             SetPrivateField(networkIdentity, "_networkContext", context);
             SetPrivateField(networkIdentity, "_distanceBasedAuthority", true);
 
-            networkIdentity.NetworkOwner = networkOwner;
+            networkIdentity.NetworkAuthorityOwner = networkAuthorityOwner;
             networkIdentity.NetworkIdentifier = Guid.NewGuid();
 
             gameObject.SetActive(true);
@@ -172,14 +172,14 @@ namespace BananaParty.WebSocketRelay.Tests
         public StubNetworkIdentity(
             GameObject gameObject,
             string prefabName,
-            Guid networkOwner,
+            Guid networkAuthorityOwner,
             Guid networkIdentifier,
             string channel = "test-channel",
             IReadOnlyList<INetworkState> networkStates = null)
         {
             GameObject = gameObject;
             PrefabName = prefabName;
-            NetworkOwner = networkOwner;
+            NetworkAuthorityOwner = networkAuthorityOwner;
             NetworkIdentifier = networkIdentifier;
             Channel = channel;
             _networkStates = networkStates ?? Array.Empty<INetworkState>();
@@ -189,17 +189,17 @@ namespace BananaParty.WebSocketRelay.Tests
         public GameObject GameObject { get; }
         public string Channel { get; set; }
         public Guid NetworkIdentifier { get; set; }
-        public Guid NetworkOwner { get; set; }
+        public Guid NetworkAuthorityOwner { get; set; }
         public bool NetworkAuthority => false;
         public bool DistanceBasedAuthority { get; set; }
-        public bool DestroyWhenOwnerLeaves { get; set; } = true;
+        public bool DestroyWhenAuthorityOwnerLeaves { get; set; } = true;
         public string NetworkStateName => PrefabName;
         public NetworkContext NetworkContext => throw new NotImplementedException();
 
         public void WriteNetworkState(IStateOutput stateOutput)
         {
             stateOutput.WriteString(nameof(PrefabName), PrefabName);
-            stateOutput.WriteGuid(nameof(NetworkOwner), NetworkOwner);
+            stateOutput.WriteGuid(nameof(NetworkAuthorityOwner), NetworkAuthorityOwner);
 
             stateOutput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
@@ -214,7 +214,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public void ReadNetworkState(IStateInput stateInput)
         {
             stateInput.ReadString(nameof(PrefabName));
-            NetworkOwner = stateInput.ReadGuid(nameof(NetworkOwner));
+            NetworkAuthorityOwner = stateInput.ReadGuid(nameof(NetworkAuthorityOwner));
 
             stateInput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)

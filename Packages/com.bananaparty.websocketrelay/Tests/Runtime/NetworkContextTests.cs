@@ -62,7 +62,7 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [UnityTest]
-        public IEnumerator TimedOutPlayer_KeepsIdentitiesWhenDestroyWhenOwnerLeavesIsFalse()
+        public IEnumerator TimedOutPlayer_KeepsIdentitiesWhenDestroyWhenAuthorityOwnerLeavesIsFalse()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext(playerTimeoutSeconds: 1f);
             context.LocalClientIdentity = Guid.NewGuid();
@@ -77,7 +77,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 remotePlayer,
                 Guid.NewGuid())
             {
-                DestroyWhenOwnerLeaves = false
+                DestroyWhenAuthorityOwnerLeaves = false
             };
             context.RegisterNetworkIdentity(remoteIdentity);
 

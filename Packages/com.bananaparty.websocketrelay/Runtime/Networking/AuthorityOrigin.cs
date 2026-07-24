@@ -31,7 +31,7 @@ namespace BananaParty.WebSocketRelay
 
         private void Update()
         {
-            if (NetworkIdentity.NetworkOwner != _networkContext.LocalClientIdentity)
+            if (NetworkIdentity.NetworkAuthorityOwner != _networkContext.LocalClientIdentity)
                 return;
 
             foreach (INetworkIdentity networkIdentity in _networkContext.NetworkIdentities)
@@ -39,11 +39,11 @@ namespace BananaParty.WebSocketRelay
                 if (!networkIdentity.DistanceBasedAuthority)
                     continue;
 
-                if (networkIdentity.NetworkOwner == _networkContext.LocalClientIdentity)
+                if (networkIdentity.NetworkAuthorityOwner == _networkContext.LocalClientIdentity)
                     continue;
 
-                AuthorityOrigin currentOwnerAuthorityOrigin = GetAuthorityOriginForNetworkOwner(networkIdentity.NetworkOwner);
-                if (currentOwnerAuthorityOrigin == null)
+                AuthorityOrigin currentAuthorityOwnerOrigin = GetAuthorityOriginForNetworkAuthorityOwner(networkIdentity.NetworkAuthorityOwner);
+                if (currentAuthorityOwnerOrigin == null)
                 {
                     if (GetClosestAuthorityOrigin(networkIdentity.GameObject.transform.position) == this)
                         networkIdentity.ClaimAuthority();
@@ -51,21 +51,21 @@ namespace BananaParty.WebSocketRelay
                     continue;
                 }
 
-                float currentOwnerDistance = Vector3.Distance(networkIdentity.GameObject.transform.position, currentOwnerAuthorityOrigin.Position);
+                float currentAuthorityOwnerDistance = Vector3.Distance(networkIdentity.GameObject.transform.position, currentAuthorityOwnerOrigin.Position);
                 float localDistance = Vector3.Distance(networkIdentity.GameObject.transform.position, Position);
 
-                if (localDistance > currentOwnerDistance * AuthorityInterceptionThreshold)
+                if (localDistance > currentAuthorityOwnerDistance * AuthorityInterceptionThreshold)
                     continue;
 
                 networkIdentity.ClaimAuthority();
             }
         }
 
-        private AuthorityOrigin GetAuthorityOriginForNetworkOwner(Guid networkOwner)
+        private AuthorityOrigin GetAuthorityOriginForNetworkAuthorityOwner(Guid networkAuthorityOwner)
         {
             foreach (IAuthorityOrigin authorityOrigin in _networkContext.AuthorityOrigins)
             {
-                if (authorityOrigin.NetworkIdentity.NetworkOwner != networkOwner)
+                if (authorityOrigin.NetworkIdentity.NetworkAuthorityOwner != networkAuthorityOwner)
                     continue;
 
                 return (AuthorityOrigin)authorityOrigin;
