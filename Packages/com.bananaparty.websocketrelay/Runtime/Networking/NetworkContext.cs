@@ -210,8 +210,10 @@ namespace BananaParty.WebSocketRelay
                 // cannot read its own state before the prefab to spawn is known.
                 string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
                 Guid networkAuthorityOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkAuthorityOwner));
+                long networkAuthorityVersion = stateInput.ReadLong(nameof(NetworkIdentity.NetworkAuthorityVersion));
 
                 NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkAuthorityOwner);
+                spawnedNetworkIdentity.NetworkAuthorityVersion = networkAuthorityVersion;
                 spawnedNetworkIdentity.ReadComponentStates(stateInput);
             }
 

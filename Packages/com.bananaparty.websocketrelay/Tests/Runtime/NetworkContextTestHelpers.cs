@@ -74,10 +74,11 @@ namespace BananaParty.WebSocketRelay.Tests
             return output;
         }
 
-        public static byte[] CreateClaimAuthorityRpcParameters(Guid requesterGuid)
+        public static byte[] CreateClaimAuthorityRpcParameters(Guid requesterGuid, long claimVersion = 1)
         {
             JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
             output.WriteGuid("ClaimAuthorityRequesterGuidKey", requesterGuid);
+            output.WriteLong("ClaimAuthorityVersionKey", claimVersion);
             return Encoding.UTF8.GetBytes(output.ToString());
         }
 
@@ -94,13 +95,15 @@ namespace BananaParty.WebSocketRelay.Tests
             INetworkIdentity identity,
             Guid networkAuthorityOwner,
             int componentValue = 0,
-            bool includeComponentState = false)
+            bool includeComponentState = false,
+            long networkAuthorityVersion = 1)
         {
             JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
             output.BeginObjectElement();
             output.BeginObjectProperty(identity.NetworkIdentifier.ToString());
             output.WriteString(nameof(NetworkIdentity.PrefabName), identity.PrefabName);
             output.WriteGuid(nameof(NetworkIdentity.NetworkAuthorityOwner), networkAuthorityOwner);
+            output.WriteLong(nameof(NetworkIdentity.NetworkAuthorityVersion), networkAuthorityVersion);
             output.BeginArrayProperty("NetworkStates");
             if (includeComponentState)
             {
