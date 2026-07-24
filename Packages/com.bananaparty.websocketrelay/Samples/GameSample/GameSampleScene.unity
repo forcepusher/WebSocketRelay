@@ -1648,7 +1648,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.NetworkBinding
   _networkChannel: {fileID: 11400000, guid: 4031f307a119f414aa736f59d43f4f9e, type: 2}
-  _networkContext: {fileID: 11400000, guid: 3892ff3e93f930c4082ae22a3252b126, type: 2}
   _guid: 7c4a2e91-5b8d-4f3a-9e16-2d8f0a1b6c45
 --- !u!1 &1415664420
 GameObject:
