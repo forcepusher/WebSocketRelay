@@ -126,7 +126,11 @@ namespace BananaParty.WebSocketRelay
                     continue;
 
                 if (!networkIdentity.DestroyWhenAuthorityOwnerLeaves)
+                {
+                    // Surviving identities become unowned so a remaining client can claim them.
+                    networkIdentity.NetworkAuthorityOwner = Guid.Empty;
                     continue;
+                }
 
                 UnregisterNetworkIdentity(networkIdentity);
                 Destroy(networkIdentity.GameObject);
