@@ -1633,7 +1633,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.NetworkIdentity
   _networkContext: {fileID: 11400000, guid: 3892ff3e93f930c4082ae22a3252b126, type: 2}
   _prefabName: ClickObjective
-  _distanceBasedAuthority: 1
+  _distanceBasedAuthority: 0
   _destroyWhenAuthorityOwnerLeaves: 0
 --- !u!114 &1325037799
 MonoBehaviour:
