@@ -125,6 +125,9 @@ namespace BananaParty.WebSocketRelay
                 if (networkIdentity.NetworkOwner != networkOwner)
                     continue;
 
+                if (!networkIdentity.DestroyWhenOwnerLeaves)
+                    continue;
+
                 UnregisterNetworkIdentity(networkIdentity);
                 Destroy(networkIdentity.GameObject);
             }

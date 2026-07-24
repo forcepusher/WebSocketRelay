@@ -104,6 +104,7 @@ namespace BananaParty.WebSocketRelay.Tests
             public Guid NetworkOwner { get; set; } = Guid.NewGuid();
             public bool NetworkAuthority { get; set; }
             public bool DistanceBasedAuthority { get; set; } = false;
+            public bool DestroyWhenOwnerLeaves { get; set; } = true;
 
             public NetworkContext NetworkContext => throw new NotImplementedException();
             public int PlayTime { get; set; }

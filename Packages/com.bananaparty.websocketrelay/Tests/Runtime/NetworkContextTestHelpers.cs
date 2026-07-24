@@ -192,6 +192,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public Guid NetworkOwner { get; set; }
         public bool NetworkAuthority => false;
         public bool DistanceBasedAuthority { get; set; }
+        public bool DestroyWhenOwnerLeaves { get; set; } = true;
         public string NetworkStateName => PrefabName;
         public NetworkContext NetworkContext => throw new NotImplementedException();
 

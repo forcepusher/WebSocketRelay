@@ -14,6 +14,8 @@ namespace BananaParty.WebSocketRelay
         private string _prefabName;
         [SerializeField]
         private bool _distanceBasedAuthority;
+        [SerializeField]
+        private bool _destroyWhenOwnerLeaves = true;
 
         private readonly List<INetworkState> _networkStates = new();
 
@@ -25,6 +27,7 @@ namespace BananaParty.WebSocketRelay
         public bool NetworkAuthority => _networkContext.LocalClientIdentity == NetworkOwner;
 
         public bool DistanceBasedAuthority => _distanceBasedAuthority;
+        public bool DestroyWhenOwnerLeaves => _destroyWhenOwnerLeaves;
         public NetworkContext NetworkContext => _networkContext;
 
         public string NetworkStateName => _prefabName;
