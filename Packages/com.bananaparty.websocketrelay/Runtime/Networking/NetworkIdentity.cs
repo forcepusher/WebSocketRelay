@@ -4,8 +4,10 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class NetworkIdentity : MonoBehaviour, INetworkIdentity
+    public class NetworkIdentity : MonoBehaviour, INetworkIdentity, IRpcTarget
     {
+        private const string ClaimAuthorityRequesterGuidKey = nameof(ClaimAuthorityRequesterGuidKey);
+
         [SerializeField]
         private NetworkContext _networkContext;
         [SerializeField]
@@ -26,6 +28,10 @@ namespace BananaParty.WebSocketRelay
         public NetworkContext NetworkContext => _networkContext;
 
         public string NetworkStateName => _prefabName;
+
+        public string RpcSubjectName => nameof(ClaimAuthority);
+
+        INetworkIdentity IRpcTarget.NetworkIdentity => this;
 
         private void Awake()
         {
@@ -61,7 +67,7 @@ namespace BananaParty.WebSocketRelay
 
         public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
         {
-            // Ownership is applied first so a client that missed a TakeAuthority RPC
+            // Ownership is applied first so a client that missed a ClaimAuthority RPC
             // still converges on the owner carried by the owner's state broadcasts.
             ReadOwnership(stateInput);
 
@@ -99,6 +105,18 @@ namespace BananaParty.WebSocketRelay
         public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true)
         {
             _networkContext.SendRpc(NetworkIdentifier, rpcSubjectName, parametersStateOutput, Channel, invokeLocally);
+        }
+
+        public void ClaimAuthority()
+        {
+            IStateOutput parametersStateOutput = _networkContext.StateFormat.CreateOutput();
+            parametersStateOutput.WriteGuid(ClaimAuthorityRequesterGuidKey, _networkContext.LocalClientIdentity);
+            SendRpc(RpcSubjectName, parametersStateOutput);
+        }
+
+        public void ReceiveRpc(IStateInput parametersStateInput)
+        {
+            NetworkOwner = parametersStateInput.ReadGuid(ClaimAuthorityRequesterGuidKey);
         }
 
         private void OnValidate()

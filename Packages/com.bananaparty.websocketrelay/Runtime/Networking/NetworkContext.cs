@@ -68,9 +68,21 @@ namespace BananaParty.WebSocketRelay
             return networkIdentity;
         }
 
-        public void RegisterNetworkIdentity(INetworkIdentity networkIdentity) => _identityRegistry.Register(networkIdentity);
+        public void RegisterNetworkIdentity(INetworkIdentity networkIdentity)
+        {
+            _identityRegistry.Register(networkIdentity);
 
-        public void UnregisterNetworkIdentity(INetworkIdentity networkIdentity) => _identityRegistry.Unregister(networkIdentity);
+            if (networkIdentity is IRpcTarget rpcTarget)
+                RegisterRpcTarget(rpcTarget);
+        }
+
+        public void UnregisterNetworkIdentity(INetworkIdentity networkIdentity)
+        {
+            _identityRegistry.Unregister(networkIdentity);
+
+            if (networkIdentity is IRpcTarget rpcTarget)
+                UnregisterRpcTarget(rpcTarget);
+        }
 
         public void RegisterRpcTarget(IRpcTarget rpcTarget) => RpcRouter.RegisterTarget(rpcTarget);
 

@@ -74,11 +74,10 @@ namespace BananaParty.WebSocketRelay.Tests
             return output;
         }
 
-        public static byte[] CreateTakeAuthorityRpcParameters(Guid networkIdentityId, Guid requesterGuid)
+        public static byte[] CreateClaimAuthorityRpcParameters(Guid requesterGuid)
         {
             JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
-            output.WriteGuid("TakeAuthorityGuidKey", networkIdentityId);
-            output.WriteGuid("TakeAuthorityRequesterGuidKey", requesterGuid);
+            output.WriteGuid("ClaimAuthorityRequesterGuidKey", requesterGuid);
             return Encoding.UTF8.GetBytes(output.ToString());
         }
 
@@ -233,6 +232,8 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true) => throw new NotImplementedException();
+
+        public void ClaimAuthority() => throw new NotImplementedException();
     }
 
     internal sealed class StubRpcTarget : IRpcTarget

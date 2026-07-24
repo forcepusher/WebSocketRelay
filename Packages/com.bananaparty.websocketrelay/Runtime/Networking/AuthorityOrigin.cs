@@ -3,22 +3,16 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin, IRpcTarget
+    public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin
     {
         private const float AuthorityInterceptionThreshold = 0.5f;
-        private const string TakeAuthorityGuidKey = nameof(TakeAuthorityGuidKey);
-        private const string TakeAuthorityRequesterGuidKey = nameof(TakeAuthorityRequesterGuidKey);
 
         [SerializeField]
         private NetworkContext _networkContext;
 
         public NetworkIdentity NetworkIdentity { get; private set; }
 
-        INetworkIdentity IRpcTarget.NetworkIdentity => NetworkIdentity;
-
         public Vector3 Position => transform.position;
-
-        public string RpcSubjectName => nameof(AuthorityOrigin);
 
         private void Awake()
         {
@@ -28,13 +22,11 @@ namespace BananaParty.WebSocketRelay
         private void OnEnable()
         {
             _networkContext.RegisterAuthorityOrigin(this);
-            _networkContext.RegisterRpcTarget(this);
         }
 
         private void OnDisable()
         {
             _networkContext.UnregisterAuthorityOrigin(this);
-            _networkContext.UnregisterRpcTarget(this);
         }
 
         private void Update()
@@ -54,7 +46,7 @@ namespace BananaParty.WebSocketRelay
                 if (currentOwnerAuthorityOrigin == null)
                 {
                     if (GetClosestAuthorityOrigin(networkIdentity.GameObject.transform.position) == this)
-                        TakeAuthority((NetworkIdentity)networkIdentity);
+                        networkIdentity.ClaimAuthority();
 
                     continue;
                 }
@@ -65,22 +57,7 @@ namespace BananaParty.WebSocketRelay
                 if (localDistance > currentOwnerDistance * AuthorityInterceptionThreshold)
                     continue;
 
-                TakeAuthority((NetworkIdentity)networkIdentity);
-            }
-        }
-
-        public void ReceiveRpc(IStateInput parametersStateInput)
-        {
-            Guid networkIdentityToControl = parametersStateInput.ReadGuid(TakeAuthorityGuidKey);
-            Guid requesterGuid = parametersStateInput.ReadGuid(TakeAuthorityRequesterGuidKey);
-
-            foreach (INetworkIdentity networkIdentity in _networkContext.NetworkIdentities)
-            {
-                if (networkIdentity.NetworkIdentifier != networkIdentityToControl)
-                    continue;
-
-                networkIdentity.NetworkOwner = requesterGuid;
-                return;
+                networkIdentity.ClaimAuthority();
             }
         }
 
@@ -113,14 +90,6 @@ namespace BananaParty.WebSocketRelay
             }
 
             return closestAuthorityOrigin;
-        }
-
-        private void TakeAuthority(NetworkIdentity networkIdentity)
-        {
-            IStateOutput parametersStateOutput = _networkContext.UseBinary ? new BinaryStateOutput() : new JsonStateOutput();
-            parametersStateOutput.WriteGuid(TakeAuthorityGuidKey, networkIdentity.NetworkIdentifier);
-            parametersStateOutput.WriteGuid(TakeAuthorityRequesterGuidKey, _networkContext.LocalClientIdentity);
-            NetworkIdentity.SendRpc(RpcSubjectName, parametersStateOutput);
         }
     }
 }

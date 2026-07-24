@@ -13,24 +13,22 @@ namespace BananaParty.WebSocketRelay.Tests
         private static readonly Guid LocalClient = Guid.Parse("00000000-0000-0000-0000-000000000099");
 
         [Test]
-        public void TakeAuthorityRpc_AppliesOwnership()
+        public void ClaimAuthorityRpc_AppliesOwnership()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
 
-            NetworkIdentity authorityPlayer = NetworkContextTestHelpers.CreatePlayerActor(context, PlayerA, Vector3.zero);
             NetworkIdentity bot = CreateRegisteredBot(context, PlayerB);
 
             byte[] rpcMessage = NetworkContextTestHelpers.CreateRpcMessage(
-                authorityPlayer.NetworkIdentifier,
-                nameof(AuthorityOrigin),
-                NetworkContextTestHelpers.CreateTakeAuthorityRpcParameters(bot.NetworkIdentifier, PlayerA));
+                bot.NetworkIdentifier,
+                nameof(NetworkIdentity.ClaimAuthority),
+                NetworkContextTestHelpers.CreateClaimAuthorityRpcParameters(PlayerA));
 
             context.ProcessChannelMessage(PlayerA, "room", rpcMessage);
 
             Assert.AreEqual(PlayerA, bot.NetworkOwner);
 
-            UnityEngine.Object.DestroyImmediate(authorityPlayer.gameObject);
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
             UnityEngine.Object.DestroyImmediate(context);
         }

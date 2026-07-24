@@ -131,6 +131,8 @@ namespace BananaParty.WebSocketRelay.Tests
             }
 
             public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true) => throw new NotImplementedException();
+
+            public void ClaimAuthority() => throw new NotImplementedException();
         }
     }
 }
