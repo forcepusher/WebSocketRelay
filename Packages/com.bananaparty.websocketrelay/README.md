@@ -26,7 +26,7 @@ Key priorities:
 3. Tests & Stability - Integration tests using the portable runtime for quick QA. Especially valuable for AI slop.  
   
 Future plans:  
-1. Sample projects to use as a template for kickstarting development of your games.  
+1. Keep adding features and maintaining it. I don't have a choice coz I need a free Photon on a job and pet projects.  
 2. Unity Instance Dedicated Server. Unity spins up a relay server and connects to it as a client to act as a server.  
 3. UDP support via HTTP/3 QUIC. At this point it's going to be just as efficient as any other non-web network library.  
   
