@@ -7,13 +7,11 @@ namespace BananaParty.WebSocketRelay.Samples
 {
     public class GameState : MonoBehaviour
     {
-        private const float SyncInterval = 0.1f;
+        private const float SyncIntervalSeconds = 0.1f;
+        private const string ChannelName = "game-room";
 
-        private Network _network;
-
-        private string _networkChannelName = "game-room";
-
-        private float _timeSinceLastFullSync = 0f;
+        [SerializeField]
+        private string _serverAddress = "ws://127.0.0.1:80";
 
         [SerializeField]
         private NetworkContext _networkContext;
@@ -27,31 +25,32 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField]
         private RelayConnectionSettings _connectionSettings = new();
 
+        private Network _network;
+        private float _timeSinceLastSync;
+
         private void Start()
         {
-            _network = new Network("ws://127.0.0.1:80", _networkContext, connectionSettings: _connectionSettings);
-
-            //var jsonStateOutput = new JsonStateOutput();
-            //WriteState(jsonStateOutput);
-            //Debug.Log(jsonStateOutput.ToString());
+            _network = new Network(_serverAddress, _networkContext, connectionSettings: _connectionSettings);
         }
 
         private void Update()
         {
-            if (_network == null)
-                return;
-
             _network.ManualUpdate(Time.unscaledDeltaTime);
 
             if (!_network.IsConnected)
                 return;
 
-            _timeSinceLastFullSync += Time.unscaledDeltaTime;
-            if (_timeSinceLastFullSync >= SyncInterval)
-            {
-                _timeSinceLastFullSync = 0f;
-                _network.SendSyncIdentities();
-            }
+            _timeSinceLastSync += Time.unscaledDeltaTime;
+            if (_timeSinceLastSync < SyncIntervalSeconds)
+                return;
+
+            _timeSinceLastSync = 0f;
+            _network.SendSyncIdentities();
+        }
+
+        private void OnDestroy()
+        {
+            _network?.Dispose();
         }
 
         public void OnStartServerButtonClick()
@@ -86,15 +85,14 @@ namespace BananaParty.WebSocketRelay.Samples
             {
                 if (_network.HasRelayClient)
                     _network.Disconnect();
+
                 yield break;
             }
 
             // Subscriptions, owned identities and the client GUID survive reconnects, so this runs only once.
-            _network.SubscribeToChannel(_networkChannelName);
-
-            _networkChannel.SetChannel(_networkChannelName);
-
-            _networkContext.Instantiate(_playerCharacterPrefab, _networkChannelName);
+            _network.SubscribeToChannel(ChannelName);
+            _networkChannel.SetChannel(ChannelName);
+            _networkContext.Instantiate(_playerCharacterPrefab, ChannelName);
         }
     }
 }

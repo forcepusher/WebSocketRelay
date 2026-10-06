@@ -148,7 +148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 54a67e6579dfa3b41bdefa9fe008db65, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.DebugOutput
-  maxLogs: 20
+  _maxLogs: 20
 --- !u!4 &118067017
 Transform:
   m_ObjectHideFlags: 0
@@ -1931,7 +1931,7 @@ GameObject:
   - component: {fileID: 1748200971}
   - component: {fileID: 1748200970}
   m_Layer: 5
-  m_Name: StoptServerText
+  m_Name: StopServerText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

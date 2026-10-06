@@ -5,29 +5,29 @@ namespace BananaParty.WebSocketRelay.Samples
     [RequireComponent(typeof(CharacterController))]
     public class Character : MonoBehaviour, INetworkState
     {
-        public string NetworkStateName => nameof(Character);
+        private const float Gravity = 9.81f;
 
-        public INetworkIdentity NetworkIdentity => _networkIdentity;
+        [SerializeField]
+        private float _moveSpeed = 5f;
 
-        [SerializeField] private float moveSpeed = 5f;
-        [SerializeField] private float rotationSpeed = 10f;
-        [SerializeField] private float jumpHeight = 2f;
+        [SerializeField]
+        private float _rotationSpeed = 10f;
 
-        private CharacterController _characteController;
+        [SerializeField]
+        private float _jumpHeight = 2f;
+
+        private CharacterController _characterController;
         private ICharacterInput _characterInput;
+        private NetworkIdentity _networkIdentity;
 
         private float _verticalVelocity;
-
         private float _health = 100f;
         private Vector3 _position = Vector3.zero;
 
-        private NetworkIdentity _networkIdentity;
-
         private void Awake()
         {
-            _characteController = GetComponent<CharacterController>();
+            _characterController = GetComponent<CharacterController>();
             _networkIdentity = GetComponent<NetworkIdentity>();
-
             _characterInput = GetComponent<ICharacterInput>();
         }
 
@@ -35,7 +35,8 @@ namespace BananaParty.WebSocketRelay.Samples
         {
             _characterInput.PollInput();
 
-            Move();
+            if (_networkIdentity.NetworkAuthority)
+                Move();
         }
 
         public void WriteNetworkState(IStateOutput stateOutput)
@@ -49,44 +50,34 @@ namespace BananaParty.WebSocketRelay.Samples
             float health = stateInput.ReadFloat(nameof(_health));
             Vector3 position = stateInput.ReadVector3(nameof(_position));
 
-            if (!_networkIdentity.NetworkAuthority)
-            {
-                _health = health;
-                _position = position;
-                transform.position = position;
-            }
+            if (_networkIdentity.NetworkAuthority)
+                return;
+
+            _health = health;
+            _position = position;
+            transform.position = position;
         }
 
         private void Move()
         {
-            if (_networkIdentity.NetworkAuthority)
+            Vector3 moveDirection = new Vector3(_characterInput.MovementInput.x, 0f, _characterInput.MovementInput.y).normalized;
+            if (moveDirection != Vector3.zero)
             {
-                Vector3 moveDirection = new Vector3(_characterInput.MovementInput.x, 0, _characterInput.MovementInput.y).normalized;
+                _characterController.Move(moveDirection * (_moveSpeed * Time.deltaTime));
 
-                if (moveDirection != Vector3.zero)
-                {
-                    _characteController.Move(moveDirection * moveSpeed * Time.deltaTime);
-
-                    Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
-                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
-                }
-
-                if (_characterInput.JumpInput && _characteController.isGrounded)
-                {
-                    _verticalVelocity = Mathf.Sqrt(jumpHeight * 2f * 9.81f);
-                }
-
-                if (_characteController.isGrounded && _verticalVelocity < 0)
-                {
-                    _verticalVelocity = -2f;
-                }
-                else
-                {
-                    _verticalVelocity -= 9.81f * Time.deltaTime;
-                }
-
-                _characteController.Move(Vector3.up * _verticalVelocity * Time.deltaTime);
+                Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, _rotationSpeed * Time.deltaTime);
             }
+
+            if (_characterInput.JumpInput && _characterController.isGrounded)
+                _verticalVelocity = Mathf.Sqrt(_jumpHeight * 2f * Gravity);
+
+            if (_characterController.isGrounded && _verticalVelocity < 0f)
+                _verticalVelocity = -2f;
+            else
+                _verticalVelocity -= Gravity * Time.deltaTime;
+
+            _characterController.Move(Vector3.up * (_verticalVelocity * Time.deltaTime));
         }
     }
 }

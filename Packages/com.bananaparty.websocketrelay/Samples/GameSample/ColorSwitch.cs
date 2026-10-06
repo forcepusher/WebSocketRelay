@@ -4,23 +4,25 @@ namespace BananaParty.WebSocketRelay.Samples
 {
     public class ColorSwitch : MonoBehaviour, IRpcTarget
     {
-        private const string RandomColorParametername = "RandomColor";
+        private const string RandomColorParameterName = "RandomColor";
 
         private NetworkIdentity _networkIdentity;
-
-        public INetworkIdentity NetworkIdentity => _networkIdentity;
+        private Renderer _renderer;
 
         private enum RpcType
         {
             RandomColorOnLeftClick,
-            GreyColorOnRightClick
+            GreyColorOnRightClick,
         }
+
+        public INetworkIdentity NetworkIdentity => _networkIdentity;
 
         public string RpcSubjectName => nameof(ColorSwitch);
 
         private void Awake()
         {
             _networkIdentity = GetComponent<NetworkIdentity>();
+            _renderer = GetComponent<Renderer>();
         }
 
         private void OnEnable()
@@ -35,44 +37,36 @@ namespace BananaParty.WebSocketRelay.Samples
 
         private void Update()
         {
-            if (_networkIdentity.NetworkAuthority)
-            {
-                if (Input.GetMouseButtonDown(0))
-                {
-                    IStateOutput parametersOutput = _networkIdentity.NetworkContext.StateFormat.CreateOutput();
-                    parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.RandomColorOnLeftClick);
-                    Color color = new(Random.value, Random.value, Random.value);
-                    parametersOutput.WriteColor(RandomColorParametername, color);
-                    _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
-                }
+            if (!_networkIdentity.NetworkAuthority)
+                return;
 
-                if (Input.GetMouseButtonDown(1))
-                {
-                    IStateOutput parametersOutput = _networkIdentity.NetworkContext.StateFormat.CreateOutput();
-                    parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.GreyColorOnRightClick);
-                    _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
-                }
+            if (Input.GetMouseButtonDown(0))
+            {
+                IStateOutput parametersOutput = _networkIdentity.NetworkContext.StateFormat.CreateOutput();
+                parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.RandomColorOnLeftClick);
+                parametersOutput.WriteColor(RandomColorParameterName, new Color(Random.value, Random.value, Random.value));
+                _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
+            }
+
+            if (Input.GetMouseButtonDown(1))
+            {
+                IStateOutput parametersOutput = _networkIdentity.NetworkContext.StateFormat.CreateOutput();
+                parametersOutput.WriteInt(nameof(RpcType), (int)RpcType.GreyColorOnRightClick);
+                _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
             }
         }
 
         public void ReceiveRpc(IStateInput parametersStateInput)
         {
-            RpcType rpcType = (RpcType)parametersStateInput.ReadInt(nameof(RpcType));
-            switch (rpcType)
+            switch ((RpcType)parametersStateInput.ReadInt(nameof(RpcType)))
             {
                 case RpcType.RandomColorOnLeftClick:
-                    Color color = parametersStateInput.ReadColor(RandomColorParametername);
-                    SetColor(color);
+                    _renderer.material.color = parametersStateInput.ReadColor(RandomColorParameterName);
                     break;
                 case RpcType.GreyColorOnRightClick:
-                    SetColor(Color.grey);
+                    _renderer.material.color = Color.grey;
                     break;
             }
-        }
-
-        private void SetColor(Color color)
-        {
-            GetComponent<Renderer>().material.color = color;
         }
     }
 }
