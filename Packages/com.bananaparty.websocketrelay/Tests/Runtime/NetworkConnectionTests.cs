@@ -292,7 +292,6 @@ namespace BananaParty.WebSocketRelay.Tests
             Update(StepSeconds);
 
             // Silent for 2 heartbeat intervals marks the link as interrupted, at 5 s it is dropped.
-            LogAssert.Expect(LogType.Warning, new Regex("did not answer any heartbeat"));
             Update(5.5f);
             Assert.AreEqual(RelayConnectionState.Reconnecting, _network.ConnectionState);
             Update(10f);

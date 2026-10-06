@@ -466,45 +466,11 @@ namespace BananaParty.WebSocketRelay.Tests
             Run(4.9);
             Assert.AreEqual(RelayConnectionState.Connected, _client.State);
 
-            LogAssert.Expect(LogType.Warning, new Regex("did not answer any heartbeat"));
             Run(0.2);
 
             Assert.AreEqual(RelayConnectionState.Reconnecting, _client.State);
             StringAssert.Contains("Nothing received for 5 s", _listener.LastReason);
             Assert.IsTrue(socket.IsDisposed);
-        }
-
-        [Test]
-        public void Heartbeat_OutdatedServerWarningIsLoggedOnce()
-        {
-            int warningCount = 0;
-            void CountWarnings(string message, string stackTrace, LogType type)
-            {
-                if (type == LogType.Warning && message.Contains("did not answer any heartbeat"))
-                    warningCount++;
-            }
-
-            Application.logMessageReceived += CountWarnings;
-            try
-            {
-                _factory.OnCreate = createdSocket => createdSocket.AnswersPings = false;
-                CreateClient();
-                ConnectAndOpen();
-
-                for (int lossCount = 0; lossCount < 3; lossCount++)
-                {
-                    RunUntil(() => _client.State == RelayConnectionState.Reconnecting, 10);
-                    RunUntil(() => _factory.Latest.IsConnectCalled && !_factory.Latest.IsClosed, 10);
-                    _factory.Latest.Open();
-                    Poll();
-                }
-            }
-            finally
-            {
-                Application.logMessageReceived -= CountWarnings;
-            }
-
-            Assert.AreEqual(1, warningCount);
         }
 
         [Test]
@@ -575,7 +541,6 @@ namespace BananaParty.WebSocketRelay.Tests
             Run(1.68);
             Assert.AreEqual(RelayConnectionState.Connected, _client.State);
 
-            LogAssert.Expect(LogType.Warning, new Regex("did not answer any heartbeat"));
             Run(0.2);
             Assert.AreEqual(RelayConnectionState.Reconnecting, _client.State);
         }

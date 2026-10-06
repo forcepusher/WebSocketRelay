@@ -39,8 +39,6 @@ namespace BananaParty.WebSocketRelay.Transport
         private double _lastReceiveTime;
         private double _lastPingTime;
         private bool _hasRoundTripTime;
-        private bool _hasReceivedPong;
-        private bool _hasWarnedAboutMissingPong;
 
         public RelayClient(string serverAddress, IRelayListener relayListener, Guid clientGuid, bool offlineMode = false, RelayConnectionSettings settings = null)
             : this(CreateSocketFactory(serverAddress, offlineMode), relayListener, clientGuid, settings)
@@ -309,7 +307,6 @@ namespace BananaParty.WebSocketRelay.Transport
             _reconnectAttemptCount = 0;
             _lastFailureReason = null;
             _lastReceiveTime = _clock;
-            _hasReceivedPong = false;
             _hasRoundTripTime = false;
             RoundTripTimeSeconds = 0d;
 
@@ -339,7 +336,6 @@ namespace BananaParty.WebSocketRelay.Transport
 
             if (_clock - _lastReceiveTime >= _settings.HeartbeatTimeoutSeconds)
             {
-                WarnIfHeartbeatsWereNeverAnswered();
                 LoseConnection($"Nothing received for {_settings.HeartbeatTimeoutSeconds} s");
                 return;
             }
@@ -401,8 +397,6 @@ namespace BananaParty.WebSocketRelay.Transport
 
         private void HandlePong(byte[] payloadBytes, double pollGapSeconds)
         {
-            _hasReceivedPong = true;
-
             // A pong read after a frame hitch has waited in the queue, so its round trip would include the hitch.
             if (pollGapSeconds > MaxPollIntervalSeconds)
                 return;
@@ -424,16 +418,6 @@ namespace BananaParty.WebSocketRelay.Transport
         {
             _lastPingTime = _clock;
             TrySend(RelayMessageCodec.CreatePingMessage(_lastPollTime));
-        }
-
-        private void WarnIfHeartbeatsWereNeverAnswered()
-        {
-            if (_hasReceivedPong || _hasWarnedAboutMissingPong)
-                return;
-
-            _hasWarnedAboutMissingPong = true;
-            Debug.LogWarning("Relay server did not answer any heartbeat on this connection. "
-                + "If connections keep timing out, the relay server may be outdated and not support heartbeats.");
         }
 
         private void LoseConnection(string reason)
