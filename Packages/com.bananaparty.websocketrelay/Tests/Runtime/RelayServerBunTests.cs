@@ -54,6 +54,8 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return "BrowserSocket.jslib > reports abnormal closure when the server drops the handshake";
             yield return "BrowserSocket.jslib > reports abnormal closure for an invalid address without throwing";
             yield return "BrowserSocket.jslib > drops sends while connecting instead of throwing";
+            yield return "BrowserSocket.jslib > drops the connection when received data is not read";
+            yield return "BrowserSocket.jslib > keeps the connection while received data is read";
             yield return "BrowserSocket.jslib > dispose frees the socket and later calls are harmless";
             yield return "BrowserSocket.jslib > never reuses ids of disposed sockets";
         }

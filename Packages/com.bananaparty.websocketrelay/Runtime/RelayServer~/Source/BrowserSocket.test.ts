@@ -12,6 +12,7 @@ import {
 
 const testPort = 23147;
 const abnormalClosureCode = 1006;
+const unreadLimitClosureCode = 1009;
 const jslibPath = fileURLToPath(new URL("../../Socket/BrowserSocket.jslib", import.meta.url));
 
 type BrowserSocketExports = {
@@ -24,7 +25,7 @@ type BrowserSocketExports = {
     BrowserSocketSend(socketId: number, payloadPtr: number, payloadLength: number): void;
     BrowserSocketDisconnect(socketId: number): void;
     BrowserSocketDispose(socketId: number): void;
-    $browserSocket: { sockets: Record<number, unknown> };
+    $browserSocket: { sockets: Record<number, unknown>; maxUnreadPayloadBytes: number };
 };
 
 // Links the jslib the way Emscripten does: $-prefixed members become module variables,
@@ -213,6 +214,42 @@ describe.skipIf(!existsSync(jslibPath))("BrowserSocket.jslib", () => {
         const socketId = harness.connect();
         harness.send(socketId, relayWritePingMessage());
         harness.exports.BrowserSocketDispose(socketId);
+    });
+
+    test("drops the connection when received data is not read", async () => {
+        const socketId = await connectOpen();
+        const previousLimit = harness.exports.$browserSocket.maxUnreadPayloadBytes;
+        harness.exports.$browserSocket.maxUnreadPayloadBytes = 20;
+        try {
+            for (let index = 0; index < 3; index++) harness.send(socketId, relayWritePingMessage(new Uint8Array(8)));
+            await waitFor(() => harness.exports.GetBrowserSocketCloseCode(socketId) !== 0);
+
+            expect(harness.exports.GetBrowserSocketCloseCode(socketId)).toBe(unreadLimitClosureCode);
+            expect(harness.exports.GetBrowserSocketIsConnected(socketId)).toBe(false);
+            expect(harness.exports.GetBrowserSocketHasUnreadPayloadQueue(socketId)).toBe(false);
+        } finally {
+            harness.exports.$browserSocket.maxUnreadPayloadBytes = previousLimit;
+            harness.exports.BrowserSocketDispose(socketId);
+        }
+    });
+
+    test("keeps the connection while received data is read", async () => {
+        const socketId = await connectOpen();
+        const previousLimit = harness.exports.$browserSocket.maxUnreadPayloadBytes;
+        harness.exports.$browserSocket.maxUnreadPayloadBytes = 20;
+        try {
+            for (let index = 0; index < 5; index++) {
+                harness.send(socketId, relayWritePingMessage(new Uint8Array(8)));
+                await waitFor(() => harness.exports.GetBrowserSocketHasUnreadPayloadQueue(socketId));
+                expect(harness.readPayload(socketId)[0]).toBe(RelayMessageType.Pong);
+            }
+
+            expect(harness.exports.GetBrowserSocketIsConnected(socketId)).toBe(true);
+            expect(harness.exports.GetBrowserSocketCloseCode(socketId)).toBe(0);
+        } finally {
+            harness.exports.$browserSocket.maxUnreadPayloadBytes = previousLimit;
+            harness.exports.BrowserSocketDispose(socketId);
+        }
     });
 
     test("dispose frees the socket and later calls are harmless", async () => {

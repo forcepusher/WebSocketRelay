@@ -9,6 +9,10 @@ const browserSocketLibrary = {
         // Matches the code browsers report for connections that end without a close frame.
         abnormalClosureCode: 1006,
 
+        // Reported when the connection is dropped because the application stopped reading, see queuePayload.
+        unreadLimitClosureCode: 1009,
+        maxUnreadPayloadBytes: 4 * 1024 * 1024,
+
         getSocket: function (socketId) {
             return browserSocket.sockets[socketId] || null;
         },
@@ -63,8 +67,29 @@ const browserSocketLibrary = {
                 return payloadBytesCount;
 
             const payloadBytes = socket.payloadQueue.shift();
+            socket.unreadPayloadBytes -= payloadBytesCount;
             HEAPU8.set(payloadBytes, payloadBytesBufferPtr);
             return payloadBytesCount;
+        },
+
+        // Browsers keep delivering messages while a hidden tab runs no frames, and cannot pause a WebSocket.
+        // Past the limit the connection is dropped instead of buffering without end, and the client reconnects once it runs again.
+        queuePayload: function (socket, payloadBytes) {
+            socket.payloadQueue.push(payloadBytes);
+            socket.unreadPayloadBytes += payloadBytes.length;
+            if (socket.unreadPayloadBytes <= browserSocket.maxUnreadPayloadBytes)
+                return;
+
+            console.warn(
+                "Closing WebSocket because " +
+                    socket.unreadPayloadBytes +
+                    " received bytes were not read.",
+            );
+            socket.payloadQueue = [];
+            socket.unreadPayloadBytes = 0;
+            socket.closeCode = browserSocket.unreadLimitClosureCode;
+            socket.webSocket.onmessage = null;
+            socket.webSocket.close();
         },
 
         browserSocketConnect: function (serverAddress) {
@@ -72,6 +97,7 @@ const browserSocketLibrary = {
             const socket = {
                 webSocket: null,
                 payloadQueue: [],
+                unreadPayloadBytes: 0,
                 closeCode: 0,
             };
             browserSocket.sockets[socketId] = socket;
@@ -95,9 +121,13 @@ const browserSocketLibrary = {
 
             webSocket.onmessage = function (messageEvent) {
                 if (messageEvent.data instanceof ArrayBuffer) {
-                    socket.payloadQueue.push(new Uint8Array(messageEvent.data));
+                    browserSocket.queuePayload(
+                        socket,
+                        new Uint8Array(messageEvent.data),
+                    );
                 } else if (typeof messageEvent.data === "string") {
-                    socket.payloadQueue.push(
+                    browserSocket.queuePayload(
+                        socket,
                         new TextEncoder().encode(messageEvent.data),
                     );
                 } else if (messageEvent.data instanceof Blob) {
@@ -114,8 +144,9 @@ const browserSocketLibrary = {
             };
 
             webSocket.onclose = function (closeEvent) {
-                socket.closeCode =
-                    closeEvent.code || browserSocket.abnormalClosureCode;
+                if (socket.closeCode === 0)
+                    socket.closeCode =
+                        closeEvent.code || browserSocket.abnormalClosureCode;
             };
 
             socket.webSocket = webSocket;
