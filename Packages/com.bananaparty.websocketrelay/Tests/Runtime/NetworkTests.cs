@@ -11,8 +11,6 @@ namespace BananaParty.WebSocketRelay.Tests
 {
     public class NetworkTests
     {
-        private static string ServerAddress => $"ws://localhost:{TestParameters.RelayServerPort}";
-
         [UnitySetUp]
         public IEnumerator SetUp()
         {
@@ -23,7 +21,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public void SubscribeWhenNotConnected_ThrowsInvalidOperationException()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
-            Network network = new Network(ServerAddress, context);
+            Network network = new Network(TestParameters.RelayServerAddress, context);
 
             Assert.Throws<InvalidOperationException>(() => network.SubscribeToChannel("room"));
             Assert.Throws<InvalidOperationException>(() => network.UnsubscribeFromChannel("room"));
@@ -93,7 +91,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             Assert.IsFalse(network.HasRelayClient);
 
-            Network connectedNetwork = new Network(ServerAddress, context);
+            Network connectedNetwork = new Network(TestParameters.RelayServerAddress, context);
             connectedNetwork.Connect(Guid.NewGuid());
             yield return TestParameters.WaitForCondition(
                 () => connectedNetwork.IsConnected,
@@ -130,7 +128,7 @@ namespace BananaParty.WebSocketRelay.Tests
             network.Disconnect(clearSession: false);
 
             Assert.IsFalse(network.HasRelayClient);
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(1, context.NetworkIdentities.Count);
             Assert.IsFalse(sceneObject == null);
 
             UnityEngine.Object.DestroyImmediate(sceneObject);
@@ -142,7 +140,7 @@ namespace BananaParty.WebSocketRelay.Tests
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             Guid clientGuid = Guid.NewGuid();
-            Network network = new Network(ServerAddress, context, connectionSettings: TestParameters.ReconnectDisabledSettings());
+            Network network = new Network(TestParameters.RelayServerAddress, context, connectionSettings: TestParameters.ReconnectDisabledSettings());
 
             network.Connect(clientGuid);
             yield return TestParameters.WaitForCondition(
@@ -167,7 +165,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             Assert.IsFalse(network.HasRelayClient);
             Assert.AreEqual(Guid.Empty, context.LocalClientIdentity);
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(0, context.NetworkIdentities.Count);
             Assert.IsTrue(localObject == null);
 
             yield return RelayServerLauncher.StartCoroutine();
@@ -189,7 +187,7 @@ namespace BananaParty.WebSocketRelay.Tests
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             Guid clientGuid = Guid.NewGuid();
-            Network network = new Network(ServerAddress, context, connectionSettings: TestParameters.ReconnectDisabledSettings());
+            Network network = new Network(TestParameters.RelayServerAddress, context, connectionSettings: TestParameters.ReconnectDisabledSettings());
 
             network.Connect(clientGuid);
             yield return TestParameters.WaitForCondition(
@@ -216,7 +214,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 () => network.ManualUpdate(Time.deltaTime));
 
             Assert.IsFalse(network.IsConnected);
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(0, context.NetworkIdentities.Count);
             Assert.IsTrue(localObject == null);
 
             UnityEngine.Object.DestroyImmediate(context);
@@ -278,9 +276,9 @@ namespace BananaParty.WebSocketRelay.Tests
 
             Assert.AreEqual(guidA, contextA.LocalClientIdentity);
             Assert.AreEqual(guidB, contextB.LocalClientIdentity);
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkIdentityCount(contextA));
+            Assert.AreEqual(1, contextA.NetworkIdentities.Count);
             Assert.IsFalse(ownedObject == null);
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(contextB));
+            Assert.AreEqual(1, contextB.NetworkPlayers.Count);
 
             // Both sides resubscribe on their own; a sync sent before the other side resubscribed would be lost.
             yield return TestParameters.WaitForDuration(0.25f, UpdateBoth);
@@ -291,7 +289,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 TestParameters.ReceiveTimeoutThreshold,
                 UpdateBoth);
             Assert.Less(FindPlayer(contextB, guidA).TimeSinceLastMessage, timeSinceLastMessage, "Sync after reconnect did not arrive.");
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(contextB));
+            Assert.AreEqual(1, contextB.NetworkPlayers.Count);
 
             networkA.Disconnect();
             networkB.Disconnect();

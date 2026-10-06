@@ -185,8 +185,8 @@ namespace BananaParty.WebSocketRelay.Tests
             Assert.IsTrue(_networkA.IsConnected);
             Assert.IsFalse(_contextA.IsConnectionInterrupted);
             Assert.AreEqual(guidA, _contextA.LocalClientIdentity);
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(_contextA));
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(_contextB));
+            Assert.AreEqual(1, _contextA.NetworkPlayers.Count);
+            Assert.AreEqual(1, _contextB.NetworkPlayers.Count);
         }
 
         [UnityTest]
@@ -222,8 +222,8 @@ namespace BananaParty.WebSocketRelay.Tests
 
             Assert.IsFalse(peerWasDropped, "A peer was dropped although the outage was shorter than the player timeout.");
             Assert.Less(FindPlayer(_contextB, guidA).TimeSinceLastMessage, 0.5f, "Syncs did not resume after reconnecting.");
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(_contextA));
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(_contextB));
+            Assert.AreEqual(1, _contextA.NetworkPlayers.Count);
+            Assert.AreEqual(1, _contextB.NetworkPlayers.Count);
         }
 
         private IEnumerator ConnectRelaysSubscribedToChannel()
@@ -307,12 +307,12 @@ namespace BananaParty.WebSocketRelay.Tests
             _networkA.SubscribeToChannel(Channel);
             _networkB.SubscribeToChannel(Channel);
             yield return TestParameters.WaitForCondition(
-                () => NetworkContextTestHelpers.GetNetworkPlayerCount(_contextA) == 1
-                      && NetworkContextTestHelpers.GetNetworkPlayerCount(_contextB) == 1,
+                () => _contextA.NetworkPlayers.Count == 1
+                      && _contextB.NetworkPlayers.Count == 1,
                 TestParameters.ReceiveTimeoutThreshold,
                 UpdateNetworks);
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(_contextA), "A does not see B.");
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(_contextB), "B does not see A.");
+            Assert.AreEqual(1, _contextA.NetworkPlayers.Count, "A does not see B.");
+            Assert.AreEqual(1, _contextB.NetworkPlayers.Count, "B does not see A.");
         }
 
         private void UpdateNetworks()

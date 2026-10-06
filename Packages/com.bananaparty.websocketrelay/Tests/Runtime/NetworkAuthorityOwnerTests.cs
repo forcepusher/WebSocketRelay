@@ -200,8 +200,6 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private sealed class StubNetworkState : MonoBehaviour, INetworkState
         {
-            public string NetworkStateName => nameof(StubNetworkState);
-
             public int LastReadValue { get; private set; }
 
             public void WriteNetworkState(IStateOutput stateOutput) =>

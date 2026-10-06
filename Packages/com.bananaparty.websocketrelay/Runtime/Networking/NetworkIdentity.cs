@@ -42,21 +42,13 @@ namespace BananaParty.WebSocketRelay
         public bool IsSceneBound { get; internal set; }
         public NetworkContext NetworkContext => _networkContext;
 
-        public string NetworkStateName => _prefabName;
-
         public string RpcSubjectName => nameof(ClaimAuthority);
 
         INetworkIdentity IRpcTarget.NetworkIdentity => this;
 
         private void Awake()
         {
-            foreach (INetworkState networkState in GetComponents<INetworkState>())
-            {
-                if (ReferenceEquals(networkState, this))
-                    continue;
-
-                _networkStates.Add(networkState);
-            }
+            GetComponents(_networkStates);
         }
 
         public void WriteNetworkState(IStateOutput stateOutput)
@@ -73,14 +65,6 @@ namespace BananaParty.WebSocketRelay
                 stateOutput.EndObject();
             }
             stateOutput.EndArray();
-        }
-
-        public void ReadNetworkState(IStateInput stateInput)
-        {
-            if (!ReadNetworkAuthorityOwner(stateInput))
-                return;
-
-            ReadComponentStates(stateInput);
         }
 
         public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)

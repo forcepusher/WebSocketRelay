@@ -336,7 +336,6 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private sealed class MockCharacterState : INetworkState
         {
-            public string NetworkStateName => nameof(MockCharacterState);
             public int Health { get; set; }
             public Vector3 Position { get; set; }
 

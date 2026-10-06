@@ -18,7 +18,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             context.ProcessChannelMessage(context.LocalClientIdentity, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
 
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
+            Assert.AreEqual(0, context.NetworkPlayers.Count);
             UnityEngine.Object.DestroyImmediate(context);
         }
 
@@ -31,7 +31,7 @@ namespace BananaParty.WebSocketRelay.Tests
 
             context.ProcessChannelMessage(remotePlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
 
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
+            Assert.AreEqual(1, context.NetworkPlayers.Count);
             UnityEngine.Object.DestroyImmediate(context);
         }
 
@@ -55,8 +55,8 @@ namespace BananaParty.WebSocketRelay.Tests
             NetworkContextTestHelpers.Advance(context, 1.1f);
             yield return null;
 
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(0, context.NetworkPlayers.Count);
+            Assert.AreEqual(0, context.NetworkIdentities.Count);
             Assert.IsTrue(remoteObject == null);
 
             UnityEngine.Object.DestroyImmediate(context);
@@ -85,8 +85,8 @@ namespace BananaParty.WebSocketRelay.Tests
             NetworkContextTestHelpers.Advance(context, 1.1f);
             yield return null;
 
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(0, context.NetworkPlayers.Count);
+            Assert.AreEqual(1, context.NetworkIdentities.Count);
             Assert.IsFalse(remoteObject == null);
 
             UnityEngine.Object.DestroyImmediate(remoteObject);
@@ -122,8 +122,8 @@ namespace BananaParty.WebSocketRelay.Tests
             NetworkContextTestHelpers.Advance(context, 1.1f);
             yield return null;
 
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(1, context.NetworkPlayers.Count);
+            Assert.AreEqual(1, context.NetworkIdentities.Count);
             Assert.IsTrue(timingOutObject == null);
             Assert.IsFalse(activeObject == null);
 
@@ -152,8 +152,8 @@ namespace BananaParty.WebSocketRelay.Tests
             NetworkContextTestHelpers.Advance(context, 1.5f);
             yield return null;
 
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(1, context.NetworkPlayers.Count);
+            Assert.AreEqual(1, context.NetworkIdentities.Count);
             Assert.IsFalse(remoteObject == null);
 
             UnityEngine.Object.DestroyImmediate(remoteObject);
@@ -187,11 +187,36 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return null;
 
             Assert.AreEqual(Guid.Empty, context.LocalClientIdentity);
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(0, context.NetworkPlayers.Count);
+            Assert.AreEqual(0, context.NetworkIdentities.Count);
             Assert.IsTrue(localObject == null);
             Assert.IsTrue(remoteObject == null);
 
+            UnityEngine.Object.DestroyImmediate(context);
+        }
+
+        [UnityTest]
+        public IEnumerator ClearNetworkSession_KeepsSceneBoundIdentitiesWithoutOwner()
+        {
+            NetworkContext context = NetworkContextTestHelpers.CreateContext();
+            NetworkChannel networkChannel = ScriptableObject.CreateInstance<NetworkChannel>();
+            Guid localPlayer = Guid.NewGuid();
+            context.LocalClientIdentity = localPlayer;
+
+            NetworkIdentity sceneIdentity = NetworkContextTestHelpers.CreateSceneBoundIdentity(context, networkChannel, localPlayer);
+            GameObject spawnedObject = new("SpawnedObject");
+            context.RegisterNetworkIdentity(new StubNetworkIdentity(spawnedObject, "SpawnedPrefab", localPlayer, Guid.NewGuid()));
+
+            context.ClearNetworkSession();
+            yield return null;
+
+            Assert.IsFalse(sceneIdentity == null, "Scene identity was destroyed, but scene objects cannot be spawned again.");
+            Assert.AreEqual(Guid.Empty, sceneIdentity.NetworkAuthorityOwner);
+            CollectionAssert.AreEqual(new INetworkIdentity[] { sceneIdentity }, context.NetworkIdentities);
+            Assert.IsTrue(spawnedObject == null);
+
+            UnityEngine.Object.DestroyImmediate(sceneIdentity.gameObject);
+            UnityEngine.Object.DestroyImmediate(networkChannel);
             UnityEngine.Object.DestroyImmediate(context);
         }
 
@@ -210,13 +235,13 @@ namespace BananaParty.WebSocketRelay.Tests
 
             Network network = new Network("ws://127.0.0.1:1", context);
             network.Connect(context.LocalClientIdentity);
-            network.OnConnectionStateChanged(RelayConnectionState.Connected, RelayConnectionState.Disconnected, "Test");
+            ((IRelayListener)network).OnConnectionStateChanged(RelayConnectionState.Connected, RelayConnectionState.Disconnected, "Test");
             yield return null;
 
             Assert.IsFalse(network.HasRelayClient);
 
             Assert.AreEqual(Guid.Empty, context.LocalClientIdentity);
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(0, context.NetworkIdentities.Count);
             Assert.IsTrue(localObject == null);
 
             UnityEngine.Object.DestroyImmediate(context);
@@ -231,7 +256,7 @@ namespace BananaParty.WebSocketRelay.Tests
             context.ProcessChannelMessage(Guid.NewGuid(), "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
             context.ManualUpdate(30f);
 
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
+            Assert.AreEqual(1, context.NetworkPlayers.Count);
             UnityEngine.Object.DestroyImmediate(context);
         }
 
@@ -244,14 +269,14 @@ namespace BananaParty.WebSocketRelay.Tests
 
             context.IsConnectionInterrupted = true;
             NetworkContextTestHelpers.Advance(context, 5f);
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
+            Assert.AreEqual(1, context.NetworkPlayers.Count);
 
             context.IsConnectionInterrupted = false;
             NetworkContextTestHelpers.Advance(context, 0.9f);
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
+            Assert.AreEqual(1, context.NetworkPlayers.Count);
 
             NetworkContextTestHelpers.Advance(context, 0.2f);
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
+            Assert.AreEqual(0, context.NetworkPlayers.Count);
 
             UnityEngine.Object.DestroyImmediate(context);
         }
@@ -283,14 +308,14 @@ namespace BananaParty.WebSocketRelay.Tests
             Assert.IsTrue(sceneIdentity.IsSceneBound);
             Assert.IsFalse(sceneIdentity.DestroyWhenAuthorityOwnerLeaves);
             Assert.IsTrue(spawnedIdentity.DestroyWhenAuthorityOwnerLeaves);
-            Assert.AreEqual(2, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(2, context.NetworkIdentities.Count);
 
             context.ProcessChannelMessage(remotePlayer, "room", NetworkContextTestHelpers.CreateEmptySyncIdentitiesMessage());
             NetworkContextTestHelpers.Advance(context, 1.1f);
             yield return null;
 
-            Assert.AreEqual(0, NetworkContextTestHelpers.GetNetworkPlayerCount(context));
-            Assert.AreEqual(1, NetworkContextTestHelpers.GetNetworkIdentityCount(context));
+            Assert.AreEqual(0, context.NetworkPlayers.Count);
+            Assert.AreEqual(1, context.NetworkIdentities.Count);
             Assert.IsFalse(sceneIdentity == null);
             Assert.AreEqual(Guid.Empty, sceneIdentity.NetworkAuthorityOwner);
             Assert.IsTrue(spawnedIdentity == null);

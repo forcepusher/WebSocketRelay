@@ -3,6 +3,9 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
+    /// <summary>
+    /// Claims authority over identities with distance based authority that are closer to it than to their current owner.
+    /// </summary>
     public class AuthorityOrigin : MonoBehaviour, IAuthorityOrigin
     {
         [SerializeField]
@@ -42,47 +45,41 @@ namespace BananaParty.WebSocketRelay
 
             foreach (INetworkIdentity networkIdentity in _networkContext.NetworkIdentities)
             {
-                if (!networkIdentity.DistanceBasedAuthority)
+                if (!networkIdentity.DistanceBasedAuthority || networkIdentity.NetworkAuthorityOwner == _networkContext.LocalClientIdentity)
                     continue;
 
-                if (networkIdentity.NetworkAuthorityOwner == _networkContext.LocalClientIdentity)
-                    continue;
-
-                AuthorityOrigin currentAuthorityOwnerOrigin = GetAuthorityOriginForNetworkAuthorityOwner(networkIdentity.NetworkAuthorityOwner);
-                if (currentAuthorityOwnerOrigin == null)
-                {
-                    if (GetClosestAuthorityOrigin(networkIdentity.GameObject.transform.position) == this)
-                        networkIdentity.ClaimAuthority();
-
-                    continue;
-                }
-
-                float currentAuthorityOwnerDistance = Vector3.Distance(networkIdentity.GameObject.transform.position, currentAuthorityOwnerOrigin.Position);
-                float localDistance = Vector3.Distance(networkIdentity.GameObject.transform.position, Position);
-
-                if (localDistance > currentAuthorityOwnerDistance * _authorityInterceptionDistanceThreshold)
-                    continue;
-
-                networkIdentity.ClaimAuthority();
+                if (ShouldClaim(networkIdentity.GameObject.transform.position, networkIdentity.NetworkAuthorityOwner))
+                    networkIdentity.ClaimAuthority();
             }
         }
 
-        private AuthorityOrigin GetAuthorityOriginForNetworkAuthorityOwner(Guid networkAuthorityOwner)
+        private bool ShouldClaim(Vector3 targetPosition, Guid currentAuthorityOwner)
+        {
+            IAuthorityOrigin currentAuthorityOwnerOrigin = FindAuthorityOrigin(currentAuthorityOwner);
+
+            // Without an origin to compare against, the closest origin takes it.
+            if (currentAuthorityOwnerOrigin == null)
+                return ReferenceEquals(FindClosestAuthorityOrigin(targetPosition), this);
+
+            float currentAuthorityOwnerDistance = Vector3.Distance(targetPosition, currentAuthorityOwnerOrigin.Position);
+            float localDistance = Vector3.Distance(targetPosition, Position);
+            return localDistance <= currentAuthorityOwnerDistance * _authorityInterceptionDistanceThreshold;
+        }
+
+        private IAuthorityOrigin FindAuthorityOrigin(Guid networkAuthorityOwner)
         {
             foreach (IAuthorityOrigin authorityOrigin in _networkContext.AuthorityOrigins)
             {
-                if (authorityOrigin.NetworkIdentity.NetworkAuthorityOwner != networkAuthorityOwner)
-                    continue;
-
-                return (AuthorityOrigin)authorityOrigin;
+                if (authorityOrigin.NetworkIdentity.NetworkAuthorityOwner == networkAuthorityOwner)
+                    return authorityOrigin;
             }
 
             return null;
         }
 
-        private AuthorityOrigin GetClosestAuthorityOrigin(Vector3 targetPosition)
+        private IAuthorityOrigin FindClosestAuthorityOrigin(Vector3 targetPosition)
         {
-            AuthorityOrigin closestAuthorityOrigin = null;
+            IAuthorityOrigin closestAuthorityOrigin = null;
             float closestDistance = float.MaxValue;
 
             foreach (IAuthorityOrigin authorityOrigin in _networkContext.AuthorityOrigins)
@@ -92,7 +89,7 @@ namespace BananaParty.WebSocketRelay
                     continue;
 
                 closestDistance = distance;
-                closestAuthorityOrigin = (AuthorityOrigin)authorityOrigin;
+                closestAuthorityOrigin = authorityOrigin;
             }
 
             return closestAuthorityOrigin;

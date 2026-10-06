@@ -23,11 +23,10 @@ namespace BananaParty.WebSocketRelay
         private readonly NetworkIdentityRegistry _identityRegistry = new();
         private readonly NetworkPlayerRoster _playerRoster = new();
         private readonly List<IAuthorityOrigin> _authorityOrigins = new();
+        private readonly List<Guid> _timedOutPlayerGuids = new();
 
         private IStateFormat _stateFormat;
         private RpcRouter _rpcRouter;
-
-        public bool UseBinary => _useBinary;
 
         public float PlayerTimeoutSeconds => _playerTimeoutSeconds;
 
@@ -65,8 +64,15 @@ namespace BananaParty.WebSocketRelay
             // otherwise components register themselves using an empty NetworkIdentifier.
             bool prefabWasActive = prefab.gameObject.activeSelf;
             prefab.gameObject.SetActive(false);
-            NetworkIdentity networkIdentity = GameObject.Instantiate(prefab);
-            prefab.gameObject.SetActive(prefabWasActive);
+            NetworkIdentity networkIdentity;
+            try
+            {
+                networkIdentity = GameObject.Instantiate(prefab);
+            }
+            finally
+            {
+                prefab.gameObject.SetActive(prefabWasActive);
+            }
 
             networkIdentity.NetworkIdentifier = networkIdentifier;
             networkIdentity.NetworkAuthorityOwner = networkAuthorityOwner;
@@ -104,11 +110,23 @@ namespace BananaParty.WebSocketRelay
 
         public void UnregisterAuthorityOrigin(IAuthorityOrigin authorityOrigin) => _authorityOrigins.Remove(authorityOrigin);
 
+        /// <summary>
+        /// Forgets the session: spawned identities are destroyed, scene identities stay and lose their owner,
+        /// and players, queued RPCs and the local client identity are cleared.
+        /// </summary>
         public void ClearNetworkSession()
         {
             for (int identityIndex = NetworkIdentities.Count - 1; identityIndex >= 0; identityIndex--)
             {
                 INetworkIdentity networkIdentity = NetworkIdentities[identityIndex];
+
+                // Scene identities cannot be spawned again, so they stay for the next session.
+                if (networkIdentity.IsSceneBound)
+                {
+                    networkIdentity.NetworkAuthorityOwner = Guid.Empty;
+                    continue;
+                }
+
                 UnregisterNetworkIdentity(networkIdentity);
 
                 if (networkIdentity.GameObject != null)
@@ -127,7 +145,8 @@ namespace BananaParty.WebSocketRelay
                 return;
 
             float deltaTime = Mathf.Min(unscaledDeltaTime, MaxUpdateDeltaSeconds);
-            foreach (Guid playerGuid in _playerRoster.RemoveTimedOut(deltaTime, _playerTimeoutSeconds))
+            _playerRoster.RemoveTimedOut(deltaTime, _playerTimeoutSeconds, _timedOutPlayerGuids);
+            foreach (Guid playerGuid in _timedOutPlayerGuids)
             {
                 DestroyIdentitiesOwnedByAuthorityOwner(playerGuid);
                 Debug.Log($"Removed timed out player {playerGuid}");

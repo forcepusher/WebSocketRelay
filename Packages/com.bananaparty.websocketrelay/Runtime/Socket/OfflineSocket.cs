@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using BananaParty.WebSocketRelay.Transport;
 
@@ -25,7 +26,7 @@ namespace BananaParty.WebSocketRelay
         public byte[] ReadPayloadQueue()
         {
             if (_payloadQueue.Count == 0)
-                throw new System.InvalidOperationException($"Trying to use {nameof(ReadPayloadQueue)} while {nameof(HasUnreadPayloadQueue)} is false.");
+                throw new InvalidOperationException($"Trying to use {nameof(ReadPayloadQueue)} while {nameof(HasUnreadPayloadQueue)} is false.");
 
             return _payloadQueue.Dequeue();
         }
@@ -40,7 +41,7 @@ namespace BananaParty.WebSocketRelay
         public void Send(byte[] payloadBytes)
         {
             if (!IsConnected)
-                throw new System.InvalidOperationException($"Trying to use {nameof(Send)} while not {nameof(IsConnected)}.");
+                throw new InvalidOperationException($"Trying to use {nameof(Send)} while not {nameof(IsConnected)}.");
 
             if (payloadBytes.Length > 0 && payloadBytes[0] == RelayMessageType.Ping)
             {

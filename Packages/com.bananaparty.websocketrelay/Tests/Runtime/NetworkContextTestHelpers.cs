@@ -34,21 +34,6 @@ namespace BananaParty.WebSocketRelay.Tests
                 context.ManualUpdate(stepSeconds);
         }
 
-        public static int GetNetworkPlayerCount(NetworkContext context)
-        {
-            return context.NetworkPlayers.Count;
-        }
-
-        public static int GetNetworkIdentityCount(NetworkContext context)
-        {
-            return context.NetworkIdentities.Count;
-        }
-
-        public static int GetAuthorityOriginCount(NetworkContext context)
-        {
-            return context.AuthorityOrigins.Count;
-        }
-
         public static void SetPrivateField(object target, string fieldName, object value)
         {
             FieldInfo field = target.GetType().GetField(
@@ -233,7 +218,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public bool HasAuthorityOwner => NetworkAuthorityOwner != Guid.Empty;
         public bool DistanceBasedAuthority { get; set; }
         public bool DestroyWhenAuthorityOwnerLeaves { get; set; } = true;
-        public string NetworkStateName => PrefabName;
+        public bool IsSceneBound { get; set; }
         public NetworkContext NetworkContext => throw new NotImplementedException();
 
         public void WriteNetworkState(IStateOutput stateOutput)
@@ -251,7 +236,7 @@ namespace BananaParty.WebSocketRelay.Tests
             stateOutput.EndArray();
         }
 
-        public void ReadNetworkState(IStateInput stateInput)
+        public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
         {
             stateInput.ReadString(nameof(PrefabName));
             NetworkAuthorityOwner = stateInput.ReadGuid(nameof(NetworkAuthorityOwner));
@@ -264,11 +249,6 @@ namespace BananaParty.WebSocketRelay.Tests
                 stateInput.EndObject();
             }
             stateInput.EndArray();
-        }
-
-        public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
-        {
-            ReadNetworkState(stateInput);
             return true;
         }
 

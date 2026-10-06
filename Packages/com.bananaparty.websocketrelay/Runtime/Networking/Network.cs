@@ -164,12 +164,13 @@ namespace BananaParty.WebSocketRelay
         public void Dispose()
         {
             _relayServerProcess?.Stop();
+            _relayServerProcess = null;
 
             if (_relayClient != null)
                 Disconnect();
         }
 
-        public void OnConnectionStateChanged(RelayConnectionState previousState, RelayConnectionState state, string reason)
+        void IRelayListener.OnConnectionStateChanged(RelayConnectionState previousState, RelayConnectionState state, string reason)
         {
             switch (state)
             {
@@ -194,7 +195,7 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        public void OnChannelMessage(Guid senderGuid, string channel, byte[] data)
+        void IRelayListener.OnChannelMessage(Guid senderGuid, string channel, byte[] data)
         {
             _networkContext.ProcessChannelMessage(senderGuid, channel, data);
         }

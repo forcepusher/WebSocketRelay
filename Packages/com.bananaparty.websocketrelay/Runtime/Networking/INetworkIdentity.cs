@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
 {
-    public interface INetworkIdentity : INetworkState
+    public interface INetworkIdentity
     {
         string PrefabName { get; }
         GameObject GameObject { get; }
@@ -14,9 +14,21 @@ namespace BananaParty.WebSocketRelay
         bool HasAuthorityOwner { get; }
         bool DistanceBasedAuthority { get; }
         bool DestroyWhenAuthorityOwnerLeaves { get; }
-        bool ReadNetworkState(IStateInput stateInput, Guid senderGuid);
-        void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true);
-        void ClaimAuthority();
+
+        /// <summary>
+        /// Placed in a scene rather than spawned, so it outlives sessions and owners instead of being destroyed.
+        /// </summary>
+        bool IsSceneBound { get; }
+
         NetworkContext NetworkContext { get; }
+
+        void WriteNetworkState(IStateOutput stateOutput);
+
+        /// <returns>False when the state is outdated or was not written by the authority owner, so it was not applied.</returns>
+        bool ReadNetworkState(IStateInput stateInput, Guid senderGuid);
+
+        void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true);
+
+        void ClaimAuthority();
     }
 }
