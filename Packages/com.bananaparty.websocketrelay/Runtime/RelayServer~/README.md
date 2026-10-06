@@ -20,6 +20,6 @@ Optional environment variables:
 | --- | --- | --- |
 | `RELAY_PORT` | `80` | Port to listen on. |
 | `RELAY_TLS_CERT`, `RELAY_TLS_KEY` | | Certificate and key paths that enable WSS. |
-| `RELAY_IDLE_TIMEOUT` | `32` | Seconds without any traffic before a connection is dropped. Clients send a heartbeat every second, so only dead connections reach it. |
-| `RELAY_BACKPRESSURE_LIMIT` | `1048576` | Bytes queued for a client before it is disconnected. A client that cannot keep up reconnects and resynchronizes instead of receiving stale messages. |
 | `RELAY_DEBUG` | | Set to `1` for verbose logging. |
+
+A connection with no traffic for 60 seconds is closed. Clients heartbeat every second, so this only removes a dead socket. A client with more than 4 MiB queued is disconnected and resynchronizes after reconnecting.

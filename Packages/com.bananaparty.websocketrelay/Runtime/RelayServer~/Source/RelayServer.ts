@@ -25,8 +25,10 @@ export type RelayServerOptions = {
     backpressureLimitBytes?: number;
 };
 
-export const RelayServerDefaultIdleTimeoutSeconds = 32;
-export const RelayServerDefaultBackpressureLimitBytes = 1024 * 1024;
+// Clients heartbeat every second, so only a dead socket stays quiet this long.
+export const RelayServerDefaultIdleTimeoutSeconds = 60;
+// A short stall fits under this. A client further behind is disconnected and resynchronizes on reconnect.
+export const RelayServerDefaultBackpressureLimitBytes = 4 * 1024 * 1024;
 
 const backpressureSweepIntervalMs = 250;
 

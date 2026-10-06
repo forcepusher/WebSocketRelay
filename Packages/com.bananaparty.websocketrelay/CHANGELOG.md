@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RelayConnectionState` with `Network.ConnectionState` and `RelayClient.State`, plus `RoundTripTimeSeconds`, `IsLinkHealthy`, `PendingSendBytes` and `IsSendBacklogged`.  
 - `NetworkContext.IsConnectionInterrupted`. While the local connection is silent, player timeouts and distance-based authority claims pause, so peers are not dropped and objects are not stolen because of a local outage.  
 - `ISocket.IsClosed`, `ISocket.CloseReason` and `ISocket.PendingSendBytes`. Disconnect reasons are now reported and logged.  
-- Relay server `RELAY_IDLE_TIMEOUT` and `RELAY_BACKPRESSURE_LIMIT` environment variables.  
   
 ### Changed  
 - **Breaking:** `IRelayListener.OnDisconnectedFromRelay` is replaced by `OnConnectionStateChanged(previousState, state, reason)`.  
@@ -20,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** A lost connection no longer clears the session right away. It is cleared only when reconnecting gives up. Set `ReconnectTimeoutSeconds` to 0 for the old behavior.  
 - `RelayClient.Send` returns false instead of throwing while not connected. Subscriptions made while not connected are sent once connected.  
 - Network syncs are skipped while the send backlog exceeds `SendBacklogLimitBytes`, so a slow connection catches up on fresh state instead of queueing stale state.  
-- The relay server no longer echoes channel messages back to their sender, disconnects clients that fall more than 1 MiB behind, and drops connections idle for 32 seconds.  
+- The relay server no longer echoes channel messages back to their sender, disconnects clients that fall more than 4 MiB behind, and drops connections idle for 60 seconds.  
 - Default player timeout is 10 seconds, above the 5 second heartbeat timeout, so players have time to reconnect.  
 - A single long frame advances player timeouts by at most 0.25 seconds.  
 - Scene objects with a `NetworkBinding` are no longer destroyed when their owner leaves, they only lose the owner, because they cannot be spawned again.  
