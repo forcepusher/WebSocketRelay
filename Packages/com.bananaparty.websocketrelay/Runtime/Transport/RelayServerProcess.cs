@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -7,31 +8,55 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Transport
 {
+    /// <summary>
+    /// Runs the relay server bundled with the package on the Bun runtime bundled with it.
+    /// </summary>
     public class RelayServerProcess
     {
+        private const string PackageName = "com.bananaparty.websocketrelay";
         private const string ProcessMarker = "-relay-server";
-        private const string UnityPackageEntry = "com.bananaparty.websocketrelay/Runtime/RelayServer~/Source/index.ts";
-        private const string StandaloneEntry = "Source/index.ts";
+        private const string EntryScript = "Source/index.ts";
+
+        private static string s_serverDirectory;
 
         private Process _process;
 
         public bool IsRunning => _process != null && !_process.HasExited;
 
-        public static string GetServerDirectory() =>
-            Path.GetFullPath(Path.Combine(
-                Application.dataPath,
-                "..",
-                "Packages",
-                "com.bananaparty.websocketrelay",
-                "Runtime",
-                "RelayServer~"));
+        /// <summary>
+        /// The package's RelayServer~ folder, wherever the package manager put the package.
+        /// </summary>
+        public static string GetServerDirectory() => s_serverDirectory ??= FindServerDirectory();
+
+        public static string GetBunPath() => GetBunPath(GetServerDirectory());
+
+#if UNITY_EDITOR
+        // Package locations can only be looked up on the main thread, while servers are also started from background threads.
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void CacheServerDirectory()
+        {
+            s_serverDirectory = FindServerDirectory();
+        }
+#endif
+
+        private static string FindServerDirectory()
+        {
+#if UNITY_EDITOR
+            // Packages installed from git or a registry live in Library/PackageCache rather than in the Packages folder.
+            UnityEditor.PackageManager.PackageInfo packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(RelayServerProcess).Assembly);
+            if (packageInfo != null)
+                return Path.Combine(packageInfo.resolvedPath, "Runtime", "RelayServer~");
+#endif
+            return Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages", PackageName, "Runtime", "RelayServer~"));
+        }
 
         public void Start(bool verboseDebug = false, bool createNoWindow = false, int? relayPort = null)
         {
             if (IsRunning)
                 return;
 
-            _process = Launch(createNoWindow, verboseDebug, relayPort);
+            KillAll();
+            _process = Launch(verboseDebug, createNoWindow, relayPort);
         }
 
         public void Stop()
@@ -41,11 +66,16 @@ namespace BananaParty.WebSocketRelay.Transport
 
             try
             {
-                StopProcess(_process);
+                KillAll();
+                if (!_process.HasExited)
+                {
+                    _process.Kill();
+                    _process.WaitForExit(5000);
+                }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                UnityEngine.Debug.LogWarning($"Failed to stop server process: {e.Message}");
+                UnityEngine.Debug.LogWarning($"Failed to stop server process: {exception.Message}");
             }
             finally
             {
@@ -54,39 +84,9 @@ namespace BananaParty.WebSocketRelay.Transport
             }
         }
 
-        private static Process Launch(bool createNoWindow, bool verboseDebug, int? relayPort)
-        {
-            string serverDirectory = GetServerDirectory();
-            KillAll();
-
-            string bunPath = GetBunPath(serverDirectory);
-            if (!File.Exists(bunPath))
-                throw new FileNotFoundException($"Bundled Bun runtime not found at: {bunPath}");
-
-            (string workingDirectory, string entryScript) = GetLaunchPaths(serverDirectory);
-            ProcessStartInfo startInfo = CreateBunStartInfo(bunPath, serverDirectory, workingDirectory, entryScript, createNoWindow, verboseDebug, relayPort);
-            Process process = Process.Start(startInfo);
-
-            process.EnableRaisingEvents = true;
-            process.OutputDataReceived += (_, e) => ForwardLine(e.Data, isError: false);
-            process.ErrorDataReceived += (_, e) => ForwardLine(e.Data, isError: true);
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
-            return process;
-        }
-
-        private static void StopProcess(Process process)
-        {
-            KillAll();
-
-            if (process == null || process.HasExited)
-                return;
-
-            process.Kill();
-            process.WaitForExit(5000);
-        }
-
+        /// <summary>
+        /// Stops every relay server started from the bundled Bun runtime, including ones left behind by earlier sessions.
+        /// </summary>
         public static void KillAll()
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -97,32 +97,34 @@ namespace BananaParty.WebSocketRelay.Transport
 
         private static void KillAllWindows()
         {
-            string embeddedBunPath = Path.GetFullPath(GetBunPath(GetServerDirectory()));
+            string bunPath = Path.GetFullPath(GetBunPath());
 
             foreach (Process process in Process.GetProcessesByName("bun"))
             {
                 using (process)
                 {
-                    if (process.HasExited)
-                        continue;
+                    try
+                    {
+                        if (process.HasExited || !Path.GetFullPath(process.MainModule.FileName).Equals(bunPath, StringComparison.OrdinalIgnoreCase))
+                            continue;
 
-                    if (!Path.GetFullPath(process.MainModule.FileName).Equals(embeddedBunPath, StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    process.Kill();
-                    process.WaitForExit(5000);
+                        process.Kill();
+                        process.WaitForExit(5000);
+                    }
+                    catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
+                    {
+                        // Exited meanwhile, or belongs to another user or an elevated process, so it is not ours anyway.
+                    }
                 }
             }
         }
 
         private static void KillAllUnix()
         {
-            string embeddedBunPath = Path.GetFullPath(GetBunPath(GetServerDirectory()));
-
-            ProcessStartInfo startInfo = new ProcessStartInfo
+            ProcessStartInfo startInfo = new()
             {
                 FileName = "pkill",
-                Arguments = $"-f \"{embeddedBunPath}.*{ProcessMarker}\"",
+                Arguments = $"-f \"{Path.GetFullPath(GetBunPath())}.*{ProcessMarker}\"",
                 CreateNoWindow = true,
                 UseShellExecute = false,
             };
@@ -131,19 +133,17 @@ namespace BananaParty.WebSocketRelay.Transport
             process?.WaitForExit(5000);
         }
 
-        private static ProcessStartInfo CreateBunStartInfo(
-            string bunPath,
-            string serverDirectory,
-            string workingDirectory,
-            string entryScript,
-            bool createNoWindow,
-            bool verboseDebug,
-            int? relayPort)
+        private static Process Launch(bool verboseDebug, bool createNoWindow, int? relayPort)
         {
-            ProcessStartInfo startInfo = new ProcessStartInfo
+            string serverDirectory = GetServerDirectory();
+            string bunPath = GetBunPath(serverDirectory);
+            if (!File.Exists(bunPath))
+                throw new FileNotFoundException($"Bundled Bun runtime not found at: {bunPath}");
+
+            ProcessStartInfo startInfo = new()
             {
                 FileName = bunPath,
-                Arguments = $"--cwd \"{workingDirectory}\" {entryScript} {ProcessMarker}",
+                Arguments = $"{EntryScript} {ProcessMarker}",
                 WorkingDirectory = serverDirectory,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -154,23 +154,20 @@ namespace BananaParty.WebSocketRelay.Transport
             };
 
             startInfo.Environment["RELAY_DEBUG"] = verboseDebug ? "1" : "0";
+
+            // When Bun crashes on Windows, its crash reporter starts a PowerShell process that inherits the
+            // listening socket and keeps the port open without answering, so no new server could take over.
+            startInfo.Environment["BUN_ENABLE_CRASH_REPORTING"] = "0";
+
             if (relayPort.HasValue)
                 startInfo.Environment["RELAY_PORT"] = relayPort.Value.ToString();
 
-            return startInfo;
-        }
-
-        private static (string WorkingDirectory, string EntryScript) GetLaunchPaths(string serverDirectory)
-        {
-            string unityPackageManifest = Path.GetFullPath(Path.Combine(serverDirectory, "..", "..", "package.json"));
-            if (File.Exists(unityPackageManifest))
-            {
-                return (
-                    Path.GetFullPath(Path.Combine(serverDirectory, "..", "..", "..")),
-                    UnityPackageEntry);
-            }
-
-            return (serverDirectory, StandaloneEntry);
+            Process process = Process.Start(startInfo);
+            process.OutputDataReceived += (_, e) => ForwardLine(e.Data, isError: false);
+            process.ErrorDataReceived += (_, e) => ForwardLine(e.Data, isError: true);
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            return process;
         }
 
         private static string GetBunPath(string serverDirectory)

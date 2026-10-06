@@ -12,6 +12,11 @@ Default port **80** (`ws://localhost`) when no TLS certificates are present. Pla
 
 Export the server via **Tools → WebSocket Relay → Export Server** before running these scripts.
 
+The scripts start the server again whenever it exits, one second later, until you stop them with Ctrl+C. Clients reconnect on their own, so a crash only costs them a reconnect.
+
+Bun's crash reporter is turned off, because on Windows it kept the port open after a crash so no new server could start.
+Bun 1.3 on Windows crashes when an anti-cheat such as nProtect GameGuard (Helldivers 2 and others) or some security software injects into processes, see [oven-sh/bun#34055](https://github.com/oven-sh/bun/issues/34055). Bun 1.4 fixed it.
+
 ## Configuration
 
 Optional environment variables:

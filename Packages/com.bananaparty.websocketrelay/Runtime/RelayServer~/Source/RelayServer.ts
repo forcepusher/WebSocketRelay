@@ -70,14 +70,11 @@ export class RelayServer {
                   }
                 : {}),
             fetch: (req, server) => {
-                const connectionId = this.#nextConnectionId++;
-                if (
-                    server.upgrade(req, {
-                        data: { connectionId },
-                    })
-                ) {
+                const connectionId = this.#nextConnectionId;
+                if (server.upgrade(req, { data: { connectionId } })) {
+                    this.#nextConnectionId++;
                     RelayServerLog.debug(
-                        `upgrade requested connectionId=${connectionId} remote=${req.headers.get("host") ?? "unknown"}`,
+                        `upgrade requested id=${connectionId} remote=${server.requestIP(req)?.address ?? "unknown"}`,
                     );
                     return undefined;
                 }
