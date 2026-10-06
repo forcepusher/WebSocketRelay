@@ -181,29 +181,6 @@ namespace BananaParty.WebSocketRelay.Transport
             State = RelayConnectionState.Disconnected;
         }
 
-        internal void ProcessPayload(byte[] payloadBytes)
-        {
-            if (payloadBytes.Length == 0 || payloadBytes[0] != RelayMessageType.ChannelMessage)
-                return;
-
-            int channelLength = RelayMessageCodec.ReadChannelLength(payloadBytes, RelayMessageCodec.ChannelMessageChannelLengthOffset);
-            if (channelLength < 0)
-                throw new InvalidDataException("Incomplete channel message.");
-
-            int payloadOffset = RelayMessageCodec.GetChannelMessagePayloadOffset(channelLength);
-            if (payloadBytes.Length < payloadOffset)
-                throw new InvalidDataException("Incomplete channel message.");
-
-            string channel = RelayMessageCodec.ReadChannel(payloadBytes, RelayMessageCodec.ChannelMessageChannelLengthOffset);
-            if (!SubscribedChannels.Contains(channel))
-                return;
-
-            Guid senderGuid = RelayMessageCodec.ReadGuid(payloadBytes, RelayMessageCodec.ChannelMessageGuidOffset);
-            byte[] messageData = new byte[payloadBytes.Length - payloadOffset];
-            Array.Copy(payloadBytes, payloadOffset, messageData, 0, messageData.Length);
-            _relayListener.OnChannelMessage(senderGuid, channel, messageData);
-        }
-
         private static Func<ISocket> CreateSocketFactory(string serverAddress, bool offlineMode)
         {
             if (offlineMode)
@@ -340,6 +317,9 @@ namespace BananaParty.WebSocketRelay.Transport
 
         private void UpdateConnected(double pollGapSeconds)
         {
+            // Read before draining, so messages that arrived right before the socket closed are still delivered.
+            bool isSocketOpen = _socket.IsConnected;
+
             while (State == RelayConnectionState.Connected && _socket.HasUnreadPayloadQueue)
             {
                 byte[] payloadBytes = _socket.ReadPayloadQueue();
@@ -351,7 +331,7 @@ namespace BananaParty.WebSocketRelay.Transport
             if (State != RelayConnectionState.Connected)
                 return;
 
-            if (!_socket.IsConnected)
+            if (!isSocketOpen)
             {
                 LoseConnection(_socket.CloseReason ?? "Connection closed");
                 return;
@@ -378,12 +358,35 @@ namespace BananaParty.WebSocketRelay.Transport
 
             try
             {
-                ProcessPayload(payloadBytes);
+                DispatchChannelMessage(payloadBytes);
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
             }
+        }
+
+        private void DispatchChannelMessage(byte[] payloadBytes)
+        {
+            if (payloadBytes.Length == 0 || payloadBytes[0] != RelayMessageType.ChannelMessage)
+                return;
+
+            int channelLength = RelayMessageCodec.ReadChannelLength(payloadBytes, RelayMessageCodec.ChannelMessageChannelLengthOffset);
+            if (channelLength < 0)
+                throw new InvalidDataException("Incomplete channel message.");
+
+            int payloadOffset = RelayMessageCodec.GetChannelMessagePayloadOffset(channelLength);
+            if (payloadBytes.Length < payloadOffset)
+                throw new InvalidDataException("Incomplete channel message.");
+
+            string channel = RelayMessageCodec.ReadChannel(payloadBytes, RelayMessageCodec.ChannelMessageChannelLengthOffset);
+            if (!SubscribedChannels.Contains(channel))
+                return;
+
+            Guid senderGuid = RelayMessageCodec.ReadGuid(payloadBytes, RelayMessageCodec.ChannelMessageGuidOffset);
+            byte[] messageData = new byte[payloadBytes.Length - payloadOffset];
+            Array.Copy(payloadBytes, payloadOffset, messageData, 0, messageData.Length);
+            _relayListener.OnChannelMessage(senderGuid, channel, messageData);
         }
 
         private void HandlePong(byte[] payloadBytes, double pollGapSeconds)

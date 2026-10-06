@@ -772,6 +772,27 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void MessageQueuedAsSocketCloses_IsDeliveredBeforeReconnecting()
+        {
+            CreateClient();
+            FakeSocket socket = ConnectAndOpen();
+            _client.SubscribeToChannel("room");
+            List<RelayConnectionState> statesAtDelivery = new();
+            _listener.ChannelMessageReceived += (_, _, _) => statesAtDelivery.Add(_client.State);
+
+            socket.OnQueueFoundEmpty = () =>
+            {
+                socket.ReceiveChannelMessage(PeerGuid, "room", new byte[] { 1 });
+                socket.Close("Server went away");
+            };
+            Poll();
+            Poll();
+
+            CollectionAssert.AreEqual(new[] { RelayConnectionState.Connected }, statesAtDelivery);
+            Assert.AreEqual(RelayConnectionState.Reconnecting, _client.State);
+        }
+
+        [Test]
         public void MalformedChannelMessage_IsLoggedAndConnectionContinues()
         {
             CreateClient();

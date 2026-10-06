@@ -20,7 +20,25 @@ namespace BananaParty.WebSocketRelay.Tests
 
         public int PendingSendBytes { get; set; }
 
-        public bool HasUnreadPayloadQueue => _incomingPayloads.Count > 0;
+        public bool HasUnreadPayloadQueue
+        {
+            get
+            {
+                if (_incomingPayloads.Count > 0)
+                    return true;
+
+                Action onQueueFoundEmpty = OnQueueFoundEmpty;
+                OnQueueFoundEmpty = null;
+                onQueueFoundEmpty?.Invoke();
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Runs once the next time the queue is found empty, like a background receive loop
+        /// that queues a message and closes right after the client drained the queue.
+        /// </summary>
+        public Action OnQueueFoundEmpty { get; set; }
 
         public bool IsConnectCalled { get; private set; }
 
