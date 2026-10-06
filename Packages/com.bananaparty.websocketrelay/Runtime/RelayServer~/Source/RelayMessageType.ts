@@ -2,9 +2,14 @@ export const RelayMessageType = {
     Subscribe: 0x01,
     Unsubscribe: 0x02,
     ChannelMessage: 0x03,
+    Ping: 0x04,
+    Pong: 0x05,
 } as const;
 
 export const RelayMessageGuidSize = 16;
+
+// Ping layout: [type:1][opaque payload]. The server answers with a Pong carrying the same payload.
+export const RelayMessagePingMaxSize = 64;
 
 export const RelayMessageChannelLengthOffset = 1;
 export const RelayMessageChannelOffset = 3;
@@ -17,6 +22,8 @@ const relayMessageTypeNames: Record<number, string> = {
     [RelayMessageType.Subscribe]: "Subscribe",
     [RelayMessageType.Unsubscribe]: "Unsubscribe",
     [RelayMessageType.ChannelMessage]: "ChannelMessage",
+    [RelayMessageType.Ping]: "Ping",
+    [RelayMessageType.Pong]: "Pong",
 };
 
 export function relayMessageTypeName(type: number): string {
@@ -73,6 +80,13 @@ export function relayWriteProtocolMessage(type: number, channel: string, payload
     view.setUint16(RelayMessageChannelLengthOffset, channelBytes.byteLength, true);
     message.set(channelBytes, RelayMessageChannelOffset);
     if (payload) message.set(payload, relayPayloadOffset(channelBytes.byteLength));
+    return message;
+}
+
+export function relayWritePingMessage(payload?: Uint8Array): Uint8Array {
+    const message = new Uint8Array(1 + (payload?.byteLength ?? 0));
+    message[0] = RelayMessageType.Ping;
+    if (payload) message.set(payload, 1);
     return message;
 }
 

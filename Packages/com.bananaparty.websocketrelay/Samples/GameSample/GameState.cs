@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
@@ -23,9 +24,12 @@ namespace BananaParty.WebSocketRelay.Samples
         [SerializeField]
         private NetworkIdentity _playerCharacterPrefab;
 
+        [SerializeField]
+        private RelayConnectionSettings _connectionSettings = new();
+
         private void Start()
         {
-            _network = new Network("ws://127.0.0.1:80", _networkContext);
+            _network = new Network("ws://127.0.0.1:80", _networkContext, connectionSettings: _connectionSettings);
 
             //var jsonStateOutput = new JsonStateOutput();
             //WriteState(jsonStateOutput);
@@ -62,7 +66,7 @@ namespace BananaParty.WebSocketRelay.Samples
 
         public void OnConnectButtonClick()
         {
-            StartCoroutine(ConnectCoroutine(5f));
+            StartCoroutine(ConnectCoroutine());
         }
 
         public void OnDisconnectButtonClick()
@@ -70,27 +74,22 @@ namespace BananaParty.WebSocketRelay.Samples
             _network.Disconnect();
         }
 
-        private IEnumerator ConnectCoroutine(float connectionTimeout)
+        private IEnumerator ConnectCoroutine()
         {
-            float elapsed = 0;
             _network.Connect(Guid.NewGuid());
 
-            while (!_network.IsConnected)
-            {
-                _network.ManualUpdate(Time.unscaledDeltaTime);
-                elapsed += Time.unscaledDeltaTime;
-                if (elapsed > connectionTimeout)
-                {
-                    Debug.LogError($"Connection timed out after {connectionTimeout}s");
-                    if (_network.HasRelayClient)
-                        _network.Disconnect();
-                    yield break;
-                }
+            // Update polls the network, which connects or gives up after the connect timeout on its own.
+            while (_network.ConnectionState == RelayConnectionState.Connecting)
                 yield return null;
+
+            if (!_network.IsConnected)
+            {
+                if (_network.HasRelayClient)
+                    _network.Disconnect();
+                yield break;
             }
 
-            Debug.Log("Connected to relay");
-
+            // Subscriptions, owned identities and the client GUID survive reconnects, so this runs only once.
             _network.SubscribeToChannel(_networkChannelName);
 
             _networkChannel.SetChannel(_networkChannelName);

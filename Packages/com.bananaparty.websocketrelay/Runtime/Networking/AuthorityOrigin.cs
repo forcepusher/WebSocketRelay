@@ -36,6 +36,10 @@ namespace BananaParty.WebSocketRelay
             if (NetworkIdentity.NetworkAuthorityOwner != _networkContext.LocalClientIdentity)
                 return;
 
+            // Positions of other players are stale while interrupted, and claims would only be delivered after reconnecting.
+            if (_networkContext.IsConnectionInterrupted)
+                return;
+
             foreach (INetworkIdentity networkIdentity in _networkContext.NetworkIdentities)
             {
                 if (!networkIdentity.DistanceBasedAuthority)

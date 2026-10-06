@@ -7,8 +7,12 @@ namespace BananaParty.WebSocketRelay
     [CreateAssetMenu]
     public class NetworkContext : ScriptableObject
     {
+        // Longer frames count as this long, so a hitch does not time out players whose messages waited in the queue.
+        private const float MaxUpdateDeltaSeconds = 0.25f;
+
         [SerializeField]
-        private float _playerTimeoutSeconds = 5f;
+        [Tooltip("How long a player may stay silent before it is removed. Keep it above the connection heartbeat timeout, so players can reconnect in time.")]
+        private float _playerTimeoutSeconds = 10f;
 
         [SerializeField]
         private bool _useBinary = false;
@@ -25,7 +29,15 @@ namespace BananaParty.WebSocketRelay
 
         public bool UseBinary => _useBinary;
 
+        public float PlayerTimeoutSeconds => _playerTimeoutSeconds;
+
         public Guid LocalClientIdentity { get; set; }
+
+        /// <summary>
+        /// Set while the local connection delivers nothing. Player timeouts and authority claims pause then,
+        /// because silence from everyone says nothing about who actually left.
+        /// </summary>
+        public bool IsConnectionInterrupted { get; set; }
 
         public IReadOnlyList<INetworkIdentity> NetworkIdentities => _identityRegistry.Identities;
 
@@ -106,11 +118,16 @@ namespace BananaParty.WebSocketRelay
             _playerRoster.Clear();
             RpcRouter.ClearOutgoingMessages();
             LocalClientIdentity = Guid.Empty;
+            IsConnectionInterrupted = false;
         }
 
         public void ManualUpdate(float unscaledDeltaTime)
         {
-            foreach (Guid playerGuid in _playerRoster.RemoveTimedOut(unscaledDeltaTime, _playerTimeoutSeconds))
+            if (IsConnectionInterrupted)
+                return;
+
+            float deltaTime = Mathf.Min(unscaledDeltaTime, MaxUpdateDeltaSeconds);
+            foreach (Guid playerGuid in _playerRoster.RemoveTimedOut(deltaTime, _playerTimeoutSeconds))
             {
                 DestroyIdentitiesOwnedByAuthorityOwner(playerGuid);
                 Debug.Log($"Removed timed out player {playerGuid}");

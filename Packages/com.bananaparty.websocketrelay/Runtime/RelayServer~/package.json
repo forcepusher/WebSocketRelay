@@ -2,7 +2,7 @@
   "name": "websocket-relay-server",
   "type": "module",
   "scripts": {
-    "test": "bun test Source/RelayServer.test.ts"
+    "test": "bun test Source/"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",

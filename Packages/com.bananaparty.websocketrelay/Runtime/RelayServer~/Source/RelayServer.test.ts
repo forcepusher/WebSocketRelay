@@ -1,14 +1,17 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import net from "node:net";
 import { RelayServer } from "./RelayServer";
 import {
     RelayMessageType,
     RelayMessageChannelMessageChannelLengthOffset,
+    RelayMessagePingMaxSize,
     relayReadGuid,
     relayReadChannel,
     relayReadChannelLength,
     relayChannelMessagePayloadOffset,
     relayWriteProtocolMessage,
     relayWriteChannelMessage,
+    relayWritePingMessage,
 } from "./RelayMessageType";
 
 const testPort = 23145;
@@ -48,8 +51,11 @@ async function receiveBinary(ws: WebSocket, timeoutMs = 2000): Promise<Uint8Arra
     });
 }
 
-async function openSocket(clientGuid = crypto.randomUUID()): Promise<{ ws: WebSocket; clientGuid: string }> {
-    const ws = new WebSocket(`ws://127.0.0.1:${testPort}`);
+async function openSocket(
+    clientGuid = crypto.randomUUID(),
+    port = testPort,
+): Promise<{ ws: WebSocket; clientGuid: string }> {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
     ws.binaryType = "arraybuffer";
     await new Promise<void>((resolve, reject) => {
         ws.onopen = () => resolve();
@@ -57,6 +63,53 @@ async function openSocket(clientGuid = crypto.randomUUID()): Promise<{ ws: WebSo
     });
 
     return { ws, clientGuid };
+}
+
+async function waitFor(condition: () => boolean, timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (!condition() && Date.now() < deadline) await Bun.sleep(10);
+}
+
+// Client frames must be masked (RFC 6455 5.3). Only short payloads are needed here.
+function maskedBinaryFrame(payload: Uint8Array): Uint8Array {
+    if (payload.byteLength > 125) throw new Error("Payload too large for a short frame");
+    const mask = crypto.getRandomValues(new Uint8Array(4));
+    const frame = new Uint8Array(6 + payload.byteLength);
+    frame[0] = 0x82;
+    frame[1] = 0x80 | payload.byteLength;
+    frame.set(mask, 2);
+    for (let i = 0; i < payload.byteLength; i++) frame[6 + i] = payload[i]! ^ mask[i % 4]!;
+    return frame;
+}
+
+// A raw WebSocket client that subscribes and then stops reading, like a client on a stalled link.
+async function openStalledSubscriber(port: number, channel: string): Promise<net.Socket> {
+    const socket = net.connect(port, "127.0.0.1");
+    await new Promise<void>((resolve, reject) => {
+        socket.once("connect", () => resolve());
+        socket.once("error", reject);
+    });
+
+    const key = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
+    socket.write(
+        `GET / HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n` +
+            `Sec-WebSocket-Key: ${key}\r\nSec-WebSocket-Version: 13\r\n\r\n`,
+    );
+
+    await new Promise<void>((resolve) => {
+        let response = "";
+        const onData = (chunk: Buffer) => {
+            response += chunk.toString("latin1");
+            if (!response.includes("\r\n\r\n")) return;
+            socket.off("data", onData);
+            resolve();
+        };
+        socket.on("data", onData);
+    });
+
+    socket.pause();
+    socket.write(maskedBinaryFrame(relayWriteProtocolMessage(RelayMessageType.Subscribe, channel)));
+    return socket;
 }
 
 async function expectNoMessage(ws: WebSocket, timeoutMs = 100): Promise<void> {
@@ -169,5 +222,130 @@ describe("RelayServer", () => {
         await expectNoMessage(ws);
 
         ws.close();
+    });
+
+    test("does not echo channel messages back to the sender", async () => {
+        const sender = await openSocket();
+        const receiver = await openSocket();
+
+        await subscribeAndSettle(sender.ws, "echo");
+        await subscribeAndSettle(receiver.ws, "echo");
+
+        const senderSilence = expectNoMessage(sender.ws, 200);
+        sendChannelMessage(sender.ws, sender.clientGuid, "echo", new Uint8Array([0x42]));
+
+        const response = await receiveBinary(receiver.ws);
+        expect(relayReadGuid(response, 1)).toBe(sender.clientGuid);
+        await senderSilence;
+
+        sender.ws.close();
+        receiver.ws.close();
+    });
+
+    test("answers ping with pong carrying the same payload", async () => {
+        const { ws } = await openSocket();
+        const payload = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+
+        ws.send(relayWritePingMessage(payload));
+        const response = await receiveBinary(ws);
+
+        expect(response[0]).toBe(RelayMessageType.Pong);
+        expect(Array.from(response.subarray(1))).toEqual(Array.from(payload));
+
+        ws.close();
+    });
+
+    test("answers ping without payload", async () => {
+        const { ws } = await openSocket();
+
+        ws.send(relayWritePingMessage());
+        const response = await receiveBinary(ws);
+
+        expect(Array.from(response)).toEqual([RelayMessageType.Pong]);
+
+        ws.close();
+    });
+
+    test("ignores oversized ping", async () => {
+        const { ws } = await openSocket();
+
+        ws.send(relayWritePingMessage(new Uint8Array(RelayMessagePingMaxSize)));
+        await expectNoMessage(ws);
+
+        ws.close();
+    });
+
+    test("ignores empty frames and keeps the connection open", async () => {
+        const { ws } = await openSocket();
+
+        ws.send(new Uint8Array(0));
+        ws.send(relayWritePingMessage());
+        const response = await receiveBinary(ws);
+
+        expect(response[0]).toBe(RelayMessageType.Pong);
+        expect(ws.readyState).toBe(WebSocket.OPEN);
+
+        ws.close();
+    });
+});
+
+describe("RelayServer backpressure", () => {
+    const backpressurePort = 23146;
+    const server = new RelayServer(backpressurePort, undefined, { backpressureLimitBytes: 64 * 1024 });
+
+    beforeAll(() => {
+        server.start();
+    });
+
+    afterAll(() => {
+        server.stop();
+    });
+
+    test(
+        "disconnects a subscriber that stops reading instead of buffering for it",
+        async () => {
+            const stalledSubscriber = await openStalledSubscriber(backpressurePort, "flood");
+            const publisher = await openSocket(crypto.randomUUID(), backpressurePort);
+            await waitFor(() => server.connectionCount === 2, 2000);
+            expect(server.connectionCount).toBe(2);
+
+            // Server and clients share this event loop, so yield regularly to let the relay run.
+            const chunk = new Uint8Array(16 * 1024);
+            const deadline = Date.now() + 15000;
+            while (server.connectionCount === 2 && Date.now() < deadline) {
+                for (let i = 0; i < 16; i++) sendChannelMessage(publisher.ws, publisher.clientGuid, "flood", chunk);
+                await Bun.sleep(1);
+            }
+
+            expect(server.connectionCount).toBe(1);
+            expect(publisher.ws.readyState).toBe(WebSocket.OPEN);
+
+            stalledSubscriber.destroy();
+            publisher.ws.close();
+        },
+        20000,
+    );
+
+    test("keeps a subscriber that reads everything", async () => {
+        const publisher = await openSocket(crypto.randomUUID(), backpressurePort);
+        const subscriber = await openSocket(crypto.randomUUID(), backpressurePort);
+        await subscribeAndSettle(subscriber.ws, "steady");
+
+        let receivedCount = 0;
+        subscriber.ws.onmessage = () => receivedCount++;
+
+        const chunk = new Uint8Array(1024);
+        const messageCount = 2000;
+        for (let i = 0; i < messageCount; i++) {
+            sendChannelMessage(publisher.ws, publisher.clientGuid, "steady", chunk);
+            if (i % 50 === 0) await Bun.sleep(1);
+        }
+
+        await waitFor(() => receivedCount === messageCount, 5000);
+        expect(receivedCount).toBe(messageCount);
+        expect(subscriber.ws.readyState).toBe(WebSocket.OPEN);
+
+        publisher.ws.close();
+        subscriber.ws.close();
     });
 });

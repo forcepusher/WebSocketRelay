@@ -56,9 +56,13 @@ namespace BananaParty.WebSocketRelay.Tests
 
             relayA.SubscribeToChannel("state-sync");
             relayB.SubscribeToChannel("state-sync");
-            relayA.ProcessIncomingMessages();
-            relayB.ProcessIncomingMessages();
-            yield return null;
+
+            // The relay does not acknowledge subscriptions, so give them time to arrive before publishing.
+            yield return TestParameters.WaitForDuration(0.1f, () =>
+            {
+                relayA.ProcessIncomingMessages();
+                relayB.ProcessIncomingMessages();
+            });
 
             // Act: Client A serializes and sends state via channel
             JsonStateOutput writeGraph = new();

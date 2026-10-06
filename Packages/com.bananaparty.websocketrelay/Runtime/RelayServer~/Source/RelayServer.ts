@@ -2,6 +2,7 @@ import {
     RelayMessageType,
     relayMessageTypeName,
     RelayMessageChannelMessageChannelLengthOffset,
+    RelayMessagePingMaxSize,
     relayReadGuid,
     relayReadChannel,
     relayReadChannelLength,
@@ -17,15 +18,42 @@ type RelayServerTlsOptions = {
     key: string;
 };
 
+export type RelayServerOptions = {
+    /** Seconds without any traffic before a connection is dropped. Clients heartbeat every second. */
+    idleTimeoutSeconds?: number;
+    /** Bytes queued for a slow client before it is disconnected instead of buffering stale messages. */
+    backpressureLimitBytes?: number;
+};
+
+export const RelayServerDefaultIdleTimeoutSeconds = 32;
+export const RelayServerDefaultBackpressureLimitBytes = 1024 * 1024;
+
+const backpressureSweepIntervalMs = 250;
+
+// Bun silently drops messages to a client once its own backpressure limit is reached
+// and keeps the connection open. Its limit is kept above ours so that slow clients are
+// disconnected and resynchronize on reconnect instead of receiving a stream with gaps.
+const bunBackpressureLimitMultiplier = 4;
+
 export class RelayServer {
     #port: number;
     #tls?: RelayServerTlsOptions;
+    #idleTimeoutSeconds: number;
+    #backpressureLimitBytes: number;
     #server: Bun.Server<RelayWebSocketData> | null = null;
+    #backpressureSweepTimer: ReturnType<typeof setInterval> | null = null;
+    #connections = new Set<Bun.ServerWebSocket<RelayWebSocketData>>();
     #nextConnectionId = 1;
 
-    constructor(port: number = 80, tls?: RelayServerTlsOptions) {
+    constructor(port: number = 80, tls?: RelayServerTlsOptions, options: RelayServerOptions = {}) {
         this.#port = port;
         this.#tls = tls;
+        this.#idleTimeoutSeconds = options.idleTimeoutSeconds ?? RelayServerDefaultIdleTimeoutSeconds;
+        this.#backpressureLimitBytes = options.backpressureLimitBytes ?? RelayServerDefaultBackpressureLimitBytes;
+    }
+
+    get connectionCount(): number {
+        return this.#connections.size;
     }
 
     start(): void {
@@ -56,14 +84,18 @@ export class RelayServer {
             },
             websocket: {
                 data: {} as RelayWebSocketData,
+                idleTimeout: this.#idleTimeoutSeconds,
+                backpressureLimit: this.#backpressureLimitBytes * bunBackpressureLimitMultiplier,
                 open: (ws) => {
+                    this.#connections.add(ws);
                     RelayServerLog.info(
                         `connected id=${ws.data.connectionId} remote=${ws.remoteAddress} subscriptions=[]`,
                     );
                 },
-                close: (ws) => {
+                close: (ws, code, reason) => {
+                    this.#connections.delete(ws);
                     RelayServerLog.info(
-                        `disconnected id=${ws.data.connectionId} remote=${ws.remoteAddress} subscriptions=[${ws.subscriptions.join(", ")}]`,
+                        `disconnected id=${ws.data.connectionId} remote=${ws.remoteAddress} code=${code} reason=${reason || "none"} subscriptions=[${ws.subscriptions.join(", ")}]`,
                     );
                 },
                 message: (ws, message) => {
@@ -74,7 +106,18 @@ export class RelayServer {
                         return;
                     }
 
+                    if (message.byteLength === 0) {
+                        RelayServerLog.warn(`ignored empty frame id=${ws.data.connectionId}`);
+                        return;
+                    }
+
                     const type = message[0];
+
+                    // Heartbeats arrive every second per client and would drown out the debug log.
+                    if (type === RelayMessageType.Ping) {
+                        this.#handlePing(ws, message);
+                        return;
+                    }
 
                     RelayServerLog.debug(
                         `message id=${ws.data.connectionId} type=${relayMessageTypeName(type)} bytes=${message.byteLength}`,
@@ -100,18 +143,51 @@ export class RelayServer {
             },
         });
 
+        this.#backpressureSweepTimer = setInterval(() => this.#disconnectSlowClients(), backpressureSweepIntervalMs);
+
         const scheme = this.#tls ? "wss" : "ws";
         RelayServerLog.info(
-            `listening on ${scheme}://0.0.0.0:${this.#port} debug=${process.env.RELAY_DEBUG === "1" ? "verbose" : "basic"}`,
+            `listening on ${scheme}://0.0.0.0:${this.#port} idleTimeout=${this.#idleTimeoutSeconds}s backpressureLimit=${this.#backpressureLimitBytes}B debug=${process.env.RELAY_DEBUG === "1" ? "verbose" : "basic"}`,
         );
     }
 
     stop(): void {
+        if (this.#backpressureSweepTimer) {
+            clearInterval(this.#backpressureSweepTimer);
+            this.#backpressureSweepTimer = null;
+        }
+
         if (this.#server) {
             this.#server.stop();
             this.#server = null;
             RelayServerLog.info("stopped");
         }
+    }
+
+    #disconnectSlowClients(): void {
+        for (const ws of this.#connections) {
+            const bufferedBytes = ws.getBufferedAmount();
+            if (bufferedBytes <= this.#backpressureLimitBytes) continue;
+
+            RelayServerLog.warn(
+                `disconnecting slow client id=${ws.data.connectionId} remote=${ws.remoteAddress} bufferedBytes=${bufferedBytes}`,
+            );
+            // terminate() does not wait for a close handshake that a stalled client cannot complete.
+            ws.terminate();
+        }
+    }
+
+    #handlePing(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
+        if (message.byteLength > RelayMessagePingMaxSize) {
+            RelayServerLog.warn(
+                `ping rejected id=${ws.data.connectionId} reason=oversized bytes=${message.byteLength}`,
+            );
+            return;
+        }
+
+        const pong = new Uint8Array(message);
+        pong[0] = RelayMessageType.Pong;
+        ws.send(pong);
     }
 
     #handleSubscribe(ws: Bun.ServerWebSocket<RelayWebSocketData>, message: Uint8Array): void {
@@ -178,10 +254,14 @@ export class RelayServer {
         }
 
         const senderGuid = relayReadGuid(message, 1);
-        const deliveredTo = this.#server!.publish(channel, message);
+        // ws.publish skips the sender so it does not download its own messages,
+        // but it delivers nothing when the sender has no subscriptions at all.
+        const status = ws.isSubscribed(channel)
+            ? ws.publish(channel, message)
+            : this.#server!.publish(channel, message);
 
         RelayServerLog.debug(
-            `published id=${ws.data.connectionId} guid=${senderGuid} channel=${channel} bytes=${message.byteLength} deliveredTo=${deliveredTo}`,
+            `published id=${ws.data.connectionId} guid=${senderGuid} channel=${channel} bytes=${message.byteLength} status=${status}`,
         );
     }
 }

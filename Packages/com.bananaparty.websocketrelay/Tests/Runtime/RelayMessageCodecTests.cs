@@ -53,5 +53,48 @@ namespace BananaParty.WebSocketRelay.Tests
             Assert.AreEqual(0xde, message[payloadOffset]);
             Assert.AreEqual(0xad, message[payloadOffset + 1]);
         }
+
+        [Test]
+        public void CreatePingMessage_PongWithSamePayload_RoundTripsSentTime()
+        {
+            const double sentTimeSeconds = 12345.678901;
+            byte[] ping = RelayMessageCodec.CreatePingMessage(sentTimeSeconds);
+            byte[] pong = (byte[])ping.Clone();
+            pong[0] = RelayMessageType.Pong;
+
+            Assert.AreEqual(RelayMessageType.Ping, ping[0]);
+            Assert.AreEqual(RelayMessageCodec.PingMessageSize, ping.Length);
+            Assert.IsTrue(RelayMessageCodec.TryReadPongSentTime(pong, out double readSentTimeSeconds));
+            Assert.AreEqual(sentTimeSeconds, readSentTimeSeconds);
+        }
+
+        [Test]
+        public void CreatePingMessage_EncodesLittleEndian()
+        {
+            byte[] ping = RelayMessageCodec.CreatePingMessage(1d);
+
+            // 1.0 is 0x3FF0000000000000.
+            CollectionAssert.AreEqual(new byte[] { RelayMessageType.Ping, 0, 0, 0, 0, 0, 0, 0xF0, 0x3F }, ping);
+        }
+
+        [Test]
+        public void TryReadPongSentTime_RejectsPing()
+        {
+            Assert.IsFalse(RelayMessageCodec.TryReadPongSentTime(RelayMessageCodec.CreatePingMessage(1d), out _));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(8)]
+        [TestCase(10)]
+        public void TryReadPongSentTime_RejectsWrongLength(int length)
+        {
+            byte[] message = new byte[length];
+            if (length > 0)
+                message[0] = RelayMessageType.Pong;
+
+            Assert.IsFalse(RelayMessageCodec.TryReadPongSentTime(message, out double sentTimeSeconds));
+            Assert.AreEqual(0d, sentTimeSeconds);
+        }
     }
 }

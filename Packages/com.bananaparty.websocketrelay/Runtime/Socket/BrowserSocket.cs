@@ -1,34 +1,67 @@
 #if UNITY_WEBGL && !UNITY_EDITOR
+using System;
 using System.Runtime.InteropServices;
 
 namespace BananaParty.WebSocketRelay
 {
     public class BrowserSocket : ISocket
     {
+        private const int NotConnectedSocketId = 0;
+
         private readonly string _serverAddress;
 
-        private int _socketIndex = -1;
+        private int _socketId = NotConnectedSocketId;
+        private bool _isDisposed;
+        private string _closeReason;
 
         public BrowserSocket(string serverAddress)
         {
             _serverAddress = serverAddress;
         }
 
-        public bool IsConnected => GetBrowserSocketIsConnected(_socketIndex);
+        private bool HasSocket => _socketId != NotConnectedSocketId && !_isDisposed;
+
+        public bool IsConnected => HasSocket && GetBrowserSocketIsConnected(_socketId);
 
         [DllImport("__Internal")]
-        private static extern bool GetBrowserSocketIsConnected(int socketIndex);
+        private static extern bool GetBrowserSocketIsConnected(int socketId);
 
-        public bool HasUnreadPayloadQueue => GetBrowserSocketHasUnreadPayloadQueue(_socketIndex);
+        public bool IsClosed => _isDisposed || (HasSocket && GetBrowserSocketCloseCode(_socketId) != 0);
+
+        public string CloseReason
+        {
+            get
+            {
+                if (_closeReason != null || !HasSocket)
+                    return _closeReason;
+
+                int closeCode = GetBrowserSocketCloseCode(_socketId);
+                return closeCode == 0 ? null : $"Connection closed (code {closeCode})";
+            }
+        }
+
+        /// <returns>WebSocket close code, or 0 while the socket has not closed.</returns>
+        [DllImport("__Internal")]
+        private static extern int GetBrowserSocketCloseCode(int socketId);
+
+        public int PendingSendBytes => HasSocket ? GetBrowserSocketBufferedAmount(_socketId) : 0;
 
         [DllImport("__Internal")]
-        private static extern bool GetBrowserSocketHasUnreadPayloadQueue(int socketIndex);
+        private static extern int GetBrowserSocketBufferedAmount(int socketId);
+
+        public bool HasUnreadPayloadQueue => HasSocket && GetBrowserSocketHasUnreadPayloadQueue(_socketId);
+
+        [DllImport("__Internal")]
+        private static extern bool GetBrowserSocketHasUnreadPayloadQueue(int socketId);
 
         public byte[] ReadPayloadQueue()
         {
-            int payloadBytesCount = BrowserSocketReadPayloadQueue(_socketIndex, null, 0);
+            if (!HasUnreadPayloadQueue)
+                throw new InvalidOperationException($"Trying to use {nameof(ReadPayloadQueue)} while {nameof(HasUnreadPayloadQueue)} is false.");
+
+            int payloadBytesCount = BrowserSocketReadPayloadQueue(_socketId, null, 0);
             byte[] payloadBytesBuffer = new byte[payloadBytesCount];
-            BrowserSocketReadPayloadQueue(_socketIndex, payloadBytesBuffer, payloadBytesBuffer.Length);
+            BrowserSocketReadPayloadQueue(_socketId, payloadBytesBuffer, payloadBytesBuffer.Length);
             return payloadBytesBuffer;
         }
 
@@ -37,11 +70,14 @@ namespace BananaParty.WebSocketRelay
         /// </summary>
         /// <returns>Received bytes count.</returns>
         [DllImport("__Internal")]
-        private static extern int BrowserSocketReadPayloadQueue(int socketIndex, byte[] payloadBytesBuffer, int payloadBytesBufferLength);
+        private static extern int BrowserSocketReadPayloadQueue(int socketId, byte[] payloadBytesBuffer, int payloadBytesBufferLength);
 
         public void Connect()
         {
-            _socketIndex = BrowserSocketConnect(_serverAddress);
+            if (_socketId != NotConnectedSocketId || _isDisposed)
+                throw new InvalidOperationException($"{nameof(BrowserSocket)} can only connect once. Create a new one to reconnect.");
+
+            _socketId = BrowserSocketConnect(_serverAddress);
         }
 
         [DllImport("__Internal")]
@@ -49,24 +85,43 @@ namespace BananaParty.WebSocketRelay
 
         public void Send(byte[] payloadBytes)
         {
-            BrowserSocketSend(_socketIndex, payloadBytes, payloadBytes.Length);
+            if (!IsConnected)
+                throw new InvalidOperationException($"Trying to use {nameof(Send)} while not {nameof(IsConnected)}.");
+
+            BrowserSocketSend(_socketId, payloadBytes, payloadBytes.Length);
         }
 
         [DllImport("__Internal")]
-        private static extern void BrowserSocketSend(int socketIndex, byte[] payloadBytes, int payloadBytesCount);
+        private static extern void BrowserSocketSend(int socketId, byte[] payloadBytes, int payloadBytesCount);
 
         public void Disconnect()
         {
-            BrowserSocketDisconnect(_socketIndex);
+            if (!HasSocket)
+                return;
+
+            _closeReason ??= CloseReason ?? "Disconnected locally";
+            BrowserSocketDisconnect(_socketId);
         }
 
         [DllImport("__Internal")]
-        private static extern void BrowserSocketDisconnect(int socketIndex);
+        private static extern void BrowserSocketDisconnect(int socketId);
 
         public void Dispose()
         {
+            if (_isDisposed)
+                return;
+
             Disconnect();
+            _closeReason ??= "Disconnected locally";
+
+            if (_socketId != NotConnectedSocketId)
+                BrowserSocketDispose(_socketId);
+
+            _isDisposed = true;
         }
+
+        [DllImport("__Internal")]
+        private static extern void BrowserSocketDispose(int socketId);
     }
 }
 #endif

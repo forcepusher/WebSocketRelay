@@ -24,6 +24,16 @@ namespace BananaParty.WebSocketRelay.Tests
             field.SetValue(context, playerTimeoutSeconds);
         }
 
+        /// <summary>
+        /// Advances in frame-sized steps, because a single long update is treated as a hitch.
+        /// </summary>
+        public static void Advance(NetworkContext context, float seconds, float stepSeconds = 0.1f)
+        {
+            int steps = Mathf.RoundToInt(seconds / stepSeconds);
+            for (int step = 0; step < steps; step++)
+                context.ManualUpdate(stepSeconds);
+        }
+
         public static int GetNetworkPlayerCount(NetworkContext context)
         {
             return context.NetworkPlayers.Count;
@@ -162,6 +172,32 @@ namespace BananaParty.WebSocketRelay.Tests
 
             networkIdentity.NetworkAuthorityOwner = networkAuthorityOwner;
             networkIdentity.NetworkIdentifier = Guid.NewGuid();
+
+            gameObject.SetActive(true);
+            return networkIdentity;
+        }
+
+        /// <summary>
+        /// Creates an identity like one placed in a scene, which registers itself through its <see cref="NetworkBinding"/>.
+        /// </summary>
+        public static NetworkIdentity CreateSceneBoundIdentity(
+            NetworkContext context,
+            NetworkChannel networkChannel,
+            Guid networkAuthorityOwner,
+            string name = "SceneObject")
+        {
+            GameObject gameObject = new(name);
+            gameObject.SetActive(false);
+
+            NetworkIdentity networkIdentity = gameObject.AddComponent<NetworkIdentity>();
+            SetPrivateField(networkIdentity, "_networkContext", context);
+            SetPrivateField(networkIdentity, "_prefabName", name);
+
+            NetworkBinding networkBinding = gameObject.AddComponent<NetworkBinding>();
+            SetPrivateField(networkBinding, "_networkChannel", networkChannel);
+            SetPrivateField(networkBinding, "_guid", Guid.NewGuid().ToString());
+
+            networkIdentity.NetworkAuthorityOwner = networkAuthorityOwner;
 
             gameObject.SetActive(true);
             return networkIdentity;

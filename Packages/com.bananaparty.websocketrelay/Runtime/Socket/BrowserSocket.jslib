@@ -2,27 +2,55 @@ const browserSocketLibrary = {
     // Class definition.
 
     $browserSocket: {
-        sockets: [],
+        // Keyed by id so disposed sockets free their slot without shifting the others.
+        sockets: {},
+        nextSocketId: 1,
 
-        getBrowserSocketIsConnected: function (socketIndex) {
+        // Matches the code browsers report for connections that end without a close frame.
+        abnormalClosureCode: 1006,
+
+        getSocket: function (socketId) {
+            return browserSocket.sockets[socketId] || null;
+        },
+
+        getBrowserSocketIsConnected: function (socketId) {
+            const socket = browserSocket.getSocket(socketId);
             return (
-                browserSocket.sockets[socketIndex].webSocket.readyState ===
-                WebSocket.OPEN
+                !!socket &&
+                !!socket.webSocket &&
+                socket.webSocket.readyState === WebSocket.OPEN
             );
         },
 
-        getBrowserSocketHasUnreadPayloadQueue: function (socketIndex) {
-            return browserSocket.sockets[socketIndex].payloadQueue.length > 0;
+        getBrowserSocketCloseCode: function (socketId) {
+            const socket = browserSocket.getSocket(socketId);
+            if (!socket) return browserSocket.abnormalClosureCode;
+            if (socket.closeCode !== 0) return socket.closeCode;
+            if (socket.webSocket.readyState === WebSocket.CLOSED)
+                return browserSocket.abnormalClosureCode;
+            return 0;
+        },
+
+        getBrowserSocketBufferedAmount: function (socketId) {
+            const socket = browserSocket.getSocket(socketId);
+            return socket && socket.webSocket
+                ? socket.webSocket.bufferedAmount
+                : 0;
+        },
+
+        getBrowserSocketHasUnreadPayloadQueue: function (socketId) {
+            const socket = browserSocket.getSocket(socketId);
+            return !!socket && socket.payloadQueue.length > 0;
         },
 
         browserSocketReadPayloadQueue: function (
-            socketIndex,
+            socketId,
             payloadBytesBufferPtr,
             payloadBytesBufferLength,
         ) {
-            const socket = browserSocket.sockets[socketIndex];
+            const socket = browserSocket.getSocket(socketId);
             if (!socket) {
-                console.error("Socket at index " + socketIndex + " is missing");
+                console.error("Socket with id " + socketId + " is missing");
                 return 0;
             }
 
@@ -40,16 +68,36 @@ const browserSocketLibrary = {
         },
 
         browserSocketConnect: function (serverAddress) {
-            const webSocket = new WebSocket(serverAddress);
-            webSocket.binaryType = "arraybuffer";
+            const socketId = browserSocket.nextSocketId++;
+            const socket = {
+                webSocket: null,
+                payloadQueue: [],
+                closeCode: 0,
+            };
+            browserSocket.sockets[socketId] = socket;
 
-            const payloadQueue = [];
+            let webSocket;
+            try {
+                webSocket = new WebSocket(serverAddress);
+            } catch (error) {
+                // Invalid addresses throw instead of firing onclose.
+                console.error(
+                    "WebSocket connection to " +
+                        serverAddress +
+                        " failed: " +
+                        error,
+                );
+                socket.closeCode = browserSocket.abnormalClosureCode;
+                return socketId;
+            }
+
+            webSocket.binaryType = "arraybuffer";
 
             webSocket.onmessage = function (messageEvent) {
                 if (messageEvent.data instanceof ArrayBuffer) {
-                    payloadQueue.push(new Uint8Array(messageEvent.data));
+                    socket.payloadQueue.push(new Uint8Array(messageEvent.data));
                 } else if (typeof messageEvent.data === "string") {
-                    payloadQueue.push(
+                    socket.payloadQueue.push(
                         new TextEncoder().encode(messageEvent.data),
                     );
                 } else if (messageEvent.data instanceof Blob) {
@@ -65,41 +113,70 @@ const browserSocketLibrary = {
                 }
             };
 
-            const socket = {
-                webSocket: webSocket,
-                payloadQueue: payloadQueue,
+            webSocket.onclose = function (closeEvent) {
+                socket.closeCode =
+                    closeEvent.code || browserSocket.abnormalClosureCode;
             };
 
-            const socketIndex = browserSocket.sockets.push(socket) - 1;
-            return socketIndex;
+            socket.webSocket = webSocket;
+            return socketId;
         },
 
-        browserSocketSend: function (socketIndex, payloadBytes) {
-            browserSocket.sockets[socketIndex].webSocket.send(payloadBytes);
+        browserSocketSend: function (socketId, payloadBytes) {
+            if (!browserSocket.getBrowserSocketIsConnected(socketId)) return;
+            browserSocket.sockets[socketId].webSocket.send(payloadBytes);
         },
 
-        browserSocketDisconnect: function (socketIndex) {
-            browserSocket.sockets[socketIndex].webSocket.close();
+        browserSocketDisconnect: function (socketId) {
+            const socket = browserSocket.getSocket(socketId);
+            if (!socket || !socket.webSocket) return;
+
+            const readyState = socket.webSocket.readyState;
+            if (
+                readyState === WebSocket.CONNECTING ||
+                readyState === WebSocket.OPEN
+            )
+                socket.webSocket.close();
+        },
+
+        browserSocketDispose: function (socketId) {
+            const socket = browserSocket.getSocket(socketId);
+            if (!socket) return;
+
+            browserSocket.browserSocketDisconnect(socketId);
+            if (socket.webSocket) {
+                socket.webSocket.onmessage = null;
+                socket.webSocket.onclose = null;
+            }
+            delete browserSocket.sockets[socketId];
         },
     },
 
     // External C# calls.
 
-    GetBrowserSocketIsConnected: function (socketIndex) {
-        return browserSocket.getBrowserSocketIsConnected(socketIndex);
+    GetBrowserSocketIsConnected: function (socketId) {
+        return browserSocket.getBrowserSocketIsConnected(socketId);
     },
 
-    GetBrowserSocketHasUnreadPayloadQueue: function (socketIndex) {
-        return browserSocket.getBrowserSocketHasUnreadPayloadQueue(socketIndex);
+    GetBrowserSocketCloseCode: function (socketId) {
+        return browserSocket.getBrowserSocketCloseCode(socketId);
+    },
+
+    GetBrowserSocketBufferedAmount: function (socketId) {
+        return browserSocket.getBrowserSocketBufferedAmount(socketId);
+    },
+
+    GetBrowserSocketHasUnreadPayloadQueue: function (socketId) {
+        return browserSocket.getBrowserSocketHasUnreadPayloadQueue(socketId);
     },
 
     BrowserSocketReadPayloadQueue: function (
-        socketIndex,
+        socketId,
         payloadBytesBufferPtr,
         payloadBytesBufferLength,
     ) {
         return browserSocket.browserSocketReadPayloadQueue(
-            socketIndex,
+            socketId,
             payloadBytesBufferPtr,
             payloadBytesBufferLength,
         );
@@ -110,20 +187,20 @@ const browserSocketLibrary = {
         return browserSocket.browserSocketConnect(serverAddress);
     },
 
-    BrowserSocketSend: function (
-        socketIndex,
-        payloadBytesPtr,
-        payloadBytesCount,
-    ) {
+    BrowserSocketSend: function (socketId, payloadBytesPtr, payloadBytesCount) {
         const bytesToSend = HEAPU8.buffer.slice(
             payloadBytesPtr,
             payloadBytesPtr + payloadBytesCount,
         );
-        browserSocket.browserSocketSend(socketIndex, bytesToSend);
+        browserSocket.browserSocketSend(socketId, bytesToSend);
     },
 
-    BrowserSocketDisconnect: function (socketIndex) {
-        browserSocket.browserSocketDisconnect(socketIndex);
+    BrowserSocketDisconnect: function (socketId) {
+        browserSocket.browserSocketDisconnect(socketId);
+    },
+
+    BrowserSocketDispose: function (socketId) {
+        browserSocket.browserSocketDispose(socketId);
     },
 };
 

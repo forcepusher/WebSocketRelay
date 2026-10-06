@@ -16,6 +16,7 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private bool _distanceBasedAuthority;
         [SerializeField]
+        [Tooltip("Ignored for scene objects with a NetworkBinding, which cannot be spawned again and only lose their owner.")]
         private bool _destroyWhenAuthorityOwnerLeaves = true;
 
         private readonly List<INetworkState> _networkStates = new();
@@ -33,7 +34,12 @@ namespace BananaParty.WebSocketRelay
         public bool HasAuthorityOwner => NetworkAuthorityOwner != Guid.Empty;
 
         public bool DistanceBasedAuthority => _distanceBasedAuthority;
-        public bool DestroyWhenAuthorityOwnerLeaves => _destroyWhenAuthorityOwnerLeaves;
+        public bool DestroyWhenAuthorityOwnerLeaves => _destroyWhenAuthorityOwnerLeaves && !IsSceneBound;
+
+        /// <summary>
+        /// Set by <see cref="NetworkBinding"/> for identities placed in a scene rather than spawned from a prefab.
+        /// </summary>
+        public bool IsSceneBound { get; internal set; }
         public NetworkContext NetworkContext => _networkContext;
 
         public string NetworkStateName => _prefabName;

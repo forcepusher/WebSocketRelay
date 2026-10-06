@@ -38,6 +38,24 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return "RelayServer > does not relay to clients on other channels";
             yield return "RelayServer > relays channel message even when sender is not subscribed to channel";
             yield return "RelayServer > unsubscribe does not send confirmation";
+            yield return "RelayServer > does not echo channel messages back to the sender";
+            yield return "RelayServer > answers ping with pong carrying the same payload";
+            yield return "RelayServer > answers ping without payload";
+            yield return "RelayServer > ignores oversized ping";
+            yield return "RelayServer > ignores empty frames and keeps the connection open";
+            yield return "RelayServer backpressure > disconnects a subscriber that stops reading instead of buffering for it";
+            yield return "RelayServer backpressure > keeps a subscriber that reads everything";
+            yield return "BrowserSocket.jslib > relays channel messages between sockets";
+            yield return "BrowserSocket.jslib > receives pong for ping";
+            yield return "BrowserSocket.jslib > keeps a payload queued when the buffer is too small";
+            yield return "BrowserSocket.jslib > reports buffered amount of an open socket";
+            yield return "BrowserSocket.jslib > is not closed while connecting or open";
+            yield return "BrowserSocket.jslib > reports close code after disconnecting";
+            yield return "BrowserSocket.jslib > reports abnormal closure when the server drops the handshake";
+            yield return "BrowserSocket.jslib > reports abnormal closure for an invalid address without throwing";
+            yield return "BrowserSocket.jslib > drops sends while connecting instead of throwing";
+            yield return "BrowserSocket.jslib > dispose frees the socket and later calls are harmless";
+            yield return "BrowserSocket.jslib > never reuses ids of disposed sockets";
         }
 
         [TestCaseSource(nameof(BunTestCaseNames))]

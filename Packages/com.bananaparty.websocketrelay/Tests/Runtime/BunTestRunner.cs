@@ -12,6 +12,7 @@ namespace BananaParty.WebSocketRelay.Tests
     {
         private const int RunTimeoutMs = 60_000;
         private const string RelayServerTestFile = "Source/RelayServer.test.ts";
+        private const string TestDirectoryFilter = "Source/";
 
         public static BunTestRunReport RunRelayServerTests()
         {
@@ -46,7 +47,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
                     FileName = bunExecutablePath,
-                    Arguments = $"test {RelayServerTestFile} --reporter=junit --reporter-outfile=\"{junitReportPath}\"",
+                    Arguments = $"test {TestDirectoryFilter} --reporter=junit --reporter-outfile=\"{junitReportPath}\"",
                     WorkingDirectory = serverDirectory,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,

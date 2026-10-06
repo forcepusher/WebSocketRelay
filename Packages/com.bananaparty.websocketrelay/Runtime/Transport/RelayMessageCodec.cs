@@ -15,6 +15,29 @@ namespace BananaParty.WebSocketRelay.Transport
         public const int ChannelMessageChannelLengthOffset = ChannelMessageGuidOffset + GuidSize;
         public const int ChannelMessageChannelOffset = ChannelMessageChannelLengthOffset + 2;
 
+        // Ping layout: [type:1][sentTimeSeconds:8]. The relay answers with a Pong carrying the same payload.
+        public const int PingMessageSize = 1 + sizeof(double);
+
+        public static byte[] CreatePingMessage(double sentTimeSeconds)
+        {
+            byte[] message = new byte[PingMessageSize];
+            message[0] = RelayMessageType.Ping;
+            BinaryPrimitives.WriteInt64LittleEndian(message.AsSpan(1), BitConverter.DoubleToInt64Bits(sentTimeSeconds));
+            return message;
+        }
+
+        public static bool TryReadPongSentTime(ReadOnlySpan<byte> message, out double sentTimeSeconds)
+        {
+            if (message.Length != PingMessageSize || message[0] != RelayMessageType.Pong)
+            {
+                sentTimeSeconds = 0d;
+                return false;
+            }
+
+            sentTimeSeconds = BitConverter.Int64BitsToDouble(BinaryPrimitives.ReadInt64LittleEndian(message.Slice(1)));
+            return true;
+        }
+
         public static byte[] CreateProtocolMessage(byte type, string channel, ReadOnlySpan<byte> payload = default)
         {
             byte[] channelBytes = Encoding.UTF8.GetBytes(channel);
