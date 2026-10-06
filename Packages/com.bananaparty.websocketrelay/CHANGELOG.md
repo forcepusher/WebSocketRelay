@@ -17,18 +17,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `IRelayListener.OnDisconnectedFromRelay` is replaced by `OnConnectionStateChanged(previousState, state, reason)`.  
 - **Breaking:** `ISocket` has new members that custom implementations need to provide.  
 - **Breaking:** A lost connection no longer clears the session right away. It is cleared only when reconnecting gives up. Set `ReconnectTimeoutSeconds` to 0 for the old behavior.  
+- **Breaking:** `INetworkIdentity` no longer extends `INetworkState`. It declares `WriteNetworkState` and the two-argument `ReadNetworkState` itself, and adds `IsSceneBound`.  
+- **Breaking:** Removed members that nothing used: `INetworkState.NetworkStateName`, `IStateInput.BeginArrayElement`, `IStateOutput.BeginArrayElement`, `NetworkContext.UseBinary` and `BinaryStateOutput.GetBuffer`. Use `NetworkContext.StateFormat` and `BinaryStateOutput.ToArray` instead.  
+- **Breaking:** `Network` implements `IRelayListener` explicitly, so the relay callbacks are no longer part of its public API.  
+- **Breaking:** `NetworkPlayerRoster.RemoveTimedOut` fills a list passed to it instead of allocating a new one every frame.  
 - `RelayClient.Send` returns false instead of throwing while not connected. Subscriptions made while not connected are sent once connected.  
 - Network syncs are skipped while the send backlog exceeds `SendBacklogLimitBytes`, so a slow connection catches up on fresh state instead of queueing stale state.  
 - The relay server no longer echoes channel messages back to their sender, disconnects clients that fall more than 4 MiB behind, and drops connections idle for 60 seconds.  
 - Default player timeout is 10 seconds, above the 5 second heartbeat timeout, so players have time to reconnect.  
 - A single long frame advances player timeouts by at most 0.25 seconds.  
 - Scene objects with a `NetworkBinding` are no longer destroyed when their owner leaves, they only lose the owner, because they cannot be spawned again.  
+- `NetworkContext.ClearNetworkSession`, and so `Network.Disconnect` and giving up on reconnecting, keeps scene objects with a `NetworkBinding` and only clears their owner, for the same reason.  
+- The relay launch scripts start the server again whenever it exits, so a crash only costs clients a reconnect.  
+- The relay server runs with Bun's crash reporter turned off. On Windows the reporter kept the port open after a crash, so no new server could start.  
   
 ### Fixed  
 - Connections that died without a close frame were never detected.  
 - Sending on a connection that just closed threw exceptions.  
 - WebGL sockets leaked their slot and could send while still connecting or already closing.  
 - A long frame, such as loading a scene, timed out every player.  
+- Standalone sockets sent and received about one message per frame, so sessions with more than a few players fell further behind every second. In a soak test with 6 clients at 60 fps, messages arrived 107 seconds late after 6 minutes. Sending and receiving now run on the thread pool.  
+- Messages that arrived right before a connection dropped could be discarded.  
+- WebGL sockets kept buffering incoming messages while the application ran no frames, for example in a hidden tab. Past 4 MiB the connection is now dropped, and restored once the application runs again.  
+- Strings with quotes, backslashes or control characters broke JSON state.  
+- JSON state was missing the comma after an empty object or array.  
+- JSON state rounded floats to 7 digits, so 123456.79 arrived as 123456.8.  
+- `Network.StartServer` could not find the bundled relay server when the package was installed from git rather than placed in the Packages folder.  
+- Stopping relay servers failed when a `bun` process of another user or an elevated one was running.  
   
 ## [2.2.0] - 2026-08-06  
 ### Added  
