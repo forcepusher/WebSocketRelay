@@ -16,7 +16,7 @@ node build.mjs --out <build folder>
 node build.mjs --out <build folder> --revision <git ref>
 ```
 
-Without `--revision` the working tree is built. The client sources always come from the working tree, so older revisions can be measured with the same client.
+Without `--revision` the working tree is built. The client sources always come from the working tree, so the revision needs the networking API they use, which rules out versions before 3.0.0.
 
 Then run the phases:
 

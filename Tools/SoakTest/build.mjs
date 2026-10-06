@@ -4,7 +4,8 @@
 // node build.mjs --out <folder> [--revision <git ref>] [--webgl] [--unity <Unity.exe>]
 //
 // Without --revision the working tree is built, uncommitted changes included.
-// The soak client sources in Assets/SoakTest always come from the working tree, so older revisions can be measured too.
+// The soak client sources in Assets/SoakTest always come from the working tree, so the revision needs the networking
+// API they use, which rules out versions before 3.0.0.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";

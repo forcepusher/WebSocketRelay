@@ -19,9 +19,6 @@ namespace BananaParty.WebSocketRelay.SoakTest
         private NetworkIdentity _networkIdentity;
         private int _sequence;
 
-        // Older revisions require it in INetworkState, and the soak client should build against them for comparison.
-        public string NetworkStateName => nameof(SoakAvatar);
-
         /// <summary>
         /// Stops every local avatar, so distance based authority settles and owners can be compared.
         /// </summary>
@@ -74,9 +71,6 @@ namespace BananaParty.WebSocketRelay.SoakTest
     /// </summary>
     public class SoakShared : MonoBehaviour, INetworkState
     {
-        // Older revisions require it in INetworkState, and the soak client should build against them for comparison.
-        public string NetworkStateName => nameof(SoakShared);
-
         public int Writes { get; private set; }
 
         public void WriteNetworkState(IStateOutput stateOutput)
