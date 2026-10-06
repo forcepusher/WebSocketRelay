@@ -140,6 +140,9 @@ namespace BananaParty.WebSocketRelay.Transport
             if (!File.Exists(bunPath))
                 throw new FileNotFoundException($"Bundled Bun runtime not found at: {bunPath}");
 
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                MakeExecutable(bunPath);
+
             ProcessStartInfo startInfo = new()
             {
                 FileName = bunPath,
@@ -168,6 +171,23 @@ namespace BananaParty.WebSocketRelay.Transport
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             return process;
+        }
+
+        /// <summary>
+        /// Copies of the package made on Windows lose the executable bit that Bun needs on macOS and Linux.
+        /// </summary>
+        private static void MakeExecutable(string path)
+        {
+            ProcessStartInfo startInfo = new()
+            {
+                FileName = "chmod",
+                Arguments = $"+x \"{path}\"",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+            };
+
+            using Process process = Process.Start(startInfo);
+            process?.WaitForExit(5000);
         }
 
         private static string GetBunPath(string serverDirectory)

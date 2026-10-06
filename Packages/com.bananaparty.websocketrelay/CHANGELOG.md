@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON state rounded floats to 7 digits, so 123456.79 arrived as 123456.8.  
 - `Network.StartServer` could not find the bundled relay server when the package was installed from git rather than placed in the Packages folder.  
 - Stopping relay servers failed when a `bun` process of another user or an elevated one was running.  
+- The Linux and macOS Bun runtimes and launch scripts were stored without the executable bit, so the server could not start from a fresh checkout or from a server exported on Windows.  
   
 ## [2.2.0] - 2026-08-06  
 ### Added  
