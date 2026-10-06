@@ -4,10 +4,14 @@ using System.Collections.Generic;
 using System.Linq;
 using BananaParty.WebSocketRelay.Transport;
 using NUnit.Framework;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
+    /// <summary>
+    /// Relay clients talking through the real relay server.
+    /// </summary>
     public class RelayClientTests
     {
         private RelayClient _relayA;
@@ -16,479 +20,279 @@ namespace BananaParty.WebSocketRelay.Tests
         private TestRelayListener _listenerA;
         private TestRelayListener _listenerB;
         private TestRelayListener _listenerC;
+        private int _previousTargetFrameRate;
+        private int _previousVSyncCount;
 
         [UnitySetUp]
-        public IEnumerator Setup()
+        public IEnumerator SetUp()
         {
+            _previousTargetFrameRate = Application.targetFrameRate;
+            _previousVSyncCount = QualitySettings.vSyncCount;
             yield return RelayServerLauncher.StartCoroutine();
         }
 
-        [UnityTest] public IEnumerator ClientHasGuidOnCreation() => TestClientHasGuidOnCreation();
-        [UnityTest] public IEnumerator ClientUsesProvidedGuid() => TestClientUsesProvidedGuid();
-        [UnityTest] public IEnumerator Connect_NoServerHandshakeChannelMessages() => TestConnectNoServerHandshakeChannelMessages();
-        [UnityTest] public IEnumerator Subscribe_NoServerConfirmation() => TestSubscribeNoServerConfirmation();
-        [UnityTest] public IEnumerator ChannelMessageIncludesSenderGuid() => TestChannelMessageIncludesSenderGuid();
-        [UnityTest] public IEnumerator TwoClients_MessageRelay() => TestChannelMessage("relay-100", 2);
-        [UnityTest] public IEnumerator ThreeClients_AllReceive() => TestChannelMessage("relay-100", 3);
-        [UnityTest] public IEnumerator DifferentChannels_Isolated() => TestChannelIsolation();
-        [UnityTest] public IEnumerator MultipleChannels_SubscribeAndSwitch() => TestMultiChannelSubscribe();
-        [UnityTest] public IEnumerator SameChannelDifferentNames_AreIsolated() => TestDifferentChannelNames();
-        [UnityTest] public IEnumerator UnsubscribeStopsReceiving() => TestUnsubscribeStopsReceiving();
-        [UnityTest] public IEnumerator SendAfterUnsubscribe_ThrowsKeyNotFoundException() => TestSendAfterUnsubscribeThrows();
-        [UnityTest] public IEnumerator EmptyPayload_Relays() => TestEmptyMessage();
-        [UnityTest] public IEnumerator LargePayload_Relays() => TestLargeMessage();
-        [UnityTest] public IEnumerator RapidMessages_AllDelivered() => TestRapidMessages(50);
-        [UnityTest] public IEnumerator DisposeWhileConnected_DoesNotCallDisconnected() => TestDisposeWhileConnectedDoesNotCallDisconnected();
-        [UnityTest] public IEnumerator DisposeBeforeConnect_DoesNotCallDisconnected() => TestDisposeBeforeConnectDoesNotCallDisconnected();
-        [UnityTest] public IEnumerator ServerStop_ReconnectDisabled_CallsDisconnected() => TestServerStopCallsDisconnected();
-        [UnityTest] public IEnumerator ServerStop_DisposeDoesNotThrow() => TestServerStopDisposeDoesNotThrow();
-        [UnityTest] public IEnumerator ServerStop_ReconnectDisabled_DisconnectedNotCalledTwice() => TestDisconnectNotCalledTwice();
-        [UnityTest] public IEnumerator ServerRestart_ReconnectsWithSameGuidAndResubscribes() => TestServerRestartReconnects();
-        [UnityTest] public IEnumerator ChannelMessage_NotEchoedToSender() => TestChannelMessageNotEchoedToSender();
-        [UnityTest] public IEnumerator Heartbeat_MeasuresRoundTripTime() => TestHeartbeatMeasuresRoundTripTime();
-        [UnityTest] public IEnumerator Connect_NothingListening_DisconnectsWithReason() => TestConnectNothingListening();
-
-        private IEnumerator TestClientHasGuidOnCreation()
+        [TearDown]
+        public void TearDown()
         {
-            _relayA = CreateRelay(out _listenerA);
-            Assert.AreNotEqual(Guid.Empty, _relayA.ClientGuid);
-
-            Cleanup();
-            yield return null;
+            _relayA?.Dispose();
+            _relayB?.Dispose();
+            _relayC?.Dispose();
+            _relayA = _relayB = _relayC = null;
+            _listenerA = _listenerB = _listenerC = null;
+            Application.targetFrameRate = _previousTargetFrameRate;
+            QualitySettings.vSyncCount = _previousVSyncCount;
         }
 
-        private IEnumerator TestClientUsesProvidedGuid()
+        [Test]
+        public void ClientUsesProvidedGuid()
         {
             Guid expectedGuid = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-            _listenerA = new TestRelayListener();
-            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, expectedGuid);
+
+            _relayA = new RelayClient(TestParameters.RelayServerAddress, new TestRelayListener(), expectedGuid);
 
             Assert.AreEqual(expectedGuid, _relayA.ClientGuid);
-
-            Cleanup();
-            yield return null;
         }
 
-        private IEnumerator TestConnectNoServerHandshakeChannelMessages()
+        [UnityTest]
+        public IEnumerator Connect_NoServerHandshakeChannelMessages()
         {
-            bool channelMessageReceived = false;
-
-            _listenerA = new TestRelayListener();
-            _listenerA.ChannelMessageReceived += (_, _, _) => channelMessageReceived = true;
-
-            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
-            _relayA.Connect();
-
-            yield return TestParameters.WaitUntilRelayConnected(_relayA);
-
-            yield return TestParameters.WaitForDuration(0.25f, () => _relayA.ProcessIncomingMessages());
-
-            Assert.IsFalse(channelMessageReceived);
-
-            Cleanup();
-            yield return null;
-        }
-
-        private IEnumerator TestSubscribeNoServerConfirmation()
-        {
-            bool channelMessageReceived = false;
-
             _relayA = CreateRelay(out _listenerA);
-            _listenerA.ChannelMessageReceived += (_, _, _) => channelMessageReceived = true;
-            _relayA.Connect();
+            bool isChannelMessageReceived = false;
+            _listenerA.ChannelMessageReceived += (_, _, _) => isChannelMessageReceived = true;
 
-            yield return TestParameters.WaitUntilRelayConnected(_relayA);
+            yield return Connect(_relayA);
+            yield return TestParameters.WaitForDuration(0.25f, PollAll);
+
+            Assert.IsFalse(isChannelMessageReceived);
+        }
+
+        [UnityTest]
+        public IEnumerator Subscribe_NoServerConfirmation()
+        {
+            _relayA = CreateRelay(out _listenerA);
+            bool isChannelMessageReceived = false;
+            _listenerA.ChannelMessageReceived += (_, _, _) => isChannelMessageReceived = true;
+            yield return Connect(_relayA);
 
             _relayA.SubscribeToChannel("no-ack");
             Assert.IsTrue(_relayA.SubscribedChannels.Contains("no-ack"));
+            yield return TestParameters.WaitForDuration(0.25f, PollAll);
 
-            yield return TestParameters.WaitForDuration(0.25f, () => _relayA.ProcessIncomingMessages());
-
-            Assert.IsFalse(channelMessageReceived);
-
-            Cleanup();
-            yield return null;
+            Assert.IsFalse(isChannelMessageReceived);
         }
 
-        private IEnumerator TestChannelMessageIncludesSenderGuid()
+        [UnityTest]
+        public IEnumerator ChannelMessageIncludesSenderGuid()
         {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
+            yield return ConnectSubscribed("guid-test", clientCount: 2);
 
-            _relayA.SubscribeToChannel("guid-test");
-            _relayB.SubscribeToChannel("guid-test");
-            yield return WaitForSubscriptionChanges();
-
-            Guid receivedSenderId = Guid.Empty;
-            _listenerB.ChannelMessageReceived += (senderId, channel, _) =>
+            Guid receivedSenderGuid = Guid.Empty;
+            _listenerB.ChannelMessageReceived += (senderGuid, channel, _) =>
             {
-                if (channel != "guid-test")
-                    return;
-
-                receivedSenderId = senderId;
+                if (channel == "guid-test")
+                    receivedSenderGuid = senderGuid;
             };
 
             _relayA.Send("guid-test", new byte[] { 0x01 });
-            yield return TestParameters.WaitForCondition(
-                () => receivedSenderId != Guid.Empty,
-                TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.ProcessIncomingMessages());
+            yield return TestParameters.WaitForCondition(() => receivedSenderGuid != Guid.Empty, TestParameters.ReceiveTimeoutThreshold, PollAll);
 
-            Assert.AreEqual(_relayA.ClientGuid, receivedSenderId);
-
-            Cleanup();
+            Assert.AreEqual(_relayA.ClientGuid, receivedSenderGuid);
         }
 
-        private IEnumerator TestChannelMessage(string channel, int clientCount)
+        [UnityTest]
+        public IEnumerator TwoClients_MessageRelay() => AssertChannelMessageReachesEveryOtherClient(clientCount: 2);
+
+        [UnityTest]
+        public IEnumerator ThreeClients_AllReceive() => AssertChannelMessageReachesEveryOtherClient(clientCount: 3);
+
+        [UnityTest]
+        public IEnumerator DifferentChannels_Isolated()
         {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            if (clientCount >= 3) _relayC = CreateRelay(out _listenerC);
-
-            _relayA.Connect();
-            _relayB.Connect();
-            if (clientCount >= 3) _relayC.Connect();
-
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
-            if (clientCount >= 3)
-                yield return TestParameters.WaitUntilRelayConnected(_relayC);
-
-            _relayA.SubscribeToChannel(channel);
-            _relayB.SubscribeToChannel(channel);
-            if (clientCount >= 3) _relayC.SubscribeToChannel(channel);
-
-            yield return WaitForSubscriptionChanges();
-
-            byte[] sent = GenerateRandomBytes(64);
-            int recvCount = 0;
-            byte[] receivedData = null;
-
-            _listenerB.ChannelMessageReceived += (_, receivedChannel, data) =>
-            {
-                if (receivedChannel != channel) return;
-                recvCount++;
-                receivedData = data;
-            };
-            if (clientCount >= 3)
-            {
-                _listenerC.ChannelMessageReceived += (_, receivedChannel, data) =>
-                {
-                    if (receivedChannel != channel) return;
-                    recvCount++;
-                    receivedData = data;
-                };
-            }
-
-            _relayA.Send(channel, sent);
-
-            yield return TestParameters.WaitForCondition(
-                () => recvCount >= clientCount - 1,
-                TestParameters.ReceiveTimeoutThreshold,
-                () =>
-                {
-                    _relayB.ProcessIncomingMessages();
-                    if (clientCount >= 3)
-                        _relayC.ProcessIncomingMessages();
-                });
-
-            Assert.AreEqual(clientCount - 1, recvCount, $"Expected {clientCount - 1} receivers, got {recvCount}.");
-            Assert.IsNotNull(receivedData);
-            Assert.True(sent.SequenceEqual(receivedData));
-
-            Cleanup();
-        }
-
-        private IEnumerator TestChannelIsolation()
-        {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
-
+            yield return ConnectRelays(clientCount: 2);
             _relayA.SubscribeToChannel("alpha");
             _relayB.SubscribeToChannel("beta");
-
             yield return WaitForSubscriptionChanges();
 
-            bool bReceived = false;
-            _listenerB.ChannelMessageReceived += (_, channel, _) => { if (channel == "beta") bReceived = true; };
+            bool isReceivedByB = false;
+            _listenerB.ChannelMessageReceived += (_, _, _) => isReceivedByB = true;
 
             _relayA.Send("alpha", new byte[] { 0xAA });
+            yield return TestParameters.WaitForDuration(1f, PollAll);
 
-            yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
-            Assert.IsFalse(bReceived, "Client B received message from a channel it is not subscribed to.");
-
-            Cleanup();
+            Assert.IsFalse(isReceivedByB, "Client B received a message from a channel it is not subscribed to.");
         }
 
-        private IEnumerator TestMultiChannelSubscribe()
+        [UnityTest]
+        public IEnumerator MultipleChannels_SubscribeAndSwitch()
         {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
-
+            yield return ConnectRelays(clientCount: 2);
             _relayA.SubscribeToChannel("channel-a");
             _relayB.SubscribeToChannel("channel-a");
             _relayB.SubscribeToChannel("channel-b");
-
             yield return WaitForSubscriptionChanges();
 
-            bool bGotA = false;
-            _listenerB.ChannelMessageReceived += (_, channel, _) => { if (channel == "channel-a") bGotA = true; };
-            _relayA.Send("channel-a", new byte[] { 0xCC });
-            yield return TestParameters.WaitForCondition(
-                () => bGotA,
-                TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.ProcessIncomingMessages());
-            Assert.IsTrue(bGotA, "B did not receive channel-a message.");
+            List<string> channelsReceivedByA = new();
+            List<string> channelsReceivedByB = new();
+            _listenerA.ChannelMessageReceived += (_, channel, _) => channelsReceivedByA.Add(channel);
+            _listenerB.ChannelMessageReceived += (_, channel, _) => channelsReceivedByB.Add(channel);
 
-            bool aGotB = false;
-            _listenerA.ChannelMessageReceived += (_, channel, _) => { if (channel == "channel-b") aGotB = true; };
+            _relayA.Send("channel-a", new byte[] { 0xCC });
+            yield return TestParameters.WaitForCondition(() => channelsReceivedByB.Contains("channel-a"), TestParameters.ReceiveTimeoutThreshold, PollAll);
+            Assert.Contains("channel-a", channelsReceivedByB, "B did not receive the channel-a message.");
+
             _relayB.Send("channel-b", new byte[] { 0xDD });
-            yield return TestParameters.WaitForDuration(1f, () => _relayA.ProcessIncomingMessages());
-            Assert.IsFalse(aGotB, "A received message from a channel it is not subscribed to.");
+            yield return TestParameters.WaitForDuration(1f, PollAll);
+            Assert.IsEmpty(channelsReceivedByA, "A received a message from a channel it is not subscribed to.");
 
             _relayA.SubscribeToChannel("channel-b");
             yield return WaitForSubscriptionChanges();
 
-            bool aGotFromB = false;
-            _listenerA.ChannelMessageReceived += (_, channel, _) => { if (channel == "channel-b") aGotFromB = true; };
             _relayB.Send("channel-b", new byte[] { 0xEE });
-            yield return TestParameters.WaitForCondition(
-                () => aGotFromB,
-                TestParameters.ReceiveTimeoutThreshold,
-                () => _relayA.ProcessIncomingMessages());
-            Assert.IsTrue(aGotFromB, "A did not receive channel-b message after subscribing.");
-
-            Cleanup();
+            yield return TestParameters.WaitForCondition(() => channelsReceivedByA.Contains("channel-b"), TestParameters.ReceiveTimeoutThreshold, PollAll);
+            Assert.Contains("channel-b", channelsReceivedByA, "A did not receive the channel-b message after subscribing.");
         }
 
-        private IEnumerator TestDifferentChannelNames()
+        [UnityTest]
+        public IEnumerator UnsubscribeStopsReceiving()
         {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
+            yield return ConnectSubscribed("shared", clientCount: 2);
 
-            _relayA.SubscribeToChannel("one");
-            _relayB.SubscribeToChannel("two");
+            int receivedByB = 0;
+            _listenerB.ChannelMessageReceived += (_, channel, _) => { if (channel == "shared") receivedByB++; };
 
-            yield return WaitForSubscriptionChanges();
-
-            bool bReceived = false;
-            _listenerB.ChannelMessageReceived += (_, channel, _) => { if (channel == "two") bReceived = true; };
-            _relayA.Send("one", new byte[] { 0xDD });
-
-            yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
-            Assert.IsFalse(bReceived);
-
-            Cleanup();
-        }
-
-        private IEnumerator TestUnsubscribeStopsReceiving()
-        {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
-
-            _relayA.SubscribeToChannel("shared");
-            _relayB.SubscribeToChannel("shared");
-
-            yield return WaitForSubscriptionChanges();
-
-            bool bReceivedFirst = false;
-            _listenerB.ChannelMessageReceived += (_, channel, _) => { if (channel == "shared") bReceivedFirst = true; };
             _relayA.Send("shared", new byte[] { 0xEE });
-            yield return TestParameters.WaitForCondition(
-                () => bReceivedFirst,
-                TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.ProcessIncomingMessages());
-            Assert.IsTrue(bReceivedFirst, "B did not receive before unsubscribe.");
+            yield return TestParameters.WaitForCondition(() => receivedByB == 1, TestParameters.ReceiveTimeoutThreshold, PollAll);
+            Assert.AreEqual(1, receivedByB, "B did not receive before unsubscribing.");
 
             _relayB.UnsubscribeFromChannel("shared");
             yield return WaitForSubscriptionChanges();
 
-            bool bReceivedAfterUnsubscribe = false;
-            _listenerB.ChannelMessageReceived += (_, channel, _) => { if (channel == "shared") bReceivedAfterUnsubscribe = true; };
             _relayA.Send("shared", new byte[] { 0xFF });
-            yield return TestParameters.WaitForDuration(1f, () => _relayB.ProcessIncomingMessages());
-            Assert.IsFalse(bReceivedAfterUnsubscribe, "B received payload after unsubscribing.");
-
-            Cleanup();
+            yield return TestParameters.WaitForDuration(1f, PollAll);
+            Assert.AreEqual(1, receivedByB, "B received a message after unsubscribing.");
         }
 
-        private IEnumerator TestSendAfterUnsubscribeThrows()
+        [UnityTest]
+        public IEnumerator SendAfterUnsubscribe_ThrowsKeyNotFoundException()
         {
             _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
+            yield return Connect(_relayA);
 
-            _relayB.SubscribeToChannel("temp");
-            _relayB.ProcessIncomingMessages();
-            yield return null;
+            _relayA.SubscribeToChannel("temp");
+            _relayA.UnsubscribeFromChannel("temp");
 
-            _relayB.UnsubscribeFromChannel("temp");
-            _relayB.ProcessIncomingMessages();
-            yield return null;
-
-            Assert.Throws<KeyNotFoundException>(() => _relayB.Send("temp", new byte[] { 0x01 }));
-
-            Cleanup();
+            Assert.Throws<KeyNotFoundException>(() => _relayA.Send("temp", new byte[] { 0x01 }));
         }
 
-        private IEnumerator TestEmptyMessage()
+        [UnityTest]
+        public IEnumerator EmptyPayload_Relays()
         {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
-
-            _relayA.SubscribeToChannel("empty");
-            _relayB.SubscribeToChannel("empty");
-
-            yield return WaitForSubscriptionChanges();
+            yield return ConnectSubscribed("empty", clientCount: 2);
 
             byte[] received = null;
             _listenerB.ChannelMessageReceived += (_, channel, data) => { if (channel == "empty") received = data; };
-            _relayA.Send("empty", new byte[0]);
 
-            yield return TestParameters.WaitForCondition(
-                () => received != null,
-                TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.ProcessIncomingMessages());
+            _relayA.Send("empty", Array.Empty<byte>());
+            yield return TestParameters.WaitForCondition(() => received != null, TestParameters.ReceiveTimeoutThreshold, PollAll);
 
             Assert.IsNotNull(received, "Empty message was not received.");
             Assert.AreEqual(0, received.Length);
-
-            Cleanup();
         }
 
-        private IEnumerator TestLargeMessage()
+        [UnityTest]
+        public IEnumerator LargePayload_Relays()
         {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
-
-            _relayA.SubscribeToChannel("large");
-            _relayB.SubscribeToChannel("large");
-
-            yield return WaitForSubscriptionChanges();
+            yield return ConnectSubscribed("large", clientCount: 2);
 
             byte[] sent = GenerateRandomBytes(40_000);
             byte[] received = null;
             _listenerB.ChannelMessageReceived += (_, channel, data) => { if (channel == "large") received = data; };
 
             _relayA.Send("large", sent);
-            yield return TestParameters.WaitForCondition(
-                () => received != null,
-                TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.ProcessIncomingMessages());
+            yield return TestParameters.WaitForCondition(() => received != null, TestParameters.ReceiveTimeoutThreshold, PollAll);
 
-            Assert.IsNotNull(received);
-            Assert.True(sent.SequenceEqual(received));
-
-            Cleanup();
+            CollectionAssert.AreEqual(sent, received);
         }
 
-        private IEnumerator TestRapidMessages(int count)
+        [UnityTest]
+        public IEnumerator RapidMessages_AllDeliveredInOrder()
         {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
+            const int messageCount = 50;
+            yield return ConnectSubscribed("rapid", clientCount: 2);
 
-            _relayA.SubscribeToChannel("rapid");
-            _relayB.SubscribeToChannel("rapid");
+            List<byte> received = new();
+            _listenerB.ChannelMessageReceived += (_, channel, data) => { if (channel == "rapid") received.Add(data[0]); };
 
-            yield return WaitForSubscriptionChanges();
+            for (int index = 0; index < messageCount; index++)
+                _relayA.Send("rapid", new[] { (byte)index });
 
-            for (int i = 0; i < count; i++)
-                _relayA.Send("rapid", new byte[] { (byte)i });
+            yield return TestParameters.WaitForCondition(() => received.Count >= messageCount, TestParameters.ReceiveTimeoutThreshold, PollAll);
+
+            CollectionAssert.AreEqual(Enumerable.Range(0, messageCount).Select(index => (byte)index), received);
+        }
+
+        [UnityTest]
+        public IEnumerator BurstOfMessages_IsDeliveredWithinAFewFrames()
+        {
+            // At a real frame rate a socket that moves one message per frame needs hundreds of frames for this.
+            const int messageCount = 200;
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = 30;
+            yield return ConnectSubscribed("burst", clientCount: 2);
 
             int receivedCount = 0;
-            _listenerB.ChannelMessageReceived += (_, channel, _) => { if (channel == "rapid") receivedCount++; };
+            _listenerB.ChannelMessageReceived += (_, channel, _) => { if (channel == "burst") receivedCount++; };
 
-            yield return TestParameters.WaitForCondition(
-                () => receivedCount >= count,
-                TestParameters.ReceiveTimeoutThreshold,
-                () => _relayB.ProcessIncomingMessages());
+            for (int index = 0; index < messageCount; index++)
+                _relayA.Send("burst", new byte[1000]);
 
-            Assert.AreEqual(count, receivedCount, $"Expected {count} messages, received {receivedCount}.");
+            int frameCount = 0;
+            while (receivedCount < messageCount && frameCount < 300)
+            {
+                yield return null;
+                frameCount++;
+                PollAll();
+            }
 
-            Cleanup();
+            Assert.AreEqual(messageCount, receivedCount);
+            Assert.Less(frameCount, 15, "The burst was delivered at the pace of the frame rate instead of the connection.");
         }
 
-        private IEnumerator TestDisposeWhileConnectedDoesNotCallDisconnected()
+        [UnityTest]
+        public IEnumerator DisposeWhileConnected_DoesNotCallDisconnected()
         {
+            _relayA = CreateRelay(out _listenerA);
             int disconnectCount = 0;
-
-            _listenerA = new TestRelayListener();
             _listenerA.Disconnected += () => disconnectCount++;
-            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
-            _relayA.Connect();
-
-            yield return TestParameters.WaitUntilRelayConnected(_relayA);
-            _relayA.ProcessIncomingMessages();
+            yield return Connect(_relayA);
 
             _relayA.Dispose();
-            _relayA = null;
 
             Assert.AreEqual(0, disconnectCount);
-            yield return null;
         }
 
-        private IEnumerator TestDisposeBeforeConnectDoesNotCallDisconnected()
+        [Test]
+        public void DisposeBeforeConnect_DoesNotCallDisconnected()
         {
+            _relayA = CreateRelay(out _listenerA);
             int disconnectCount = 0;
-
-            _listenerA = new TestRelayListener();
             _listenerA.Disconnected += () => disconnectCount++;
-            _relayA = new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", _listenerA, Guid.NewGuid());
 
             _relayA.Dispose();
-            _relayA = null;
 
             Assert.AreEqual(0, disconnectCount);
-            yield return null;
         }
 
-        private IEnumerator TestServerStopCallsDisconnected()
+        [UnityTest]
+        public IEnumerator ServerStop_ReconnectDisabled_CallsDisconnectedOnce()
         {
+            _relayA = CreateRelay(out _listenerA, TestParameters.ReconnectDisabledSettings());
             int disconnectCount = 0;
-
-            _listenerA = new TestRelayListener();
             _listenerA.Disconnected += () => disconnectCount++;
-            _relayA = new RelayClient(
-                $"ws://localhost:{TestParameters.RelayServerPort}",
-                _listenerA,
-                Guid.NewGuid(),
-                settings: TestParameters.ReconnectDisabledSettings());
-            _relayA.Connect();
-
-            yield return TestParameters.WaitUntilRelayConnected(_relayA);
-            _relayA.ProcessIncomingMessages();
+            yield return Connect(_relayA);
 
             yield return RelayServerLauncher.StopCoroutine();
-
-            yield return TestParameters.WaitForCondition(
-                () => disconnectCount > 0,
-                TestParameters.DisconnectTimeoutThreshold,
-                () => _relayA.ProcessIncomingMessages());
+            yield return TestParameters.WaitForCondition(() => disconnectCount > 0, TestParameters.DisconnectTimeoutThreshold, PollAll);
 
             Assert.AreEqual(1, disconnectCount);
             CollectionAssert.AreEqual(
@@ -496,136 +300,70 @@ namespace BananaParty.WebSocketRelay.Tests
                 _listenerA.States);
             Assert.IsNotEmpty(_listenerA.LastReason);
 
-            _relayA.ProcessIncomingMessages();
-            Assert.AreEqual(1, disconnectCount, "Disconnect callback should not fire again while polling.");
-
+            PollAll();
+            PollAll();
+            Assert.AreEqual(1, disconnectCount, "Disconnected was reported again while polling.");
             Assert.DoesNotThrow(() => _relayA.Dispose());
-            _relayA = null;
-            yield return null;
         }
 
-        private IEnumerator TestServerStopDisposeDoesNotThrow()
+        [UnityTest]
+        public IEnumerator ServerStop_DisposeDoesNotThrow()
         {
             _relayA = CreateRelay(out _listenerA);
-            _relayA.Connect();
-
-            yield return TestParameters.WaitUntilRelayConnected(_relayA);
-            _relayA.ProcessIncomingMessages();
+            yield return Connect(_relayA);
 
             yield return RelayServerLauncher.StopCoroutine();
-
-            yield return TestParameters.WaitForDuration(
-                0.5f,
-                () => _relayA.ProcessIncomingMessages());
+            yield return TestParameters.WaitForDuration(0.5f, PollAll);
 
             Assert.DoesNotThrow(() => _relayA.Dispose());
-            _relayA = null;
-            yield return null;
         }
 
-        private IEnumerator TestDisconnectNotCalledTwice()
+        [UnityTest]
+        public IEnumerator ServerRestart_ReconnectsWithSameGuidAndResubscribes()
         {
-            int disconnectCount = 0;
-
-            _listenerA = new TestRelayListener();
-            _listenerA.Disconnected += () => disconnectCount++;
-            _relayA = new RelayClient(
-                $"ws://localhost:{TestParameters.RelayServerPort}",
-                _listenerA,
-                Guid.NewGuid(),
-                settings: TestParameters.ReconnectDisabledSettings());
-            _relayA.Connect();
-
-            yield return TestParameters.WaitUntilRelayConnected(_relayA);
-            _relayA.ProcessIncomingMessages();
-
-            yield return RelayServerLauncher.StopCoroutine();
-
-            yield return TestParameters.WaitForCondition(
-                () => disconnectCount > 0,
-                TestParameters.DisconnectTimeoutThreshold,
-                () => _relayA.ProcessIncomingMessages());
-
-            _relayA.ProcessIncomingMessages();
-            _relayA.ProcessIncomingMessages();
-
-            Assert.AreEqual(1, disconnectCount);
-
-            Assert.DoesNotThrow(() => _relayA.Dispose());
-            _relayA = null;
-            yield return null;
-        }
-
-        private IEnumerator TestServerRestartReconnects()
-        {
-            _relayA = CreateFastReconnectingRelay(out _listenerA);
-            _relayB = CreateFastReconnectingRelay(out _listenerB);
+            _relayA = CreateRelay(out _listenerA, TestParameters.FastReconnectSettings());
+            _relayB = CreateRelay(out _listenerB, TestParameters.FastReconnectSettings());
             Guid guidA = _relayA.ClientGuid;
             Guid guidB = _relayB.ClientGuid;
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
-
+            yield return Connect(_relayA, _relayB);
             _relayA.SubscribeToChannel("resume");
             _relayB.SubscribeToChannel("resume");
 
-            void PollBoth()
-            {
-                _relayA.ProcessIncomingMessages();
-                _relayB.ProcessIncomingMessages();
-            }
-
-            yield return TestParameters.StopRelayServer(PollBoth);
+            yield return TestParameters.StopRelayServer(PollAll);
             yield return TestParameters.WaitForCondition(
                 () => _relayA.State == RelayConnectionState.Reconnecting && _relayB.State == RelayConnectionState.Reconnecting,
                 TestParameters.DisconnectTimeoutThreshold,
-                PollBoth);
+                PollAll);
             Assert.AreEqual(RelayConnectionState.Reconnecting, _relayA.State);
             Assert.AreEqual(RelayConnectionState.Reconnecting, _relayB.State);
             Assert.IsFalse(_relayA.Send("resume", new byte[] { 0x01 }));
 
-            yield return TestParameters.StartRelayServer(PollBoth);
+            yield return TestParameters.StartRelayServer(PollAll);
             yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB, TestParameters.ConnectTimeoutThreshold);
             Assert.IsTrue(_relayA.IsConnected && _relayB.IsConnected, "Clients did not reconnect after the server came back.");
             Assert.AreEqual(guidA, _relayA.ClientGuid);
             Assert.AreEqual(guidB, _relayB.ClientGuid);
             Assert.AreEqual(0, _listenerA.States.Count(state => state == RelayConnectionState.Disconnected));
 
-            Guid senderSeenByB = Guid.Empty;
             Guid senderSeenByA = Guid.Empty;
-            _listenerB.ChannelMessageReceived += (senderId, channel, _) => { if (channel == "resume") senderSeenByB = senderId; };
-            _listenerA.ChannelMessageReceived += (senderId, channel, _) => { if (channel == "resume") senderSeenByA = senderId; };
+            Guid senderSeenByB = Guid.Empty;
+            _listenerA.ChannelMessageReceived += (senderGuid, channel, _) => { if (channel == "resume") senderSeenByA = senderGuid; };
+            _listenerB.ChannelMessageReceived += (senderGuid, channel, _) => { if (channel == "resume") senderSeenByB = senderGuid; };
 
-            // Both clients resubscribe on their own; a message sent before the other side resubscribed would be lost.
-            yield return TestParameters.WaitForDuration(0.25f, PollBoth);
+            // Both clients resubscribe on their own, and a message sent before the other side resubscribed would be lost.
+            yield return TestParameters.WaitForDuration(0.25f, PollAll);
             Assert.IsTrue(_relayA.Send("resume", new byte[] { 0x02 }));
             Assert.IsTrue(_relayB.Send("resume", new byte[] { 0x03 }));
-            yield return TestParameters.WaitForCondition(
-                () => senderSeenByA != Guid.Empty && senderSeenByB != Guid.Empty,
-                TestParameters.ReceiveTimeoutThreshold,
-                PollBoth);
+            yield return TestParameters.WaitForCondition(() => senderSeenByA != Guid.Empty && senderSeenByB != Guid.Empty, TestParameters.ReceiveTimeoutThreshold, PollAll);
 
             Assert.AreEqual(guidA, senderSeenByB);
             Assert.AreEqual(guidB, senderSeenByA);
-
-            Cleanup();
         }
 
-        private IEnumerator TestChannelMessageNotEchoedToSender()
+        [UnityTest]
+        public IEnumerator ChannelMessage_NotEchoedToSender()
         {
-            _relayA = CreateRelay(out _listenerA);
-            _relayB = CreateRelay(out _listenerB);
-            _relayA.Connect();
-            _relayB.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA, _relayB);
-
-            _relayA.SubscribeToChannel("echo");
-            _relayB.SubscribeToChannel("echo");
-            yield return TestParameters.WaitForDuration(0.1f, () =>
-            {
-                _relayA.ProcessIncomingMessages();
-                _relayB.ProcessIncomingMessages();
-            });
+            yield return ConnectSubscribed("echo", clientCount: 2);
 
             int receivedByA = 0;
             int receivedByB = 0;
@@ -633,65 +371,103 @@ namespace BananaParty.WebSocketRelay.Tests
             _listenerB.ChannelMessageReceived += (_, channel, _) => { if (channel == "echo") receivedByB++; };
 
             _relayA.Send("echo", new byte[] { 0x01 });
-            yield return TestParameters.WaitForDuration(0.5f, () =>
-            {
-                _relayA.ProcessIncomingMessages();
-                _relayB.ProcessIncomingMessages();
-            });
+            yield return TestParameters.WaitForDuration(0.5f, PollAll);
 
             Assert.AreEqual(1, receivedByB);
             Assert.AreEqual(0, receivedByA, "Sender received its own message.");
-
-            Cleanup();
         }
 
-        private IEnumerator TestHeartbeatMeasuresRoundTripTime()
+        [UnityTest]
+        public IEnumerator Heartbeat_MeasuresRoundTripTime()
         {
-            _relayA = CreateFastReconnectingRelay(out _listenerA);
-            _relayA.Connect();
-            yield return TestParameters.WaitUntilRelayConnected(_relayA);
+            _relayA = CreateRelay(out _listenerA, TestParameters.FastReconnectSettings());
+            yield return Connect(_relayA);
 
-            yield return TestParameters.WaitForCondition(
-                () => _relayA.RoundTripTimeSeconds > 0d,
-                TestParameters.ReceiveTimeoutThreshold,
-                () => _relayA.ProcessIncomingMessages());
+            yield return TestParameters.WaitForCondition(() => _relayA.RoundTripTimeSeconds > 0d, TestParameters.ReceiveTimeoutThreshold, PollAll);
 
             Assert.Greater(_relayA.RoundTripTimeSeconds, 0d);
             Assert.Less(_relayA.RoundTripTimeSeconds, 0.5d);
             Assert.IsTrue(_relayA.IsLinkHealthy);
-
-            Cleanup();
         }
 
-        private IEnumerator TestConnectNothingListening()
+        [UnityTest]
+        public IEnumerator Connect_NothingListening_DisconnectsWithReason()
         {
             _listenerA = new TestRelayListener();
             _relayA = new RelayClient($"ws://127.0.0.1:{GetUnusedPort()}", _listenerA, Guid.NewGuid());
             _relayA.Connect();
 
-            yield return TestParameters.WaitForCondition(
-                () => _relayA.State == RelayConnectionState.Disconnected,
-                TestParameters.ConnectTimeoutThreshold,
-                () => _relayA.ProcessIncomingMessages());
+            yield return TestParameters.WaitForCondition(() => _relayA.State == RelayConnectionState.Disconnected, TestParameters.ConnectTimeoutThreshold, PollAll);
 
-            CollectionAssert.AreEqual(
-                new[] { RelayConnectionState.Connecting, RelayConnectionState.Disconnected },
-                _listenerA.States);
+            CollectionAssert.AreEqual(new[] { RelayConnectionState.Connecting, RelayConnectionState.Disconnected }, _listenerA.States);
             Assert.IsNotEmpty(_listenerA.LastReason);
+        }
 
-            Cleanup();
+        private IEnumerator AssertChannelMessageReachesEveryOtherClient(int clientCount)
+        {
+            const string channel = "relay-100";
+            yield return ConnectSubscribed(channel, clientCount);
+
+            byte[] sent = GenerateRandomBytes(64);
+            List<byte[]> received = new();
+            _listenerB.ChannelMessageReceived += (_, receivedChannel, data) => { if (receivedChannel == channel) received.Add(data); };
+            if (_listenerC != null)
+                _listenerC.ChannelMessageReceived += (_, receivedChannel, data) => { if (receivedChannel == channel) received.Add(data); };
+
+            _relayA.Send(channel, sent);
+            yield return TestParameters.WaitForCondition(() => received.Count >= clientCount - 1, TestParameters.ReceiveTimeoutThreshold, PollAll);
+
+            Assert.AreEqual(clientCount - 1, received.Count, $"Expected {clientCount - 1} receivers.");
+            foreach (byte[] data in received)
+                CollectionAssert.AreEqual(sent, data);
+        }
+
+        private IEnumerator ConnectSubscribed(string channel, int clientCount)
+        {
+            yield return ConnectRelays(clientCount);
+            _relayA.SubscribeToChannel(channel);
+            _relayB.SubscribeToChannel(channel);
+            _relayC?.SubscribeToChannel(channel);
+            yield return WaitForSubscriptionChanges();
+        }
+
+        private IEnumerator ConnectRelays(int clientCount)
+        {
+            _relayA = CreateRelay(out _listenerA);
+            _relayB = CreateRelay(out _listenerB);
+            if (clientCount >= 3)
+                _relayC = CreateRelay(out _listenerC);
+
+            yield return _relayC == null ? Connect(_relayA, _relayB) : Connect(_relayA, _relayB, _relayC);
+        }
+
+        private IEnumerator Connect(params RelayClient[] relays)
+        {
+            foreach (RelayClient relay in relays)
+                relay.Connect();
+
+            yield return TestParameters.WaitForCondition(() => relays.All(relay => relay.IsConnected), TestParameters.ConnectTimeoutThreshold, PollAll);
+            Assert.IsTrue(relays.All(relay => relay.IsConnected), "Relay clients did not connect.");
         }
 
         // The relay does not acknowledge subscription changes, and messages from different
         // connections are not ordered, so give a change time to reach the relay before another client publishes.
         private IEnumerator WaitForSubscriptionChanges()
         {
-            yield return TestParameters.WaitForDuration(0.1f, () =>
-            {
-                _relayA?.ProcessIncomingMessages();
-                _relayB?.ProcessIncomingMessages();
-                _relayC?.ProcessIncomingMessages();
-            });
+            yield return TestParameters.WaitForDuration(0.1f, PollAll);
+        }
+
+        private void PollAll()
+        {
+            _relayA?.ProcessIncomingMessages();
+            _relayB?.ProcessIncomingMessages();
+            _relayC?.ProcessIncomingMessages();
+        }
+
+        private static RelayClient CreateRelay(out TestRelayListener listener, RelayConnectionSettings settings = null)
+        {
+            listener = new TestRelayListener();
+            return new RelayClient(TestParameters.RelayServerAddress, listener, Guid.NewGuid(), settings: settings);
         }
 
         private static int GetUnusedPort()
@@ -703,43 +479,12 @@ namespace BananaParty.WebSocketRelay.Tests
             return port;
         }
 
-        private RelayClient CreateRelay(out TestRelayListener listener)
+        private static byte[] GenerateRandomBytes(int length)
         {
-            listener = new TestRelayListener();
-            return new RelayClient($"ws://localhost:{TestParameters.RelayServerPort}", listener, Guid.NewGuid());
-        }
-
-        private RelayClient CreateFastReconnectingRelay(out TestRelayListener listener)
-        {
-            listener = new TestRelayListener();
-            return new RelayClient(
-                TestParameters.RelayServerAddress,
-                listener,
-                Guid.NewGuid(),
-                settings: TestParameters.FastReconnectSettings());
-        }
-
-        private byte[] GenerateRandomBytes(int length)
-        {
-            var random = new System.Random();
+            System.Random random = new();
             byte[] bytes = new byte[length];
-            for (int i = 0; i < length; i++)
-                bytes[i] = (byte)random.Next(byte.MaxValue + 1);
+            random.NextBytes(bytes);
             return bytes;
-        }
-
-        private void Cleanup()
-        {
-            if (_relayA != null) { _relayA.Dispose(); _relayA = null; }
-            if (_relayB != null) { _relayB.Dispose(); _relayB = null; }
-            if (_relayC != null) { _relayC.Dispose(); _relayC = null; }
-        }
-
-        [UnityTearDown]
-        public IEnumerator Teardown()
-        {
-            Cleanup();
-            yield return null;
         }
     }
 }

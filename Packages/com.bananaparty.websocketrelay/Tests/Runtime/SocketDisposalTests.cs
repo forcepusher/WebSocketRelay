@@ -1,23 +1,24 @@
 using System;
-using System.Threading.Tasks;
 using NUnit.Framework;
-using BananaParty.WebSocketRelay;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
     public class SocketDisposalTests
     {
+        // Nothing listens there, these tests only need a socket that started connecting.
+        private const string UnreachableAddress = "ws://127.0.0.1:1";
+
         [Test]
         public void Dispose_BeforeConnect_DoesNotThrow()
         {
-            var socket = new Socket("ws://localhost:8080");
+            Socket socket = new(UnreachableAddress);
             Assert.DoesNotThrow(() => socket.Dispose());
         }
 
         [Test]
         public void Dispose_MultipleTimes_DoesNotThrow()
         {
-            var socket = new Socket("ws://localhost:8080");
+            Socket socket = new(UnreachableAddress);
             socket.Connect();
             socket.Dispose();
             Assert.DoesNotThrow(() => socket.Dispose());
@@ -26,13 +27,10 @@ namespace BananaParty.WebSocketRelay.Tests
         [Test]
         public void Send_AfterDispose_ThrowsInvalidOperationException()
         {
-            var socket = new Socket("ws://localhost:8080");
+            Socket socket = new(UnreachableAddress);
             socket.Connect();
             socket.Dispose();
 
-            // Since IsConnected might be false after dispose, we check if it throws as expected
-            // or if it's just not connected.
-            // The current implementation of Send checks IsConnected.
             Assert.IsFalse(socket.IsConnected);
             Assert.Throws<InvalidOperationException>(() => socket.Send(new byte[] { 1, 2, 3 }));
         }
@@ -40,7 +38,7 @@ namespace BananaParty.WebSocketRelay.Tests
         [Test]
         public void ReadPayloadQueue_AfterDispose_ThrowsInvalidOperationException()
         {
-            var socket = new Socket("ws://localhost:8080");
+            Socket socket = new(UnreachableAddress);
             socket.Connect();
             socket.Dispose();
 
