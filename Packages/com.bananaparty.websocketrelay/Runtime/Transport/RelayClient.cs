@@ -122,8 +122,13 @@ namespace BananaParty.WebSocketRelay.Transport
 
             // The relay or a router in between has likely dropped the connection while the application was suspended,
             // so reconnecting right away is faster than waiting for the heartbeat to time out.
+            // Messages that did arrive meanwhile are delivered first rather than thrown away with the socket.
             if (State == RelayConnectionState.Connected && pollGapSeconds > _settings.HeartbeatTimeoutSeconds)
-                LoseConnection($"Not updated for {pollGapSeconds:0.0} s");
+            {
+                DrainPayloadQueue(pollGapSeconds);
+                if (State == RelayConnectionState.Connected)
+                    LoseConnection($"Not updated for {pollGapSeconds:0.0} s");
+            }
 
             if (State == RelayConnectionState.Connecting || State == RelayConnectionState.Reconnecting)
                 UpdatePendingConnection();
@@ -320,12 +325,7 @@ namespace BananaParty.WebSocketRelay.Transport
             // Read before draining, so messages that arrived right before the socket closed are still delivered.
             bool isSocketOpen = _socket.IsConnected;
 
-            while (State == RelayConnectionState.Connected && _socket.HasUnreadPayloadQueue)
-            {
-                byte[] payloadBytes = _socket.ReadPayloadQueue();
-                _lastReceiveTime = _clock;
-                HandlePayload(payloadBytes, pollGapSeconds);
-            }
+            DrainPayloadQueue(pollGapSeconds);
 
             // The listener may have disposed this client while handling a message.
             if (State != RelayConnectionState.Connected)
@@ -346,6 +346,16 @@ namespace BananaParty.WebSocketRelay.Transport
 
             if (_clock - _lastPingTime >= _settings.HeartbeatIntervalSeconds)
                 SendPing();
+        }
+
+        private void DrainPayloadQueue(double pollGapSeconds)
+        {
+            while (State == RelayConnectionState.Connected && _socket.HasUnreadPayloadQueue)
+            {
+                byte[] payloadBytes = _socket.ReadPayloadQueue();
+                _lastReceiveTime = _clock;
+                HandlePayload(payloadBytes, pollGapSeconds);
+            }
         }
 
         private void HandlePayload(byte[] payloadBytes, double pollGapSeconds)

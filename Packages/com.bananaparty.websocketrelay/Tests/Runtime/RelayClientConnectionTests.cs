@@ -592,6 +592,22 @@ namespace BananaParty.WebSocketRelay.Tests
             StringAssert.Contains("Not updated for 6.0 s", _listener.LastReason);
         }
 
+        [Test]
+        public void PollGapLongerThanHeartbeatTimeout_DeliversQueuedMessagesBeforeReconnecting()
+        {
+            CreateClient();
+            FakeSocket socket = ConnectAndOpen();
+            _client.SubscribeToChannel("room");
+            List<RelayConnectionState> statesAtDelivery = new();
+            _listener.ChannelMessageReceived += (_, _, _) => statesAtDelivery.Add(_client.State);
+
+            socket.ReceiveChannelMessage(PeerGuid, "room", new byte[] { 1 });
+            Poll(advanceSeconds: 6);
+
+            CollectionAssert.AreEqual(new[] { RelayConnectionState.Connected }, statesAtDelivery);
+            Assert.AreEqual(RelayConnectionState.Reconnecting, _client.State);
+        }
+
         // Round trip time
 
         [Test]
