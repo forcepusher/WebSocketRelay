@@ -10,5 +10,5 @@ Each run is the full set of phases described in [the soak README](../README.md).
 | [With a WebGL client](2026-10-07-cleanup-and-soak-tests-webgl.md) | Same, plus a seventh client in a WebGL build running in Chromium | All checks passed. The browser tab was hidden and throttled to about 1 frame per second, so the WebGL client saw state about 1 s late, but it stayed in the session through every phase. |
 
 nProtect GameGuard, the anti-cheat of Helldivers 2, was running on the machine. It crashes every Bun 1.3 process it injects into
-([oven-sh/bun#34055](https://github.com/oven-sh/bun/issues/34055), fixed in Bun 1.4), so other runs had to restart the relay many times.
+([oven-sh/bun#34055](https://github.com/oven-sh/bun/issues/34055), with a fix in Bun 1.4), so other runs had to restart the relay many times.
 The runs above had no relay crash, which their summaries confirm.

@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sending on a connection that just closed threw exceptions.  
 - WebGL sockets leaked their slot and could send while still connecting or already closing.  
 - A long frame, such as loading a scene, timed out every player.  
-- Standalone sockets sent and received about one message per frame, so sessions with more than a few players fell further behind every second. In a soak test with 6 clients at 60 fps, messages arrived 107 seconds late after 6 minutes. Sending and receiving now run on the thread pool.  
+- Standalone sockets sent and received about one message per frame, so sessions with more than a few players fell further behind every second. In a soak test with 6 clients, state arrived up to 48 seconds late at 60 fps and 108 seconds late at 30 fps. Sending and receiving now run on the thread pool.  
 - Messages that arrived right before a connection dropped, or during a frame long enough to trigger a reconnect, were discarded.  
 - WebGL sockets kept buffering incoming messages while the application ran no frames, for example in a hidden tab. Past 4 MiB the connection is now dropped, and restored once the application runs again.  
 - Strings with quotes, backslashes or control characters broke JSON state.  
