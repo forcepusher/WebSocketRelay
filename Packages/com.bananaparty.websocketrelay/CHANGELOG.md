@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `NetworkContext.ClearNetworkSession`, and so `Network.Disconnect` and giving up on reconnecting, keeps scene objects with a `NetworkBinding` and only clears their owner, for the same reason.  
 - The relay launch scripts start the server again whenever it exits, so a crash only costs clients a reconnect.  
 - The relay server runs with Bun's crash reporter turned off. On Windows the reporter kept the port open after a crash, so no new server could start.  
+- The bundled Bun is 1.4.2 instead of 1.3.14. Bun 1.3 on Windows crashes when anti-cheat or security software injects into it, such as nProtect GameGuard ([oven-sh/bun#34055](https://github.com/oven-sh/bun/issues/34055)).  
   
 ### Fixed  
 - Connections that died without a close frame were never detected.  

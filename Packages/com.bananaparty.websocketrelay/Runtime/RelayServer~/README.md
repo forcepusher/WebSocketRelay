@@ -15,7 +15,7 @@ Export the server via **Tools → WebSocket Relay → Export Server** before run
 The scripts start the server again whenever it exits, one second later, until you stop them with Ctrl+C. Clients reconnect on their own, so a crash only costs them a reconnect.
 
 Bun's crash reporter is turned off, because on Windows it kept the port open after a crash so no new server could start.
-Bun 1.3 on Windows crashes when an anti-cheat such as nProtect GameGuard (Helldivers 2 and others) or some security software injects into processes, see [oven-sh/bun#34055](https://github.com/oven-sh/bun/issues/34055). Bun 1.4 ships a fix for it, [oven-sh/bun#35083](https://github.com/oven-sh/bun/pull/35083).
+Bun 1.3 on Windows crashes when an anti-cheat such as nProtect GameGuard (Helldivers 2 and others) or some security software injects into processes, see [oven-sh/bun#34055](https://github.com/oven-sh/bun/issues/34055). The bundled Bun 1.4.2 includes the fix, [oven-sh/bun#35083](https://github.com/oven-sh/bun/pull/35083).
 
 ## Configuration
 
