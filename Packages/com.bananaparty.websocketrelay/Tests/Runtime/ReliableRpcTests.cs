@@ -160,6 +160,24 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void SenderThatTimedOutOnTheReceiver_IsNotDeliveredTwiceWhenItIsBack()
+        {
+            NetworkContextTestHelpers.SetPlayerTimeoutSeconds(_receiver, 1f);
+            SenderHearsReceiver();
+            Send(1);
+            Deliver(_receiver, SenderGuid, CollectRpcs(_sender));
+
+            // The receiver drops the silent sender before its acknowledgement got through, so the sender still keeps RPC 1.
+            NetworkContextTestHelpers.Advance(_receiver, 1.2f);
+            NetworkContextTestHelpers.Advance(_sender, 1.2f);
+            SenderHearsReceiver();
+            Send(2);
+            Deliver(_receiver, SenderGuid, CollectRpcs(_sender));
+
+            CollectionAssert.AreEqual(new[] { 1, 2 }, _receivedRpcs.ReceivedValues);
+        }
+
+        [Test]
         public void SenderThatClearedItsSession_IsDeliveredFromItsNewStart()
         {
             SenderHearsReceiver();

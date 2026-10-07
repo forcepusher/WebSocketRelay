@@ -84,6 +84,7 @@ namespace BananaParty.WebSocketRelay
             uint oldestRetainedSequence = ReadUInt32(message, 9);
 
             IncomingStream stream = GetOrCreateIncomingStream(senderGuid, channel);
+            stream.IsSuspended = false;
             stream.IsAcknowledgementDue = true;
 
             // A new epoch means the sender started over, e.g. after clearing its session.
@@ -154,7 +155,11 @@ namespace BananaParty.WebSocketRelay
                 if (!isDue)
                     continue;
 
-                outgoing.Add((channel, CreateAcknowledgementMessage(streams)));
+                byte[] acknowledgement = CreateAcknowledgementMessage(streams);
+                if (acknowledgement == null)
+                    continue;
+
+                outgoing.Add((channel, acknowledgement));
                 _lastAcknowledgementTimes[channel] = time;
                 foreach (IncomingStream stream in streams.Values)
                     stream.IsAcknowledgementDue = false;
@@ -162,7 +167,8 @@ namespace BananaParty.WebSocketRelay
         }
 
         /// <summary>
-        /// Stops keeping RPCs for a peer and forgets what it sent, e.g. once it timed out.
+        /// Stops keeping RPCs for a peer, e.g. once it timed out. What it delivered is remembered,
+        /// so that RPCs it resends after coming back are not delivered twice.
         /// </summary>
         public void RemovePeer(Guid peerGuid)
         {
@@ -175,7 +181,10 @@ namespace BananaParty.WebSocketRelay
             }
 
             foreach (Dictionary<Guid, IncomingStream> streams in _incomingStreams.Values)
-                streams.Remove(peerGuid);
+            {
+                if (streams.TryGetValue(peerGuid, out IncomingStream stream))
+                    stream.Suspend();
+            }
         }
 
         public void ForgetChannel(string channel)
@@ -241,15 +250,29 @@ namespace BananaParty.WebSocketRelay
             return message;
         }
 
+        /// <returns>Null when every sender on the channel is suspended.</returns>
         private static byte[] CreateAcknowledgementMessage(Dictionary<Guid, IncomingStream> streams)
         {
-            byte[] message = new byte[AcknowledgementHeaderSize + streams.Count * AcknowledgementEntrySize];
+            int activeCount = 0;
+            foreach (IncomingStream stream in streams.Values)
+            {
+                if (!stream.IsSuspended)
+                    activeCount++;
+            }
+
+            if (activeCount == 0)
+                return null;
+
+            byte[] message = new byte[AcknowledgementHeaderSize + activeCount * AcknowledgementEntrySize];
             message[0] = NetworkMessage.RpcAcknowledgement;
-            BinaryPrimitives.WriteUInt16LittleEndian(message.AsSpan(1), (ushort)streams.Count);
+            BinaryPrimitives.WriteUInt16LittleEndian(message.AsSpan(1), (ushort)activeCount);
 
             int offset = AcknowledgementHeaderSize;
             foreach ((Guid senderGuid, IncomingStream stream) in streams)
             {
+                if (stream.IsSuspended)
+                    continue;
+
                 senderGuid.TryWriteBytes(message.AsSpan(offset));
                 WriteUInt32(message, offset + 16, stream.Epoch);
                 WriteUInt32(message, offset + 20, stream.NextExpectedSequence - 1);
@@ -398,6 +421,18 @@ namespace BananaParty.WebSocketRelay
             public Dictionary<uint, byte[]> Pending { get; } = new();
 
             public bool IsAcknowledgementDue { get; set; }
+
+            /// <summary>
+            /// Set while the sender is gone, e.g. timed out, so nothing is acknowledged to it.
+            /// </summary>
+            public bool IsSuspended { get; set; }
+
+            public void Suspend()
+            {
+                IsSuspended = true;
+                IsAcknowledgementDue = false;
+                Pending.Clear();
+            }
 
             /// <summary>
             /// Starts at the oldest RPC the sender still keeps, which covers everything sent since it heard this client.
