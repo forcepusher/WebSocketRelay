@@ -265,6 +265,34 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void ReliableRpcSentIntoALostConnection_IsSentAgainAfterReconnecting()
+        {
+            CreateNetwork();
+            FakeSocket socket = ConnectAndOpen();
+            _network.SubscribeToChannel(Channel);
+            ReceivePeerSync(socket);
+            Update(StepSeconds);
+
+            _context.SendRpc(Guid.NewGuid(), "TestRpc", NetworkContextTestHelpers.CreateRpcParameters(1), Channel, invokeLocally: false, reliable: true);
+            Update(StepSeconds);
+            Assert.AreEqual(1, CountReliableRpcs(socket));
+
+            // The connection was dead already, so the RPC never arrived and the peer never acknowledges it.
+            socket.Close("Network changed");
+            FakeSocket newSocket = ReconnectAndOpen();
+            Update(1f);
+            Assert.AreEqual(0, CountReliableRpcs(newSocket), "The peer has not been heard from since.");
+
+            ReceivePeerSync(newSocket);
+            Update(StepSeconds);
+            Assert.AreEqual(1, CountReliableRpcs(newSocket));
+        }
+
+        private static int CountReliableRpcs(FakeSocket socket)
+            => socket.SentOfType(RelayMessageType.ChannelMessage)
+                .Count(message => message[RelayMessageCodec.GetChannelMessagePayloadOffset(Channel.Length)] == NetworkMessage.ReliableRpc);
+
+        [Test]
         public void SendSyncIdentities_SkippedWhileSendBacklogged()
         {
             CreateNetwork();

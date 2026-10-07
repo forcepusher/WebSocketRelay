@@ -14,11 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ISocket.IsClosed`, `ISocket.CloseReason` and `ISocket.PendingSendBytes`. Disconnect reasons are now reported and logged.  
 - The relay binds every connection to the client guid from its hello message and closes connections that send with another guid, so clients cannot speak for each other. The guid of a dropped connection stays reserved for its client for 60 seconds.  
 - `RelayClient.SendState` for state that the next state replaces. The relay skips it for receivers that fell behind, so a client on a slow link catches up on current state instead of working through stale state. The relay tells how far behind a receiver is by timing WebSocket pings, which wait behind everything already on its way to the receiver. Network syncs use it.  
+- Reliable RPCs. `SendRpc(..., reliable: true)` delivers an RPC once and in order to every peer on the channel, also across lost connections and relay restarts. Receivers acknowledge what arrived, and senders resend what a peer that is heard from again has not acknowledged. Peers that join later do not get earlier RPCs, and a peer that timed out misses what was sent until it is back.  
   
 ### Changed  
 - **Breaking:** The relay protocol has new hello and channel state messages, so clients and relay servers only work with others from 3.0.0 on.  
 - **Breaking:** `IRpcTarget.ReceiveRpc` receives the guid of the sender as checked by the relay, or of the local client for RPCs invoked locally.  
 - **Breaking:** Authority claims and state syncs no longer carry an owner guid. Receivers make the relay-checked sender the owner, so no client can claim or sync an identity for another.  
+- **Breaking:** `INetworkIdentity.SendRpc` has a `reliable` parameter that custom implementations need to accept.  
 - **Breaking:** `IRelayListener.OnDisconnectedFromRelay` is replaced by `OnConnectionStateChanged(previousState, state, reason)`.  
 - **Breaking:** `ISocket` has new members that custom implementations need to provide.  
 - **Breaking:** A lost connection no longer clears the session right away. It is cleared only when reconnecting gives up. Set `ReconnectTimeoutSeconds` to 0 for the old behavior.  

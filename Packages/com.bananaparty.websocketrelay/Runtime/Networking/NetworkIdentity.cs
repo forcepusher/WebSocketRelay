@@ -119,9 +119,9 @@ namespace BananaParty.WebSocketRelay
             return true;
         }
 
-        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true)
+        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true, bool reliable = false)
         {
-            _networkContext.SendRpc(NetworkIdentifier, rpcSubjectName, parametersStateOutput, Channel, invokeLocally);
+            _networkContext.SendRpc(NetworkIdentifier, rpcSubjectName, parametersStateOutput, Channel, invokeLocally, reliable);
         }
 
         public void ClaimAuthority()

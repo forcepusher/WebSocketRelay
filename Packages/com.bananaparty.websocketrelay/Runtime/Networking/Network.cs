@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BananaParty.WebSocketRelay.Transport;
 using UnityEngine;
 
@@ -12,6 +13,8 @@ namespace BananaParty.WebSocketRelay
         private readonly Func<ISocket> _socketFactory;
         private readonly Func<double> _timeSource;
         private readonly RelayConnectionSettings _connectionSettings;
+
+        private readonly List<(string channel, byte[] message)> _reliableRpcMessages = new();
 
         private RelayServerProcess _relayServerProcess;
         private RelayClient _relayClient;
@@ -159,6 +162,7 @@ namespace BananaParty.WebSocketRelay
                 throw new InvalidOperationException("Not connected to unsubscribe from a channel");
 
             _relayClient.UnsubscribeFromChannel(channel);
+            _networkContext.ForgetChannel(channel);
         }
 
         public void Dispose()
@@ -212,6 +216,15 @@ namespace BananaParty.WebSocketRelay
                 if (!_relayClient.Send(channel, message))
                     break;
             }
+
+            // Reliable RPCs that do not go through are sent again once a peer that misses them is heard.
+            _networkContext.CollectReliableRpcMessages(_reliableRpcMessages);
+            foreach ((string channel, byte[] message) in _reliableRpcMessages)
+            {
+                if (!_relayClient.Send(channel, message))
+                    break;
+            }
+            _reliableRpcMessages.Clear();
         }
 
         private void WarnIfPlayerTimeoutIsTooShort()

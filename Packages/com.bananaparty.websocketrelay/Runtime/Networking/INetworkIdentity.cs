@@ -28,7 +28,11 @@ namespace BananaParty.WebSocketRelay
         /// <returns>False when the state is outdated, so it was not applied.</returns>
         bool ReadNetworkState(IStateInput stateInput, Guid senderGuid);
 
-        void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true);
+        /// <param name="reliable">
+        /// Delivered once and in order to every peer on the channel, also across lost connections and relay restarts.
+        /// Peers that join the channel later do not get it, and a peer that timed out misses what was sent until it is back.
+        /// </param>
+        void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true, bool reliable = false);
 
         void ClaimAuthority();
     }

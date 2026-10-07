@@ -28,6 +28,9 @@ namespace BananaParty.WebSocketRelay
         private IStateFormat _stateFormat;
         private RpcRouter _rpcRouter;
 
+        // Unscaled seconds since the context was first updated, for resending reliable RPCs.
+        private double _time;
+
         public float PlayerTimeoutSeconds => _playerTimeoutSeconds;
 
         public Guid LocalClientIdentity { get; set; }
@@ -134,13 +137,15 @@ namespace BananaParty.WebSocketRelay
             }
 
             _playerRoster.Clear();
-            RpcRouter.ClearOutgoingMessages();
+            RpcRouter.Clear();
             LocalClientIdentity = Guid.Empty;
             IsConnectionInterrupted = false;
         }
 
         public void ManualUpdate(float unscaledDeltaTime)
         {
+            _time += unscaledDeltaTime;
+
             if (IsConnectionInterrupted)
                 return;
 
@@ -148,6 +153,7 @@ namespace BananaParty.WebSocketRelay
             _playerRoster.RemoveTimedOut(deltaTime, _playerTimeoutSeconds, _timedOutPlayerGuids);
             foreach (Guid playerGuid in _timedOutPlayerGuids)
             {
+                RpcRouter.RemovePeer(playerGuid);
                 DestroyIdentitiesOwnedByAuthorityOwner(playerGuid);
                 Debug.Log($"Removed timed out player {playerGuid}");
             }
@@ -182,11 +188,14 @@ namespace BananaParty.WebSocketRelay
                 throw new InvalidOperationException("Channel message data is null or empty");
 
             _playerRoster.RecordMessage(senderGuid);
+            RpcRouter.RecordHeard(senderGuid, channel, _time);
 
             switch (data[0])
             {
                 case NetworkMessage.Rpc:
-                    RpcRouter.ProcessIncomingMessage(senderGuid, data);
+                case NetworkMessage.ReliableRpc:
+                case NetworkMessage.RpcAcknowledgement:
+                    RpcRouter.ProcessIncomingMessage(senderGuid, channel, data, LocalClientIdentity);
                     break;
                 case NetworkMessage.SyncIdentities:
                     ApplyIncomingChannelState(senderGuid, channel, data.AsMemory(1));
@@ -196,14 +205,40 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        public void SendRpc(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel, bool invokeLocally = true)
+        /// <param name="reliable">
+        /// Delivered once and in order to every peer on the channel, also across lost connections and relay restarts.
+        /// Peers that join the channel later do not get it, and a peer that timed out misses what was sent until it is back.
+        /// </param>
+        public void SendRpc(
+            Guid networkIdentifier,
+            string rpcSubjectName,
+            IStateOutput parametersStateOutput,
+            string channel,
+            bool invokeLocally = true,
+            bool reliable = false)
         {
-            RpcRouter.Send(LocalClientIdentity, networkIdentifier, rpcSubjectName, parametersStateOutput, channel, invokeLocally);
+            RpcRouter.Send(LocalClientIdentity, networkIdentifier, rpcSubjectName, parametersStateOutput, channel, invokeLocally, reliable);
         }
 
         public bool TryDequeueOutgoingRpcMessage(out string channel, out byte[] message)
         {
             return RpcRouter.TryDequeueOutgoingMessage(out channel, out message);
+        }
+
+        /// <summary>
+        /// Adds the reliable RPCs to send for the first time or again, and the acknowledgements that are due.
+        /// </summary>
+        public void CollectReliableRpcMessages(List<(string channel, byte[] message)> outgoing)
+        {
+            RpcRouter.CollectReliableMessages(_time, outgoing);
+        }
+
+        /// <summary>
+        /// Forgets reliable RPCs to and from a channel that is no longer subscribed.
+        /// </summary>
+        public void ForgetChannel(string channel)
+        {
+            RpcRouter.ForgetChannel(channel);
         }
 
         public byte[] GetOwnedNetworkIdentitiesPayload(string channel)

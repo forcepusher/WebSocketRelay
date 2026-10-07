@@ -248,7 +248,7 @@ namespace BananaParty.WebSocketRelay.Tests
             return true;
         }
 
-        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true) => throw new NotImplementedException();
+        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true, bool reliable = false) => throw new NotImplementedException();
 
         public void ClaimAuthority() => throw new NotImplementedException();
     }
@@ -271,11 +271,14 @@ namespace BananaParty.WebSocketRelay.Tests
 
         public Guid LastSenderGuid { get; private set; }
 
+        public List<int> ReceivedValues { get; } = new();
+
         public void ReceiveRpc(Guid senderGuid, IStateInput parametersStateInput)
         {
             ReceiveCount++;
             LastSenderGuid = senderGuid;
             LastReceivedValue = parametersStateInput.ReadInt("value");
+            ReceivedValues.Add(LastReceivedValue);
         }
     }
 }
