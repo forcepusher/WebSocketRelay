@@ -7,13 +7,55 @@ namespace BananaParty.WebSocketRelay.Transport
     public static class RelayMessageCodec
     {
         public const int GuidSize = 16;
+        public const int SecretSize = 16;
 
         public const int ChannelLengthOffset = 1;
         public const int ChannelOffset = 3;
 
+        // Channel message and channel state layout: [type:1][senderGuid:16][channelLength:2][channel][payload].
+        // The relay skips channel state for receivers that fell behind, because the next state replaces it.
         public const int ChannelMessageGuidOffset = 1;
         public const int ChannelMessageChannelLengthOffset = ChannelMessageGuidOffset + GuidSize;
         public const int ChannelMessageChannelOffset = ChannelMessageChannelLengthOffset + 2;
+
+        // Ping layout: [type:1][sentTimeSeconds:8]. The relay answers with a Pong carrying the same payload.
+        public const int PingMessageSize = 1 + sizeof(double);
+
+        // Hello layout: [type:1][clientGuid:16][secret:16]. The first message on every connection binds it to the client guid,
+        // and the secret proves that a later connection with the same guid comes from the same client.
+        public const int HelloMessageSize = 1 + GuidSize + SecretSize;
+
+        public static byte[] CreateHelloMessage(Guid clientGuid, ReadOnlySpan<byte> secret)
+        {
+            if (secret.Length != SecretSize)
+                throw new ArgumentException($"The secret must be {SecretSize} bytes.", nameof(secret));
+
+            byte[] message = new byte[HelloMessageSize];
+            message[0] = RelayMessageType.Hello;
+            WriteGuid(message.AsSpan(1), clientGuid);
+            secret.CopyTo(message.AsSpan(1 + GuidSize));
+            return message;
+        }
+
+        public static byte[] CreatePingMessage(double sentTimeSeconds)
+        {
+            byte[] message = new byte[PingMessageSize];
+            message[0] = RelayMessageType.Ping;
+            BinaryPrimitives.WriteInt64LittleEndian(message.AsSpan(1), BitConverter.DoubleToInt64Bits(sentTimeSeconds));
+            return message;
+        }
+
+        public static bool TryReadPongSentTime(ReadOnlySpan<byte> message, out double sentTimeSeconds)
+        {
+            if (message.Length != PingMessageSize || message[0] != RelayMessageType.Pong)
+            {
+                sentTimeSeconds = 0d;
+                return false;
+            }
+
+            sentTimeSeconds = BitConverter.Int64BitsToDouble(BinaryPrimitives.ReadInt64LittleEndian(message.Slice(1)));
+            return true;
+        }
 
         public static byte[] CreateProtocolMessage(byte type, string channel, ReadOnlySpan<byte> payload = default)
         {
@@ -28,11 +70,17 @@ namespace BananaParty.WebSocketRelay.Transport
         }
 
         public static byte[] CreateChannelMessage(Guid clientId, string channel, ReadOnlySpan<byte> payload = default)
+            => CreateChannelMessage(RelayMessageType.ChannelMessage, clientId, channel, payload);
+
+        public static byte[] CreateChannelStateMessage(Guid clientId, string channel, ReadOnlySpan<byte> payload = default)
+            => CreateChannelMessage(RelayMessageType.ChannelState, clientId, channel, payload);
+
+        private static byte[] CreateChannelMessage(byte type, Guid clientId, string channel, ReadOnlySpan<byte> payload)
         {
             byte[] channelBytes = Encoding.UTF8.GetBytes(channel);
             int payloadOffset = ChannelMessageChannelOffset + channelBytes.Length;
             byte[] message = new byte[payloadOffset + payload.Length];
-            message[0] = RelayMessageType.ChannelMessage;
+            message[0] = type;
             WriteGuid(message.AsSpan(ChannelMessageGuidOffset), clientId);
             BinaryPrimitives.WriteUInt16LittleEndian(message.AsSpan(ChannelMessageChannelLengthOffset), (ushort)channelBytes.Length);
             channelBytes.CopyTo(message.AsSpan(ChannelMessageChannelOffset));

@@ -24,19 +24,14 @@ namespace BananaParty.WebSocketRelay.Tests
             field.SetValue(context, playerTimeoutSeconds);
         }
 
-        public static int GetNetworkPlayerCount(NetworkContext context)
+        /// <summary>
+        /// Advances in frame-sized steps, because a single long update is treated as a hitch.
+        /// </summary>
+        public static void Advance(NetworkContext context, float seconds, float stepSeconds = 0.1f)
         {
-            return context.NetworkPlayers.Count;
-        }
-
-        public static int GetNetworkIdentityCount(NetworkContext context)
-        {
-            return context.NetworkIdentities.Count;
-        }
-
-        public static int GetAuthorityOriginCount(NetworkContext context)
-        {
-            return context.AuthorityOrigins.Count;
+            int steps = Mathf.RoundToInt(seconds / stepSeconds);
+            for (int step = 0; step < steps; step++)
+                context.ManualUpdate(stepSeconds);
         }
 
         public static void SetPrivateField(object target, string fieldName, object value)
@@ -74,10 +69,9 @@ namespace BananaParty.WebSocketRelay.Tests
             return output;
         }
 
-        public static byte[] CreateClaimAuthorityRpcParameters(Guid requesterGuid, long claimVersion = 1)
+        public static byte[] CreateClaimAuthorityRpcParameters(long claimVersion = 1)
         {
             JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
-            output.WriteGuid("ClaimAuthorityRequesterGuidKey", requesterGuid);
             output.WriteLong("ClaimAuthorityVersionKey", claimVersion);
             return Encoding.UTF8.GetBytes(output.ToString());
         }
@@ -93,7 +87,6 @@ namespace BananaParty.WebSocketRelay.Tests
 
         public static byte[] CreateSyncIdentitiesMessage(
             INetworkIdentity identity,
-            Guid networkAuthorityOwner,
             int componentValue = 0,
             bool includeComponentState = false,
             long networkAuthorityVersion = 1)
@@ -102,7 +95,6 @@ namespace BananaParty.WebSocketRelay.Tests
             output.BeginObjectElement();
             output.BeginObjectProperty(identity.NetworkIdentifier.ToString());
             output.WriteString(nameof(NetworkIdentity.PrefabName), identity.PrefabName);
-            output.WriteGuid(nameof(NetworkIdentity.NetworkAuthorityOwner), networkAuthorityOwner);
             output.WriteLong(nameof(NetworkIdentity.NetworkAuthorityVersion), networkAuthorityVersion);
             output.BeginArrayProperty("NetworkStates");
             if (includeComponentState)
@@ -166,6 +158,32 @@ namespace BananaParty.WebSocketRelay.Tests
             gameObject.SetActive(true);
             return networkIdentity;
         }
+
+        /// <summary>
+        /// Creates an identity like one placed in a scene, which registers itself through its <see cref="NetworkBinding"/>.
+        /// </summary>
+        public static NetworkIdentity CreateSceneBoundIdentity(
+            NetworkContext context,
+            NetworkChannel networkChannel,
+            Guid networkAuthorityOwner,
+            string name = "SceneObject")
+        {
+            GameObject gameObject = new(name);
+            gameObject.SetActive(false);
+
+            NetworkIdentity networkIdentity = gameObject.AddComponent<NetworkIdentity>();
+            SetPrivateField(networkIdentity, "_networkContext", context);
+            SetPrivateField(networkIdentity, "_prefabName", name);
+
+            NetworkBinding networkBinding = gameObject.AddComponent<NetworkBinding>();
+            SetPrivateField(networkBinding, "_networkChannel", networkChannel);
+            SetPrivateField(networkBinding, "_guid", Guid.NewGuid().ToString());
+
+            networkIdentity.NetworkAuthorityOwner = networkAuthorityOwner;
+
+            gameObject.SetActive(true);
+            return networkIdentity;
+        }
     }
 
     internal sealed class StubNetworkIdentity : INetworkIdentity
@@ -197,13 +215,12 @@ namespace BananaParty.WebSocketRelay.Tests
         public bool HasAuthorityOwner => NetworkAuthorityOwner != Guid.Empty;
         public bool DistanceBasedAuthority { get; set; }
         public bool DestroyWhenAuthorityOwnerLeaves { get; set; } = true;
-        public string NetworkStateName => PrefabName;
+        public bool IsSceneBound { get; set; }
         public NetworkContext NetworkContext => throw new NotImplementedException();
 
         public void WriteNetworkState(IStateOutput stateOutput)
         {
             stateOutput.WriteString(nameof(PrefabName), PrefabName);
-            stateOutput.WriteGuid(nameof(NetworkAuthorityOwner), NetworkAuthorityOwner);
 
             stateOutput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
@@ -215,10 +232,10 @@ namespace BananaParty.WebSocketRelay.Tests
             stateOutput.EndArray();
         }
 
-        public void ReadNetworkState(IStateInput stateInput)
+        public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
         {
             stateInput.ReadString(nameof(PrefabName));
-            NetworkAuthorityOwner = stateInput.ReadGuid(nameof(NetworkAuthorityOwner));
+            NetworkAuthorityOwner = senderGuid;
 
             stateInput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
@@ -228,15 +245,10 @@ namespace BananaParty.WebSocketRelay.Tests
                 stateInput.EndObject();
             }
             stateInput.EndArray();
-        }
-
-        public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
-        {
-            ReadNetworkState(stateInput);
             return true;
         }
 
-        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true) => throw new NotImplementedException();
+        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true, bool reliable = false) => throw new NotImplementedException();
 
         public void ClaimAuthority() => throw new NotImplementedException();
     }
@@ -257,10 +269,16 @@ namespace BananaParty.WebSocketRelay.Tests
 
         public int LastReceivedValue { get; private set; }
 
-        public void ReceiveRpc(IStateInput parametersStateInput)
+        public Guid LastSenderGuid { get; private set; }
+
+        public List<int> ReceivedValues { get; } = new();
+
+        public void ReceiveRpc(Guid senderGuid, IStateInput parametersStateInput)
         {
             ReceiveCount++;
+            LastSenderGuid = senderGuid;
             LastReceivedValue = parametersStateInput.ReadInt("value");
+            ReceivedValues.Add(LastReceivedValue);
         }
     }
 }

@@ -101,9 +101,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: afcb542baf6bb5c4c85a47f7aeb6a989, type: 3}
   m_Name: 
   m_EditorClassIdentifier: BananaParty.WebSocketRelay.Samples::BananaParty.WebSocketRelay.Samples.Character
-  moveSpeed: 5
-  rotationSpeed: 10
-  jumpHeight: 2
+  _moveSpeed: 5
+  _rotationSpeed: 10
+  _jumpHeight: 2
 --- !u!114 &3865023339077881690
 MonoBehaviour:
   m_ObjectHideFlags: 0

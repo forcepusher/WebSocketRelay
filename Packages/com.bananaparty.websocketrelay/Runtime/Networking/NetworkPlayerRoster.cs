@@ -23,9 +23,10 @@ namespace BananaParty.WebSocketRelay
             _playersByGuid[playerGuid] = newPlayer;
         }
 
-        public List<Guid> RemoveTimedOut(float unscaledDeltaTime, float timeoutSeconds)
+        /// <param name="removedPlayerGuids">Cleared and filled with the players that timed out.</param>
+        public void RemoveTimedOut(float unscaledDeltaTime, float timeoutSeconds, List<Guid> removedPlayerGuids)
         {
-            List<Guid> removedPlayerGuids = new();
+            removedPlayerGuids.Clear();
 
             for (int playerIndex = _players.Count - 1; playerIndex >= 0; playerIndex--)
             {
@@ -39,8 +40,6 @@ namespace BananaParty.WebSocketRelay
                 _playersByGuid.Remove(player.Guid);
                 removedPlayerGuids.Add(player.Guid);
             }
-
-            return removedPlayerGuids;
         }
 
         public void Clear()

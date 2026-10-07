@@ -16,4 +16,15 @@ else
 fi
 
 BUN_PATH="$SCRIPT_DIR/Bun/bun-darwin-aarch64/bun"
-"$BUN_PATH" --cwd "$SCRIPT_DIR" Source/index.ts -relay-server
+export BUN_ENABLE_CRASH_REPORTING=0
+
+# A server exported or copied on Windows loses the executable bit.
+chmod +x "$BUN_PATH" 2>/dev/null
+
+# Started again whenever it exits, because clients reconnect on their own and a crash should only cost them that.
+trap "exit 0" INT TERM
+while true; do
+    "$BUN_PATH" --cwd "$SCRIPT_DIR" Source/index.ts -relay-server
+    echo "Relay server exited with code $?. Starting it again in 1 second, press Ctrl+C to stop."
+    sleep 1
+done

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay
@@ -22,18 +23,6 @@ namespace BananaParty.WebSocketRelay
         {
             AdvanceToEntry(name);
             ReadArrayOpen();
-            _arrayFirstItemScopes.Push(true);
-        }
-
-        public void BeginArrayElement()
-        {
-            SkipWhitespace();
-            if (!_hasStarted)
-            {
-                ExpectCharacter('[');
-                _hasStarted = true;
-            }
-
             _arrayFirstItemScopes.Push(true);
         }
 
@@ -432,14 +421,64 @@ namespace BananaParty.WebSocketRelay
 
             _position++;
             int start = _position;
-            while (_position < _jsonString.Length && _jsonString[_position] != '"')
+            while (_position < _jsonString.Length && _jsonString[_position] != '"' && _jsonString[_position] != '\\')
                 _position++;
+
+            if (_position < _jsonString.Length && _jsonString[_position] == '\\')
+                return ReadEscapedStringRemainder(start);
 
             string value = _jsonString.Substring(start, _position - start);
             if (_position < _jsonString.Length)
                 _position++;
 
             return value;
+        }
+
+        private string ReadEscapedStringRemainder(int start)
+        {
+            StringBuilder value = new(_jsonString, start, _position - start, _position - start + 16);
+            while (_position < _jsonString.Length && _jsonString[_position] != '"')
+            {
+                char character = _jsonString[_position++];
+                if (character != '\\' || _position >= _jsonString.Length)
+                {
+                    value.Append(character);
+                    continue;
+                }
+
+                char escaped = _jsonString[_position++];
+                switch (escaped)
+                {
+                    case 'n':
+                        value.Append('\n');
+                        break;
+                    case 'r':
+                        value.Append('\r');
+                        break;
+                    case 't':
+                        value.Append('\t');
+                        break;
+                    case 'b':
+                        value.Append('\b');
+                        break;
+                    case 'f':
+                        value.Append('\f');
+                        break;
+                    case 'u' when _position + 4 <= _jsonString.Length
+                        && ushort.TryParse(_jsonString.Substring(_position, 4), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ushort code):
+                        value.Append((char)code);
+                        _position += 4;
+                        break;
+                    default:
+                        value.Append(escaped);
+                        break;
+                }
+            }
+
+            if (_position < _jsonString.Length)
+                _position++;
+
+            return value.ToString();
         }
 
         private string ReadValueAsString()

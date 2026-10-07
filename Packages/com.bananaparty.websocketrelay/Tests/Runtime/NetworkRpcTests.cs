@@ -31,6 +31,23 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void SendRpc_InvokedLocally_ReceivesTheLocalClientAsSender()
+        {
+            NetworkContext context = NetworkContextTestHelpers.CreateContext();
+            context.LocalClientIdentity = Guid.NewGuid();
+            StubNetworkIdentity networkIdentity = CreateRegisteredIdentity(context);
+            StubRpcTarget rpcTarget = new(networkIdentity, "TestSubject");
+            context.RegisterRpcTarget(rpcTarget);
+
+            context.SendRpc(networkIdentity.NetworkIdentifier, "TestSubject", NetworkContextTestHelpers.CreateRpcParameters(1), "room");
+
+            Assert.AreEqual(context.LocalClientIdentity, rpcTarget.LastSenderGuid);
+
+            UnityEngine.Object.DestroyImmediate(networkIdentity.GameObject);
+            UnityEngine.Object.DestroyImmediate(context);
+        }
+
+        [Test]
         public void SendRpc_DoesNotDispatchToDifferentIdentity()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
@@ -132,10 +149,12 @@ namespace BananaParty.WebSocketRelay.Tests
                 "TestSubject",
                 NetworkContextTestHelpers.CreateRpcParametersPayload(99));
 
-            context.ProcessChannelMessage(Guid.NewGuid(), "room", rpcMessage);
+            Guid senderGuid = Guid.NewGuid();
+            context.ProcessChannelMessage(senderGuid, "room", rpcMessage);
 
             Assert.AreEqual(1, rpcTarget.ReceiveCount);
             Assert.AreEqual(99, rpcTarget.LastReceivedValue);
+            Assert.AreEqual(senderGuid, rpcTarget.LastSenderGuid);
 
             UnityEngine.Object.DestroyImmediate(networkIdentity.GameObject);
             UnityEngine.Object.DestroyImmediate(context);

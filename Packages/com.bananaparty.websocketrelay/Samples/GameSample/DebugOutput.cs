@@ -3,21 +3,19 @@ using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
 {
+    /// <summary>
+    /// Shows the latest log messages on screen, toggled with the back quote key.
+    /// </summary>
     public class DebugOutput : MonoBehaviour
     {
-        [SerializeField] private int maxLogs = 100;
-        private readonly List<string> logs = new List<string>();
-        private readonly object lockObject = new object();
-        private Vector2 scrollPosition;
-        private bool isVisible = false;
+        [SerializeField]
+        private int _maxLogs = 100;
 
-        private void Update()
-        {
-            if (Input.GetKeyDown(KeyCode.BackQuote))
-            {
-                isVisible = !isVisible;
-            }
-        }
+        private readonly List<string> _logs = new();
+        private readonly object _logsLock = new();
+
+        private Vector2 _scrollPosition;
+        private bool _isVisible;
 
         private void OnEnable()
         {
@@ -29,37 +27,41 @@ namespace BananaParty.WebSocketRelay.Samples
             Application.logMessageReceivedThreaded -= HandleLog;
         }
 
-        private void HandleLog(string condition, string stackTrace, LogType type)
+        private void Update()
         {
-            lock (lockObject)
-            {
-                logs.Add($"[{type}] {condition}");
-                if (logs.Count > maxLogs)
-                {
-                    logs.RemoveAt(0);
-                }
-            }
+            if (Input.GetKeyDown(KeyCode.BackQuote))
+                _isVisible = !_isVisible;
         }
 
         private void OnGUI()
         {
-            if (!isVisible) return;
+            if (!_isVisible)
+                return;
 
             GUILayout.BeginArea(new Rect(0, 0, Screen.width, Screen.height));
             GUILayout.BeginVertical("box");
+            _scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
 
-            scrollPosition = GUILayout.BeginScrollView(scrollPosition);
-            lock (lockObject)
+            lock (_logsLock)
             {
-                foreach (var log in logs)
-                {
+                foreach (string log in _logs)
                     GUILayout.Label(log);
-                }
             }
-            GUILayout.EndScrollView();
 
+            GUILayout.EndScrollView();
             GUILayout.EndVertical();
             GUILayout.EndArea();
+        }
+
+        // Called from any thread, because relay server output is logged from background threads.
+        private void HandleLog(string condition, string stackTrace, LogType type)
+        {
+            lock (_logsLock)
+            {
+                _logs.Add($"[{type}] {condition}");
+                if (_logs.Count > _maxLogs)
+                    _logs.RemoveAt(0);
+            }
         }
     }
 }

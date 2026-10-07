@@ -16,6 +16,7 @@ namespace BananaParty.WebSocketRelay
         {
             _networkIdentity = GetComponent<NetworkIdentity>();
             _networkIdentity.NetworkIdentifier = Guid.Parse(_guid);
+            _networkIdentity.IsSceneBound = true;
         }
 
         private void OnEnable()

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace BananaParty.WebSocketRelay
 {
@@ -19,6 +19,12 @@ namespace BananaParty.WebSocketRelay
 
         public bool IsConnected => _platformSocket != null && _platformSocket.IsConnected;
 
+        public bool IsClosed => _platformSocket != null && _platformSocket.IsClosed;
+
+        public string CloseReason => _platformSocket?.CloseReason;
+
+        public int PendingSendBytes => _platformSocket?.PendingSendBytes ?? 0;
+
         public bool HasUnreadPayloadQueue => _platformSocket != null && _platformSocket.HasUnreadPayloadQueue;
 
         public byte[] ReadPayloadQueue()
@@ -31,6 +37,9 @@ namespace BananaParty.WebSocketRelay
 
         public void Connect()
         {
+            // Platform sockets are single use, so connecting again starts over with a fresh one.
+            _platformSocket?.Dispose();
+
 #if UNITY_WEBGL && !UNITY_EDITOR
             _platformSocket = new BrowserSocket(_serverAddress);
 #else

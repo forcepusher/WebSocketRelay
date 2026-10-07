@@ -6,7 +6,6 @@ namespace BananaParty.WebSocketRelay
 {
     public class NetworkIdentity : MonoBehaviour, INetworkIdentity, IRpcTarget
     {
-        private const string ClaimAuthorityRequesterGuidKey = nameof(ClaimAuthorityRequesterGuidKey);
         private const string ClaimAuthorityVersionKey = nameof(ClaimAuthorityVersionKey);
 
         [SerializeField]
@@ -16,6 +15,7 @@ namespace BananaParty.WebSocketRelay
         [SerializeField]
         private bool _distanceBasedAuthority;
         [SerializeField]
+        [Tooltip("Ignored for scene objects with a NetworkBinding, which cannot be spawned again and only lose their owner.")]
         private bool _destroyWhenAuthorityOwnerLeaves = true;
 
         private readonly List<INetworkState> _networkStates = new();
@@ -33,10 +33,13 @@ namespace BananaParty.WebSocketRelay
         public bool HasAuthorityOwner => NetworkAuthorityOwner != Guid.Empty;
 
         public bool DistanceBasedAuthority => _distanceBasedAuthority;
-        public bool DestroyWhenAuthorityOwnerLeaves => _destroyWhenAuthorityOwnerLeaves;
-        public NetworkContext NetworkContext => _networkContext;
+        public bool DestroyWhenAuthorityOwnerLeaves => _destroyWhenAuthorityOwnerLeaves && !IsSceneBound;
 
-        public string NetworkStateName => _prefabName;
+        /// <summary>
+        /// Set by <see cref="NetworkBinding"/> for identities placed in a scene rather than spawned from a prefab.
+        /// </summary>
+        public bool IsSceneBound { get; internal set; }
+        public NetworkContext NetworkContext => _networkContext;
 
         public string RpcSubjectName => nameof(ClaimAuthority);
 
@@ -44,19 +47,12 @@ namespace BananaParty.WebSocketRelay
 
         private void Awake()
         {
-            foreach (INetworkState networkState in GetComponents<INetworkState>())
-            {
-                if (ReferenceEquals(networkState, this))
-                    continue;
-
-                _networkStates.Add(networkState);
-            }
+            GetComponents(_networkStates);
         }
 
         public void WriteNetworkState(IStateOutput stateOutput)
         {
             stateOutput.WriteString(nameof(PrefabName), PrefabName);
-            stateOutput.WriteGuid(nameof(NetworkAuthorityOwner), NetworkAuthorityOwner);
             stateOutput.WriteLong(nameof(NetworkAuthorityVersion), NetworkAuthorityVersion);
 
             stateOutput.BeginArrayProperty("NetworkStates");
@@ -69,26 +65,15 @@ namespace BananaParty.WebSocketRelay
             stateOutput.EndArray();
         }
 
-        public void ReadNetworkState(IStateInput stateInput)
-        {
-            if (!ReadNetworkAuthorityOwner(stateInput))
-                return;
-
-            ReadComponentStates(stateInput);
-        }
-
         public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
         {
-            // Authority owner is applied first so a client that missed a ClaimAuthority RPC
-            // still converges on the owner carried by the authority owner's state broadcasts.
-            // Returns false for state written before the latest known authority claim,
-            // e.g. the previous owner's in-flight broadcasts right after a transfer.
-            if (!ReadNetworkAuthorityOwner(stateInput))
-                return false;
-
-            // Ignore stale component state from a client that is no longer the authority owner.
-            // The state input is per-identity, so abandoning it mid-object is safe.
-            if (senderGuid != NetworkAuthorityOwner)
+            // Only the authority owner syncs an identity, so the state makes its sender the owner.
+            // Authority is applied first so a client that missed a ClaimAuthority RPC
+            // still converges on the owner through the owner's state broadcasts.
+            // State written before the latest known authority claim, e.g. the previous owner's
+            // in-flight broadcasts right after a transfer, is ignored. The state input is
+            // per-identity, so abandoning it mid-object is safe.
+            if (!ReadNetworkAuthority(stateInput, senderGuid))
                 return false;
 
             ReadComponentStates(stateInput);
@@ -107,16 +92,14 @@ namespace BananaParty.WebSocketRelay
             stateInput.EndArray();
         }
 
-        private bool ReadNetworkAuthorityOwner(IStateInput stateInput)
+        private bool ReadNetworkAuthority(IStateInput stateInput, Guid senderGuid)
         {
             string prefabName = stateInput.ReadString(nameof(PrefabName));
             if (prefabName != PrefabName)
                 throw new InvalidOperationException($"Prefab name mismatch. Expected: {PrefabName}, Received: {prefabName}");
 
-            Guid networkAuthorityOwner = stateInput.ReadGuid(nameof(NetworkAuthorityOwner));
             long networkAuthorityVersion = stateInput.ReadLong(nameof(NetworkAuthorityVersion));
-
-            return TryApplyAuthority(networkAuthorityOwner, networkAuthorityVersion);
+            return TryApplyAuthority(senderGuid, networkAuthorityVersion);
         }
 
         private bool TryApplyAuthority(Guid networkAuthorityOwner, long networkAuthorityVersion)
@@ -136,24 +119,23 @@ namespace BananaParty.WebSocketRelay
             return true;
         }
 
-        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true)
+        public void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true, bool reliable = false)
         {
-            _networkContext.SendRpc(NetworkIdentifier, rpcSubjectName, parametersStateOutput, Channel, invokeLocally);
+            _networkContext.SendRpc(NetworkIdentifier, rpcSubjectName, parametersStateOutput, Channel, invokeLocally, reliable);
         }
 
         public void ClaimAuthority()
         {
             IStateOutput parametersStateOutput = _networkContext.StateFormat.CreateOutput();
-            parametersStateOutput.WriteGuid(ClaimAuthorityRequesterGuidKey, _networkContext.LocalClientIdentity);
             parametersStateOutput.WriteLong(ClaimAuthorityVersionKey, NetworkAuthorityVersion + 1);
             SendRpc(RpcSubjectName, parametersStateOutput);
         }
 
-        public void ReceiveRpc(IStateInput parametersStateInput)
+        // A claim is always for its sender, so no client can claim an identity for another.
+        public void ReceiveRpc(Guid senderGuid, IStateInput parametersStateInput)
         {
-            Guid requesterGuid = parametersStateInput.ReadGuid(ClaimAuthorityRequesterGuidKey);
             long claimVersion = parametersStateInput.ReadLong(ClaimAuthorityVersionKey);
-            TryApplyAuthority(requesterGuid, claimVersion);
+            TryApplyAuthority(senderGuid, claimVersion);
         }
 
         private void OnValidate()

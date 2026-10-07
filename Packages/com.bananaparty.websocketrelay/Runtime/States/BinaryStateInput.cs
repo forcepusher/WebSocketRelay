@@ -26,8 +26,6 @@ namespace BananaParty.WebSocketRelay
             _layers.Push(NetworkStatesReadLayer.Read(_reader, name));
         }
 
-        public void BeginArrayElement() { }
-
         public void EndArray()
         {
             if (_layers.Count == 0 || _layers.Peek() is not NetworkStatesReadLayer)

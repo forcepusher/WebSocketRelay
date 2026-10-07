@@ -11,11 +11,12 @@ namespace BananaParty.WebSocketRelay
         private readonly bool _prettyPrint;
         private readonly bool _bracesOnNewLine;
         private readonly int _indentationCount;
-        private readonly StringBuilder _sb = new();
-        private int _depth = 0;
-        private bool _hasStarted = false;
-        private readonly Stack<bool> _firstItemScopes = new();
-        private readonly Stack<char> _closers = new();
+        private readonly StringBuilder _stringBuilder = new();
+
+        // One entry per open object or array, innermost on top.
+        private readonly Stack<Scope> _scopes = new();
+
+        private bool _hasStarted;
 
         public JsonStateOutput(bool prettyPrint = true, bool bracesOnNewLine = true, int spaceIndentationCount = 4)
         {
@@ -24,258 +25,205 @@ namespace BananaParty.WebSocketRelay
             _indentationCount = spaceIndentationCount;
         }
 
-        public void WriteByte(string name, byte value) => WriteEntry(name, value);
+        public void WriteByte(string name, byte value) => WriteValue(name, value.ToString(CultureInfo.InvariantCulture));
 
-        public void WriteInt(string name, int value) => WriteEntry(name, value);
+        public void WriteInt(string name, int value) => WriteValue(name, value.ToString(CultureInfo.InvariantCulture));
 
-        public void WriteLong(string name, long value) => WriteEntry(name, value);
+        public void WriteLong(string name, long value) => WriteValue(name, value.ToString(CultureInfo.InvariantCulture));
 
-        public void WriteFloat(string name, float value) => WriteEntry(name, value);
+        public void WriteFloat(string name, float value) => WriteValue(name, FormatFloat(value));
 
-        public void WriteDouble(string name, double value) => WriteEntry(name, value);
+        public void WriteDouble(string name, double value) => WriteValue(name, value.ToString("R", CultureInfo.InvariantCulture));
 
-        public void WriteBool(string name, bool value) => WriteEntry(name, value);
+        public void WriteBool(string name, bool value) => WriteValue(name, value ? "true" : "false");
 
-        public void WriteString(string name, string value) => WriteEntry(name, value);
-
-        public void WriteVector2(string name, Vector2 value)
+        public void WriteString(string name, string value)
         {
-            string x = value.x.ToString(CultureInfo.InvariantCulture);
-            string y = value.y.ToString(CultureInfo.InvariantCulture);
-            WriteObjectEntry(name, $"{{\"x\":{x},\"y\":{y}}}");
+            BeginEntry(name);
+            AppendQuoted(value ?? string.Empty);
         }
 
-        public void WriteVector3(string name, Vector3 value)
-        {
-            string x = value.x.ToString(CultureInfo.InvariantCulture);
-            string y = value.y.ToString(CultureInfo.InvariantCulture);
-            string z = value.z.ToString(CultureInfo.InvariantCulture);
-            WriteObjectEntry(name, $"{{\"x\":{x},\"y\":{y},\"z\":{z}}}");
-        }
+        public void WriteGuid(string name, Guid value) => WriteString(name, value.ToString());
 
-        public void WriteVector2Int(string name, Vector2Int value)
-        {
-            WriteObjectEntry(name, $"{{\"x\":{value.x},\"y\":{value.y}}}");
-        }
+        public void WriteVector2(string name, Vector2 value) =>
+            WriteValue(name, $"{{\"x\":{FormatFloat(value.x)},\"y\":{FormatFloat(value.y)}}}");
 
-        public void WriteVector3Int(string name, Vector3Int value)
-        {
-            WriteObjectEntry(name, $"{{\"x\":{value.x},\"y\":{value.y},\"z\":{value.z}}}");
-        }
+        public void WriteVector3(string name, Vector3 value) =>
+            WriteValue(name, $"{{\"x\":{FormatFloat(value.x)},\"y\":{FormatFloat(value.y)},\"z\":{FormatFloat(value.z)}}}");
 
-        public void WriteQuaternion(string name, Quaternion value)
-        {
-            string x = value.x.ToString(CultureInfo.InvariantCulture);
-            string y = value.y.ToString(CultureInfo.InvariantCulture);
-            string z = value.z.ToString(CultureInfo.InvariantCulture);
-            string w = value.w.ToString(CultureInfo.InvariantCulture);
-            WriteObjectEntry(name, $"{{\"x\":{x},\"y\":{y},\"z\":{z},\"w\":{w}}}");
-        }
+        public void WriteVector2Int(string name, Vector2Int value) =>
+            WriteValue(name, $"{{\"x\":{value.x.ToString(CultureInfo.InvariantCulture)},\"y\":{value.y.ToString(CultureInfo.InvariantCulture)}}}");
 
-        public void WriteColor(string name, Color value)
-        {
-            string r = value.r.ToString(CultureInfo.InvariantCulture);
-            string g = value.g.ToString(CultureInfo.InvariantCulture);
-            string b = value.b.ToString(CultureInfo.InvariantCulture);
-            string a = value.a.ToString(CultureInfo.InvariantCulture);
-            WriteObjectEntry(name, $"{{\"r\":{r},\"g\":{g},\"b\":{b},\"a\":{a}}}");
-        }
+        public void WriteVector3Int(string name, Vector3Int value) =>
+            WriteValue(name, $"{{\"x\":{value.x.ToString(CultureInfo.InvariantCulture)},\"y\":{value.y.ToString(CultureInfo.InvariantCulture)},\"z\":{value.z.ToString(CultureInfo.InvariantCulture)}}}");
 
-        public void BeginArrayProperty(string name)
-        {
-            EnsureStarted('{', '}');
-            WriteItemSeparator();
-            _sb.Append($"\"{name}\":");
+        public void WriteQuaternion(string name, Quaternion value) =>
+            WriteValue(name, $"{{\"x\":{FormatFloat(value.x)},\"y\":{FormatFloat(value.y)},\"z\":{FormatFloat(value.z)},\"w\":{FormatFloat(value.w)}}}");
 
-            if (_prettyPrint && _bracesOnNewLine)
-            {
-                _sb.Append('\n');
-                AppendIndent();
-            }
+        public void WriteColor(string name, Color value) =>
+            WriteValue(name, $"{{\"r\":{FormatFloat(value.r)},\"g\":{FormatFloat(value.g)},\"b\":{FormatFloat(value.b)},\"a\":{FormatFloat(value.a)}}}");
 
-            _sb.Append('[');
-            _depth++;
-            _closers.Push(']');
-            _firstItemScopes.Push(true);
+        public void BeginArrayProperty(string name) => BeginProperty(name, '[', ']');
 
-            if (_prettyPrint)
-            {
-                _sb.Append('\n');
-                AppendIndent();
-            }
-        }
+        public void BeginObjectProperty(string name) => BeginProperty(name, '{', '}');
 
-        public void BeginArrayElement()
-        {
-            EnsureStarted('[', ']');
-        }
-
-        public void EndArray()
-        {
-            if (_closers.Count == 0 || _closers.Peek() != ']') return;
-
-            _closers.Pop();
-            _depth--;
-            AppendClosingDelimiter(']');
-        }
-
-        public void BeginObjectProperty(string name)
-        {
-            EnsureStarted('{', '}');
-            WriteItemSeparator();
-            _sb.Append($"\"{name}\":");
-
-            if (_prettyPrint && _bracesOnNewLine)
-            {
-                _sb.Append('\n');
-                AppendIndent();
-            }
-
-            _sb.Append('{');
-            _depth++;
-            _closers.Push('}');
-            _firstItemScopes.Push(true);
-
-            if (_prettyPrint)
-            {
-                _sb.Append('\n');
-                AppendIndent();
-            }
-        }
-
+        /// <summary>
+        /// Starts the root object on first use, otherwise an object inside the current array.
+        /// </summary>
         public void BeginObjectElement()
         {
             if (!_hasStarted)
             {
-                EnsureStarted('{', '}');
+                StartRoot();
                 return;
             }
 
             WriteItemSeparator();
-            _sb.Append('{');
-            _depth++;
-            _closers.Push('}');
-            _firstItemScopes.Push(true);
-
-            if (_prettyPrint)
-            {
-                _sb.Append('\n');
-                AppendIndent();
-            }
+            OpenScope('{', '}');
         }
 
-        public void EndObject()
-        {
-            if (_closers.Count == 0 || _closers.Peek() != '}') return;
+        public void EndArray() => CloseScope(']');
 
-            _closers.Pop();
-            _depth--;
-            AppendClosingDelimiter('}');
-        }
+        public void EndObject() => CloseScope('}');
 
-        public void WriteGuid(string name, Guid value) => WriteEntry(name, value.ToString());
-
+        /// <summary>
+        /// The JSON written so far, with every scope that is still open closed.
+        /// </summary>
         public override string ToString()
         {
-            if (!_hasStarted) return "{}";
+            if (!_hasStarted)
+                return "{}";
 
-            StringBuilder result = new(_sb.ToString());
-            int tempDepth = _depth;
-            var closersCopy = new Stack<char>(_closers);
-
-            while (closersCopy.Count > 0)
+            StringBuilder result = new(_stringBuilder.ToString());
+            int depth = _scopes.Count;
+            foreach (Scope scope in _scopes)
             {
-                char closer = closersCopy.Pop();
-                tempDepth--;
-                if (_prettyPrint)
-                {
-                    result.Append('\n');
-                    if (tempDepth > 0)
-                        result.Append(new string(' ', tempDepth * _indentationCount));
-                }
-                result.Append(closer);
+                depth--;
+                if (_prettyPrint && scope.HasItems)
+                    AppendLineBreak(result, depth);
+
+                result.Append(scope.Closer);
             }
+
             return result.ToString();
         }
 
-        private void WriteEntry(string name, byte value) => WritePrimitiveEntry(name, value.ToString(CultureInfo.InvariantCulture), false);
+        // Shortest text that parses back to the same value, which plain ToString does not guarantee on every runtime.
+        private static string FormatFloat(float value) => value.ToString("R", CultureInfo.InvariantCulture);
 
-        private void WriteEntry(string name, int value) => WritePrimitiveEntry(name, value.ToString(CultureInfo.InvariantCulture), false);
-
-        private void WriteEntry(string name, long value) => WritePrimitiveEntry(name, value.ToString(CultureInfo.InvariantCulture), false);
-
-        private void WriteEntry(string name, float value) => WritePrimitiveEntry(name, value.ToString(CultureInfo.InvariantCulture), false);
-
-        private void WriteEntry(string name, double value) => WritePrimitiveEntry(name, value.ToString(CultureInfo.InvariantCulture), false);
-
-        private void WriteEntry(string name, bool value) => WritePrimitiveEntry(name, value ? "true" : "false", false);
-
-        private void WriteEntry(string name, string value) => WritePrimitiveEntry(name, value ?? string.Empty, true);
-
-        private void WriteObjectEntry(string name, string serializedObject)
+        private void BeginProperty(string name, char opener, char closer)
         {
-            EnsureStarted('{', '}');
-            WriteItemSeparator();
-            _sb.Append($"\"{name}\":{serializedObject}");
+            BeginEntry(name);
+            if (_prettyPrint && _bracesOnNewLine)
+                AppendLineBreak(_stringBuilder, _scopes.Count);
+
+            OpenScope(opener, closer);
         }
 
-        private void WritePrimitiveEntry(string name, string serializedValue, bool quoteValue)
+        private void WriteValue(string name, string serializedValue)
         {
-            EnsureStarted('{', '}');
-            WriteItemSeparator();
-            _sb.Append(quoteValue ? $"\"{name}\":\"{serializedValue}\"" : $"\"{name}\":{serializedValue}");
+            BeginEntry(name);
+            _stringBuilder.Append(serializedValue);
         }
 
-        private void EnsureStarted(char open, char close)
+        private void BeginEntry(string name)
         {
-            if (_hasStarted) return;
+            if (!_hasStarted)
+                StartRoot();
 
-            _sb.Append(open);
+            WriteItemSeparator();
+            AppendQuoted(name);
+            _stringBuilder.Append(':');
+        }
+
+        private void StartRoot()
+        {
             _hasStarted = true;
-            _depth++;
-            _firstItemScopes.Push(true);
-            _closers.Push(close);
+            OpenScope('{', '}');
+        }
 
-            if (_prettyPrint)
-            {
-                _sb.Append('\n');
-                AppendIndent();
-            }
+        private void OpenScope(char opener, char closer)
+        {
+            _stringBuilder.Append(opener);
+            _scopes.Push(new Scope(closer));
+        }
+
+        private void CloseScope(char closer)
+        {
+            if (_scopes.Count == 0 || _scopes.Peek().Closer != closer)
+                return;
+
+            Scope scope = _scopes.Pop();
+            if (_prettyPrint && scope.HasItems)
+                AppendLineBreak(_stringBuilder, _scopes.Count);
+
+            _stringBuilder.Append(closer);
         }
 
         private void WriteItemSeparator()
         {
-            bool isFirst = _firstItemScopes.Pop();
-            if (!isFirst)
-            {
-                if (_prettyPrint)
-                {
-                    _sb.Append(",\n");
-                    AppendIndent();
-                }
-                else
-                {
-                    _sb.Append(',');
-                }
-            }
-            _firstItemScopes.Push(false);
-        }
+            Scope scope = _scopes.Pop();
+            if (scope.HasItems)
+                _stringBuilder.Append(',');
 
-        private void AppendClosingDelimiter(char delimiter)
-        {
             if (_prettyPrint)
-            {
-                _sb.Append('\n');
-                if (_depth > 0)
-                    AppendIndent();
-            }
+                AppendLineBreak(_stringBuilder, _scopes.Count + 1);
 
-            _sb.Append(delimiter);
+            scope.HasItems = true;
+            _scopes.Push(scope);
         }
 
-        private void AppendIndent()
+        private void AppendLineBreak(StringBuilder stringBuilder, int depth)
         {
-            _sb.Append(new string(' ', _depth * _indentationCount));
+            stringBuilder.Append('\n');
+            stringBuilder.Append(' ', depth * _indentationCount);
+        }
+
+        private void AppendQuoted(string value)
+        {
+            _stringBuilder.Append('"');
+            foreach (char character in value)
+            {
+                switch (character)
+                {
+                    case '"':
+                        _stringBuilder.Append("\\\"");
+                        break;
+                    case '\\':
+                        _stringBuilder.Append("\\\\");
+                        break;
+                    case '\n':
+                        _stringBuilder.Append("\\n");
+                        break;
+                    case '\r':
+                        _stringBuilder.Append("\\r");
+                        break;
+                    case '\t':
+                        _stringBuilder.Append("\\t");
+                        break;
+                    case < ' ':
+                        _stringBuilder.Append("\\u").Append(((int)character).ToString("x4", CultureInfo.InvariantCulture));
+                        break;
+                    default:
+                        _stringBuilder.Append(character);
+                        break;
+                }
+            }
+
+            _stringBuilder.Append('"');
+        }
+
+        private struct Scope
+        {
+            public Scope(char closer)
+            {
+                Closer = closer;
+                HasItems = false;
+            }
+
+            public char Closer { get; }
+
+            public bool HasItems { get; set; }
         }
     }
 }

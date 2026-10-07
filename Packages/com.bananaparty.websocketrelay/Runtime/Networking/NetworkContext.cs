@@ -7,8 +7,12 @@ namespace BananaParty.WebSocketRelay
     [CreateAssetMenu]
     public class NetworkContext : ScriptableObject
     {
+        // Longer frames count as this long, so a hitch does not time out players whose messages waited in the queue.
+        private const float MaxUpdateDeltaSeconds = 0.25f;
+
         [SerializeField]
-        private float _playerTimeoutSeconds = 5f;
+        [Tooltip("How long a player may stay silent before it is removed. Keep it above the connection heartbeat timeout, so players can reconnect in time.")]
+        private float _playerTimeoutSeconds = 10f;
 
         [SerializeField]
         private bool _useBinary = false;
@@ -19,13 +23,23 @@ namespace BananaParty.WebSocketRelay
         private readonly NetworkIdentityRegistry _identityRegistry = new();
         private readonly NetworkPlayerRoster _playerRoster = new();
         private readonly List<IAuthorityOrigin> _authorityOrigins = new();
+        private readonly List<Guid> _timedOutPlayerGuids = new();
 
         private IStateFormat _stateFormat;
         private RpcRouter _rpcRouter;
 
-        public bool UseBinary => _useBinary;
+        // Unscaled seconds since the context was first updated, for resending reliable RPCs.
+        private double _time;
+
+        public float PlayerTimeoutSeconds => _playerTimeoutSeconds;
 
         public Guid LocalClientIdentity { get; set; }
+
+        /// <summary>
+        /// Set while the local connection delivers nothing. Player timeouts and authority claims pause then,
+        /// because silence from everyone says nothing about who actually left.
+        /// </summary>
+        public bool IsConnectionInterrupted { get; set; }
 
         public IReadOnlyList<INetworkIdentity> NetworkIdentities => _identityRegistry.Identities;
 
@@ -53,8 +67,15 @@ namespace BananaParty.WebSocketRelay
             // otherwise components register themselves using an empty NetworkIdentifier.
             bool prefabWasActive = prefab.gameObject.activeSelf;
             prefab.gameObject.SetActive(false);
-            NetworkIdentity networkIdentity = GameObject.Instantiate(prefab);
-            prefab.gameObject.SetActive(prefabWasActive);
+            NetworkIdentity networkIdentity;
+            try
+            {
+                networkIdentity = GameObject.Instantiate(prefab);
+            }
+            finally
+            {
+                prefab.gameObject.SetActive(prefabWasActive);
+            }
 
             networkIdentity.NetworkIdentifier = networkIdentifier;
             networkIdentity.NetworkAuthorityOwner = networkAuthorityOwner;
@@ -92,11 +113,23 @@ namespace BananaParty.WebSocketRelay
 
         public void UnregisterAuthorityOrigin(IAuthorityOrigin authorityOrigin) => _authorityOrigins.Remove(authorityOrigin);
 
+        /// <summary>
+        /// Forgets the session: spawned identities are destroyed, scene identities stay and lose their owner,
+        /// and players, queued RPCs and the local client identity are cleared.
+        /// </summary>
         public void ClearNetworkSession()
         {
             for (int identityIndex = NetworkIdentities.Count - 1; identityIndex >= 0; identityIndex--)
             {
                 INetworkIdentity networkIdentity = NetworkIdentities[identityIndex];
+
+                // Scene identities cannot be spawned again, so they stay for the next session.
+                if (networkIdentity.IsSceneBound)
+                {
+                    networkIdentity.NetworkAuthorityOwner = Guid.Empty;
+                    continue;
+                }
+
                 UnregisterNetworkIdentity(networkIdentity);
 
                 if (networkIdentity.GameObject != null)
@@ -104,14 +137,23 @@ namespace BananaParty.WebSocketRelay
             }
 
             _playerRoster.Clear();
-            RpcRouter.ClearOutgoingMessages();
+            RpcRouter.Clear();
             LocalClientIdentity = Guid.Empty;
+            IsConnectionInterrupted = false;
         }
 
         public void ManualUpdate(float unscaledDeltaTime)
         {
-            foreach (Guid playerGuid in _playerRoster.RemoveTimedOut(unscaledDeltaTime, _playerTimeoutSeconds))
+            _time += unscaledDeltaTime;
+
+            if (IsConnectionInterrupted)
+                return;
+
+            float deltaTime = Mathf.Min(unscaledDeltaTime, MaxUpdateDeltaSeconds);
+            _playerRoster.RemoveTimedOut(deltaTime, _playerTimeoutSeconds, _timedOutPlayerGuids);
+            foreach (Guid playerGuid in _timedOutPlayerGuids)
             {
+                RpcRouter.RemovePeer(playerGuid);
                 DestroyIdentitiesOwnedByAuthorityOwner(playerGuid);
                 Debug.Log($"Removed timed out player {playerGuid}");
             }
@@ -146,11 +188,14 @@ namespace BananaParty.WebSocketRelay
                 throw new InvalidOperationException("Channel message data is null or empty");
 
             _playerRoster.RecordMessage(senderGuid);
+            RpcRouter.RecordHeard(senderGuid, channel, _time);
 
             switch (data[0])
             {
                 case NetworkMessage.Rpc:
-                    RpcRouter.ProcessIncomingMessage(data);
+                case NetworkMessage.ReliableRpc:
+                case NetworkMessage.RpcAcknowledgement:
+                    RpcRouter.ProcessIncomingMessage(senderGuid, channel, data, LocalClientIdentity);
                     break;
                 case NetworkMessage.SyncIdentities:
                     ApplyIncomingChannelState(senderGuid, channel, data.AsMemory(1));
@@ -160,14 +205,40 @@ namespace BananaParty.WebSocketRelay
             }
         }
 
-        public void SendRpc(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel, bool invokeLocally = true)
+        /// <param name="reliable">
+        /// Delivered once and in order to every peer on the channel, also across lost connections and relay restarts.
+        /// Peers that join the channel later do not get it, and a peer that timed out misses what was sent until it is back.
+        /// </param>
+        public void SendRpc(
+            Guid networkIdentifier,
+            string rpcSubjectName,
+            IStateOutput parametersStateOutput,
+            string channel,
+            bool invokeLocally = true,
+            bool reliable = false)
         {
-            RpcRouter.Send(networkIdentifier, rpcSubjectName, parametersStateOutput, channel, invokeLocally);
+            RpcRouter.Send(LocalClientIdentity, networkIdentifier, rpcSubjectName, parametersStateOutput, channel, invokeLocally, reliable);
         }
 
         public bool TryDequeueOutgoingRpcMessage(out string channel, out byte[] message)
         {
             return RpcRouter.TryDequeueOutgoingMessage(out channel, out message);
+        }
+
+        /// <summary>
+        /// Adds the reliable RPCs to send for the first time or again, and the acknowledgements that are due.
+        /// </summary>
+        public void CollectReliableRpcMessages(List<(string channel, byte[] message)> outgoing)
+        {
+            RpcRouter.CollectReliableMessages(_time, outgoing);
+        }
+
+        /// <summary>
+        /// Forgets reliable RPCs to and from a channel that is no longer subscribed.
+        /// </summary>
+        public void ForgetChannel(string channel)
+        {
+            RpcRouter.ForgetChannel(channel);
         }
 
         public byte[] GetOwnedNetworkIdentitiesPayload(string channel)
@@ -210,13 +281,13 @@ namespace BananaParty.WebSocketRelay
             }
             else
             {
-                // The prefab name and authority owner are consumed here because the identity
+                // The prefab name and authority version are consumed here because the identity
                 // cannot read its own state before the prefab to spawn is known.
+                // Only the authority owner syncs an identity, so the sender owns it.
                 string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
-                Guid networkAuthorityOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkAuthorityOwner));
                 long networkAuthorityVersion = stateInput.ReadLong(nameof(NetworkIdentity.NetworkAuthorityVersion));
 
-                NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkAuthorityOwner);
+                NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, senderGuid);
                 spawnedNetworkIdentity.NetworkAuthorityVersion = networkAuthorityVersion;
                 spawnedNetworkIdentity.ReadComponentStates(stateInput);
             }

@@ -13,7 +13,7 @@ namespace BananaParty.WebSocketRelay.Tests
         private static readonly Guid LocalClient = Guid.Parse("00000000-0000-0000-0000-000000000099");
 
         [Test]
-        public void ClaimAuthorityRpc_AppliesNetworkAuthorityOwner()
+        public void ClaimAuthorityRpc_MakesItsSenderTheOwner()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
@@ -23,7 +23,7 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] rpcMessage = NetworkContextTestHelpers.CreateRpcMessage(
                 bot.NetworkIdentifier,
                 nameof(NetworkIdentity.ClaimAuthority),
-                NetworkContextTestHelpers.CreateClaimAuthorityRpcParameters(PlayerA));
+                NetworkContextTestHelpers.CreateClaimAuthorityRpcParameters());
 
             context.ProcessChannelMessage(PlayerA, "room", rpcMessage);
 
@@ -34,15 +34,13 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
-        public void ChannelStateSync_AppliesNetworkAuthorityOwnerFromPayload()
+        public void ChannelStateSync_MakesItsSenderTheOwner()
         {
             NetworkContext context = NetworkContextTestHelpers.CreateContext();
             context.LocalClientIdentity = LocalClient;
             NetworkIdentity bot = CreateRegisteredBot(context, PlayerB);
 
-            byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
-                bot,
-                PlayerA);
+            byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(bot);
 
             context.ProcessChannelMessage(PlayerA, "room", message);
 
@@ -61,7 +59,6 @@ namespace BananaParty.WebSocketRelay.Tests
 
             byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
                 bot,
-                PlayerA,
                 componentValue: 42,
                 includeComponentState: true);
 
@@ -69,28 +66,6 @@ namespace BananaParty.WebSocketRelay.Tests
 
             Assert.AreEqual(PlayerA, bot.NetworkAuthorityOwner);
             Assert.AreEqual(42, networkState.LastReadValue);
-
-            UnityEngine.Object.DestroyImmediate(bot.GameObject);
-            UnityEngine.Object.DestroyImmediate(context);
-        }
-
-        [Test]
-        public void ChannelStateSync_RejectsStaleComponentStateAfterAuthorityOwnerTransfer()
-        {
-            NetworkContext context = NetworkContextTestHelpers.CreateContext();
-            context.LocalClientIdentity = LocalClient;
-            NetworkIdentity bot = CreateRegisteredBot(context, PlayerB, out StubNetworkState networkState);
-
-            byte[] message = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
-                bot,
-                PlayerB,
-                componentValue: 99,
-                includeComponentState: true);
-
-            context.ProcessChannelMessage(PlayerA, "room", message);
-
-            Assert.AreEqual(PlayerB, bot.NetworkAuthorityOwner);
-            Assert.AreEqual(0, networkState.LastReadValue);
 
             UnityEngine.Object.DestroyImmediate(bot.GameObject);
             UnityEngine.Object.DestroyImmediate(context);
@@ -108,14 +83,13 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] rpcMessage = NetworkContextTestHelpers.CreateRpcMessage(
                 bot.NetworkIdentifier,
                 nameof(NetworkIdentity.ClaimAuthority),
-                NetworkContextTestHelpers.CreateClaimAuthorityRpcParameters(PlayerB, claimVersion: 2));
+                NetworkContextTestHelpers.CreateClaimAuthorityRpcParameters(claimVersion: 2));
             context.ProcessChannelMessage(PlayerB, "room", rpcMessage);
 
             // PlayerA's broadcast written before it learned of the claim must not
             // revert ownership or apply its outdated component state.
             byte[] staleMessage = NetworkContextTestHelpers.CreateSyncIdentitiesMessage(
                 bot,
-                PlayerA,
                 componentValue: 99,
                 includeComponentState: true,
                 networkAuthorityVersion: 1);
@@ -139,11 +113,11 @@ namespace BananaParty.WebSocketRelay.Tests
             byte[] claimB = NetworkContextTestHelpers.CreateRpcMessage(
                 bot.NetworkIdentifier,
                 nameof(NetworkIdentity.ClaimAuthority),
-                NetworkContextTestHelpers.CreateClaimAuthorityRpcParameters(PlayerB, claimVersion: 1));
+                NetworkContextTestHelpers.CreateClaimAuthorityRpcParameters(claimVersion: 1));
             byte[] claimA = NetworkContextTestHelpers.CreateRpcMessage(
                 bot.NetworkIdentifier,
                 nameof(NetworkIdentity.ClaimAuthority),
-                NetworkContextTestHelpers.CreateClaimAuthorityRpcParameters(PlayerA, claimVersion: 1));
+                NetworkContextTestHelpers.CreateClaimAuthorityRpcParameters(claimVersion: 1));
 
             context.ProcessChannelMessage(PlayerB, "room", claimB);
             context.ProcessChannelMessage(PlayerA, "room", claimA);
@@ -200,8 +174,6 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private sealed class StubNetworkState : MonoBehaviour, INetworkState
         {
-            public string NetworkStateName => nameof(StubNetworkState);
-
             public int LastReadValue { get; private set; }
 
             public void WriteNetworkState(IStateOutput stateOutput) =>

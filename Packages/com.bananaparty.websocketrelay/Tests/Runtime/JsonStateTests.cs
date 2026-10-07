@@ -44,6 +44,71 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void ShouldRoundTripStringsThatNeedEscaping()
+        {
+            const string text = "Quote \" backslash \\ slash / newline \n tab \t bell \u0007 check ✓";
+            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            output.WriteString("Text", text);
+            output.WriteInt("After", 7);
+
+            var input = new JsonStateInput(output.ToString());
+
+            Assert.AreEqual(text, input.ReadString("Text"));
+            Assert.AreEqual(7, input.ReadInt("After"));
+        }
+
+        [Test]
+        public void ShouldSeparateEntriesThatFollowEmptyObjectsAndArrays()
+        {
+            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            output.BeginObjectElement();
+            output.BeginObjectProperty("first");
+            output.BeginArrayProperty("NetworkStates");
+            output.EndArray();
+            output.EndObject();
+            output.BeginObjectProperty("second");
+            output.EndObject();
+            output.WriteInt("last", 1);
+            output.EndObject();
+
+            Assert.AreEqual("{\"first\":{\"NetworkStates\":[]},\"second\":{},\"last\":1}", output.ToString());
+        }
+
+        [Test]
+        public void ShouldRoundTripFloatsExactly()
+        {
+            float[] values = { 0.1f, 1f / 3f, 2f / 7f, 123456.79f, -0.000123f, float.Epsilon, 16777216f };
+            var output = new JsonStateOutput(prettyPrint: false, bracesOnNewLine: false);
+            for (int index = 0; index < values.Length; index++)
+                output.WriteFloat($"Value{index}", values[index]);
+            output.WriteVector3("Vector", new Vector3(1f / 3f, 0.1f, 2f / 7f));
+
+            var input = new JsonStateInput(output.ToString());
+
+            for (int index = 0; index < values.Length; index++)
+                Assert.AreEqual(values[index], input.ReadFloat($"Value{index}"), 0f);
+            Vector3 vector = input.ReadVector3("Vector");
+            Assert.AreEqual(1f / 3f, vector.x, 0f);
+            Assert.AreEqual(0.1f, vector.y, 0f);
+            Assert.AreEqual(2f / 7f, vector.z, 0f);
+        }
+
+        [Test]
+        public void ShouldPrettyPrintWithIndentation()
+        {
+            var output = new JsonStateOutput(prettyPrint: true, bracesOnNewLine: false, spaceIndentationCount: 2);
+            output.BeginObjectElement();
+            output.BeginObjectProperty("a");
+            output.WriteInt("b", 1);
+            output.EndObject();
+            output.BeginArrayProperty("c");
+            output.EndArray();
+            output.EndObject();
+
+            Assert.AreEqual("{\n  \"a\":{\n    \"b\":1\n  },\n  \"c\":[]\n}", output.ToString());
+        }
+
+        [Test]
         public void ShouldHandlePrettyPrint()
         {
             var output = new JsonStateOutput(prettyPrint: true, bracesOnNewLine: true);
@@ -271,7 +336,6 @@ namespace BananaParty.WebSocketRelay.Tests
 
         private sealed class MockCharacterState : INetworkState
         {
-            public string NetworkStateName => nameof(MockCharacterState);
             public int Health { get; set; }
             public Vector3 Position { get; set; }
 
@@ -407,7 +471,7 @@ namespace BananaParty.WebSocketRelay.Tests
             WriteIdentity(output, networkId1, networkAuthorityOwner1, characterState1);
             output.EndObject();
 
-            var input = new BinaryStateInput(output.GetBuffer());
+            var input = new BinaryStateInput(output.ToArray());
             input.BeginObjectElement();
             Assert.Throws<KeyNotFoundException>(() => input.BeginObjectProperty(unknownId.ToString()));
             MockCharacterState readCharacterState1 = ReadIdentity(input, networkId1, out Guid readNetworkAuthorityOwner1);
@@ -425,7 +489,7 @@ namespace BananaParty.WebSocketRelay.Tests
             output.WriteVector3("Position", new Vector3(1, 2, 3));
             output.WriteColor("Tint", new Color(0.25f, 0.5f, 0.75f, 1f));
 
-            var input = new BinaryStateInput(output.GetBuffer());
+            var input = new BinaryStateInput(output.ToArray());
 
             Assert.AreEqual(10, input.ReadInt("Score"));
             Assert.AreEqual(new Vector3(1, 2, 3), input.ReadVector3("Position"));

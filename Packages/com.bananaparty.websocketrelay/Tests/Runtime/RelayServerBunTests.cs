@@ -34,10 +34,41 @@ namespace BananaParty.WebSocketRelay.Tests
             yield return "RelayServer > connection does not send messages on open";
             yield return "RelayServer > subscribe does not send confirmation";
             yield return "RelayServer > duplicate subscribe does not send a message";
-            yield return "RelayServer > relays channel messages with client-provided sender guid";
+            yield return "RelayServer > relays channel messages with the sender guid";
+            yield return "RelayServer > relays channel state like channel messages to receivers that keep up";
             yield return "RelayServer > does not relay to clients on other channels";
             yield return "RelayServer > relays channel message even when sender is not subscribed to channel";
             yield return "RelayServer > unsubscribe does not send confirmation";
+            yield return "RelayServer > stops relaying to a client that unsubscribed";
+            yield return "RelayServer > does not echo channel messages back to the sender";
+            yield return "RelayServer > answers ping with pong carrying the same payload";
+            yield return "RelayServer > answers ping before hello";
+            yield return "RelayServer > ignores oversized ping";
+            yield return "RelayServer > ignores empty frames and keeps the connection open";
+            yield return "RelayServer identities > closes a connection that subscribes before saying hello";
+            yield return "RelayServer identities > closes a connection that says hello twice";
+            yield return "RelayServer identities > closes a connection that sends as another client";
+            yield return "RelayServer identities > rejects a guid that another client holds";
+            yield return "RelayServer identities > replaces the older connection of a client that connects again";
+            yield return "RelayServer identities > keeps the guid of a dropped connection for its client";
+            yield return "RelayServer identities > releases the guid of a dropped connection after the reservation";
+            yield return "RelayServer identities > releases the guid when its client closes the connection";
+            yield return "RelayServer backpressure > disconnects a subscriber that stops reading instead of buffering for it";
+            yield return "RelayServer backpressure > keeps a subscriber that reads everything";
+            yield return "RelayServer channel state > skips channel state for a receiver that fell behind but still delivers channel messages";
+            yield return "BrowserSocket.jslib > relays channel messages between sockets";
+            yield return "BrowserSocket.jslib > receives pong for ping";
+            yield return "BrowserSocket.jslib > keeps a payload queued when the buffer is too small";
+            yield return "BrowserSocket.jslib > reports buffered amount of an open socket";
+            yield return "BrowserSocket.jslib > is not closed while connecting or open";
+            yield return "BrowserSocket.jslib > reports close code after disconnecting";
+            yield return "BrowserSocket.jslib > reports abnormal closure when the server drops the handshake";
+            yield return "BrowserSocket.jslib > reports abnormal closure for an invalid address without throwing";
+            yield return "BrowserSocket.jslib > drops sends while connecting instead of throwing";
+            yield return "BrowserSocket.jslib > drops the connection when received data is not read";
+            yield return "BrowserSocket.jslib > keeps the connection while received data is read";
+            yield return "BrowserSocket.jslib > dispose frees the socket and later calls are harmless";
+            yield return "BrowserSocket.jslib > never reuses ids of disposed sockets";
         }
 
         [TestCaseSource(nameof(BunTestCaseNames))]

@@ -19,8 +19,6 @@ namespace BananaParty.WebSocketRelay
             _activeWriter = _rootWriter;
         }
 
-        public ReadOnlyMemory<byte> GetBuffer() => _stream.ToArray().AsMemory();
-
         public void BeginArrayProperty(string name)
         {
             if (name != "NetworkStates")
@@ -29,8 +27,6 @@ namespace BananaParty.WebSocketRelay
             NetworkStatesWriteScope networkStatesScope = new(Hash.StringToInt(name));
             _scopes.Push(networkStatesScope);
         }
-
-        public void BeginArrayElement() { }
 
         public void EndArray()
         {

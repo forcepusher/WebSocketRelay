@@ -12,4 +12,3 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62a67c66a56b4ba4ab48d33c4fe5f7a8, type: 3}
   m_Name: SampleNetworkChannel
   m_EditorClassIdentifier: BananaParty.WebSocketRelay::BananaParty.WebSocketRelay.NetworkChannel
-  _channelBindings: []

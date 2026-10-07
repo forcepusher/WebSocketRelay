@@ -7,24 +7,22 @@ namespace BananaParty.WebSocketRelay.Samples
     {
         private const string ClicksParameterName = "Clicks";
 
-        public string NetworkStateName => nameof(ClickObjective);
+        private NetworkIdentity _networkIdentity;
+        private TextMesh _clickCountText;
+        private int _clickCount;
 
         public string RpcSubjectName => nameof(ClickObjective);
 
         public INetworkIdentity NetworkIdentity => _networkIdentity;
 
-        private NetworkIdentity _networkIdentity;
-        private TextMesh _clickCountText;
-
-        private int _clickCount = 0;
         private int ClickCount
         {
+            get => _clickCount;
             set
             {
                 _clickCount = value;
                 _clickCountText.text = value.ToString();
             }
-            get => _clickCount;
         }
 
         private void Awake()
@@ -55,7 +53,7 @@ namespace BananaParty.WebSocketRelay.Samples
             _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
         }
 
-        public void ReceiveRpc(IStateInput parametersStateInput)
+        public void ReceiveRpc(Guid senderGuid, IStateInput parametersStateInput)
         {
             int clicks = parametersStateInput.ReadInt(ClicksParameterName);
 

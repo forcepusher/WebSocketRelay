@@ -4,19 +4,31 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Xml;
-using UnityEngine;
+using BananaParty.WebSocketRelay.Transport;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
     public static class BunTestRunner
     {
         private const int RunTimeoutMs = 60_000;
+        private const int MaxAttempts = 3;
         private const string RelayServerTestFile = "Source/RelayServer.test.ts";
+        private const string TestDirectoryFilter = "Source/";
 
         public static BunTestRunReport RunRelayServerTests()
         {
-            string serverDirectory = GetServerDirectory();
-            string bunExecutablePath = GetBunExecutablePath(serverDirectory);
+            // The bundled Bun crashes now and then on some Windows machines, which leaves no report behind.
+            BunTestRunReport report = RunOnce();
+            for (int attempt = 1; attempt < MaxAttempts && report.Cases.Count == 0 && string.IsNullOrEmpty(report.LaunchError); attempt++)
+                report = RunOnce();
+
+            return report;
+        }
+
+        private static BunTestRunReport RunOnce()
+        {
+            string serverDirectory = RelayServerProcess.GetServerDirectory();
+            string bunExecutablePath = RelayServerProcess.GetBunPath();
 
             if (!File.Exists(bunExecutablePath))
             {
@@ -46,7 +58,7 @@ namespace BananaParty.WebSocketRelay.Tests
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
                     FileName = bunExecutablePath,
-                    Arguments = $"test {RelayServerTestFile} --reporter=junit --reporter-outfile=\"{junitReportPath}\"",
+                    Arguments = $"test {TestDirectoryFilter} --reporter=junit --reporter-outfile=\"{junitReportPath}\"",
                     WorkingDirectory = serverDirectory,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -55,6 +67,9 @@ namespace BananaParty.WebSocketRelay.Tests
                     StandardOutputEncoding = Encoding.UTF8,
                     StandardErrorEncoding = Encoding.UTF8,
                 };
+
+                // Bun's crash reporter would keep the test ports open after a crash, see RelayServerProcess.
+                startInfo.Environment["BUN_ENABLE_CRASH_REPORTING"] = "0";
 
                 using Process process = Process.Start(startInfo);
                 if (process == null)
@@ -116,26 +131,6 @@ namespace BananaParty.WebSocketRelay.Tests
                     File.Delete(junitReportPath);
             }
         }
-
-        public static string GetServerDirectory() =>
-            Path.GetFullPath(Path.Combine(
-                Application.dataPath,
-                "..",
-                "Packages",
-                "com.bananaparty.websocketrelay",
-                "Runtime",
-                "RelayServer~"));
-
-        public static string GetBunExecutablePath(string serverDirectory) =>
-            Application.platform switch
-            {
-                RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsPlayer =>
-                    Path.Combine(serverDirectory, "Bun", "bun-windows-x64", "bun.exe"),
-                RuntimePlatform.OSXEditor or RuntimePlatform.OSXPlayer =>
-                    Path.Combine(serverDirectory, "Bun", "bun-darwin-aarch64", "bun"),
-                _ =>
-                    Path.Combine(serverDirectory, "Bun", "bun-linux-x64", "bun"),
-            };
 
         private static IReadOnlyList<BunTestCaseResult> ParseJUnitReport(string junitReportPath)
         {
