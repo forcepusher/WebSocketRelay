@@ -112,7 +112,8 @@ function buildPhases() {
             description: "client 3: 16 KB/s each way, less than the session needs",
             run: () => proxies[3].setProfile({ bandwidthBytesPerSecond: 16 * 1024, queueLimitBytes: 32 * 1024 }),
             cleanup: () => proxies[3].setProfile(),
-            expect: { tolerateReconnects: [3] },
+            // The relay skips state for client 3 while it is behind, so it keeps getting current state.
+            expect: { tolerateReconnects: [3], maxStateLatencyMs: 5000 },
         },
         {
             name: "short-stall",
@@ -133,7 +134,8 @@ function buildPhases() {
             seconds: scale(35),
             description: "client 2: link stalls for 16 s, longer than the player timeout, so peers drop it until it is back",
             run: () => stallFor(2, 16000),
-            expect: { reconnects: { 2: 1 }, peersMayDrop: [2] },
+            // Peers that drop client 2 give up on the reliable RPCs it misses until it is back.
+            expect: { reconnects: { 2: 1 }, peersMayDrop: [2], rpcGapsAllowed: true },
         },
         {
             name: "reset-all",
@@ -408,6 +410,9 @@ function analyzePhase(phase, definition) {
         if (client.endRemoteAvatars !== others) failures.push(`client ${client.index} sees ${client.endRemoteAvatars} remote avatars at the end, expected ${others}`);
         if (client.duplicateAvatars > 0) failures.push(`client ${client.index} had ${client.duplicateAvatars} duplicate avatars`);
         if (client.rpcDuplicates > 0) failures.push(`client ${client.index} received ${client.rpcDuplicates} duplicate RPCs`);
+        if (client.rpcGaps > 0 && !expect.rpcGapsAllowed) failures.push(`client ${client.index} missed ${client.rpcGaps} reliable RPCs`);
+        if (expect.maxStateLatencyMs !== undefined && client.maxStateLatency > expect.maxStateLatencyMs)
+            failures.push(`client ${client.index} received state ${client.maxStateLatency} ms late, expected at most ${expect.maxStateLatencyMs} ms`);
         if (client.exceptions > 0) failures.push(`client ${client.index} logged ${client.exceptions} exceptions: ${client.errorSamples.join(" | ")}`);
 
         // Clients that lose their own link must keep their peers, the others may drop only those clients.

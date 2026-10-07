@@ -5,7 +5,8 @@ Then it degrades the network or the clients one phase at a time and checks how t
 
 The clients are headless standalone builds of `Assets/SoakTest`. Each one spawns an avatar that tours four shared scene
 objects with distance-based authority, so owners keep changing hands. It syncs state 10 times a second, sends 5 numbered
-RPCs per second to a scene object, and reports what it sees to the harness every second. Client 5 runs at 30 fps, the rest at 60.
+reliable RPCs per second to a scene object, and reports what it sees to the harness every second. Client 5 runs at 30 fps,
+the rest at 60.
 
 ## Running
 
@@ -48,6 +49,8 @@ Add `--binary` for binary state or `--quick` for half-length phases. The run tak
 At the end of every phase each client must be connected, see every other player and avatar exactly once, and have logged
 no exceptions. Reconnects must match what the phase caused. Once the avatars stop, every client must agree on who owns
 each shared object.
-RPC sequence numbers show lost and duplicated messages, and timestamps show how late state and RPCs arrive.
+RPC sequence numbers show lost and duplicated messages, and timestamps show how late state and RPCs arrive. The RPCs are
+reliable, so a lost one fails the phase, except in the blackout, where peers drop client 2 and give up on what it misses
+meanwhile. On the slow link, state must stay less than 5 s late.
 
 If the relay server dies, the harness starts it again like a process supervisor would and reports the crash.

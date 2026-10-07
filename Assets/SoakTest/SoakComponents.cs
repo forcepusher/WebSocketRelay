@@ -85,8 +85,8 @@ namespace BananaParty.WebSocketRelay.SoakTest
     }
 
     /// <summary>
-    /// Scene object every client has from the start, so RPCs addressed to it never miss their target
-    /// and every missing sequence number is a message the transport lost.
+    /// Scene object every client has from the start, so RPCs addressed to it never miss their target.
+    /// Its RPCs are reliable, so every missing sequence number is one that its sender gave up on.
     /// </summary>
     public class SoakHub : MonoBehaviour, IRpcTarget
     {
@@ -119,7 +119,7 @@ namespace BananaParty.WebSocketRelay.SoakTest
             parameters.WriteInt("Index", clientIndex);
             parameters.WriteInt("Sequence", sequence);
             parameters.WriteLong("SentAt", SoakClock.NowMilliseconds);
-            _networkIdentity.SendRpc(TickRpcName, parameters, invokeLocally: false);
+            _networkIdentity.SendRpc(TickRpcName, parameters, invokeLocally: false, reliable: true);
         }
 
         public void ReceiveRpc(Guid senderGuid, IStateInput parametersStateInput)
