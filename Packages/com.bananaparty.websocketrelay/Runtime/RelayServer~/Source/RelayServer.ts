@@ -21,6 +21,13 @@ type RelayWebSocketData = {
     guid?: string;
     guidBytes?: Uint8Array;
     channels: Set<string>;
+    /** When the outstanding WebSocket ping was sent, or 0. */
+    pingSentAt: number;
+    lastPingAt: number;
+    lastRoundTripMs: number;
+    /** The shortest recent round trip, taken as the connection's delay without a backlog. */
+    usualRoundTripMs: number;
+    recentRoundTripsMs: number[];
 };
 
 /** A client guid, the secret its client proved it with, and the connection that holds it. */
@@ -43,6 +50,8 @@ export type RelayServerOptions = {
     backpressureLimitBytes?: number;
     /** Bytes queued for a client above which channel state is skipped for it, because the next state replaces it. */
     stateSkipBufferedBytes?: number;
+    /** Delay beyond a client's usual round trip from which channel state is skipped for it, for the same reason. */
+    stateSkipDelayMs?: number;
     /** Seconds a client guid stays reserved after its connection dropped, so only that client can reconnect with it. */
     identityReservationSeconds?: number;
 };
@@ -52,6 +61,7 @@ export const RelayServerDefaultIdleTimeoutSeconds = 60;
 // A short stall fits under this. A client further behind is disconnected and resynchronizes on reconnect.
 export const RelayServerDefaultBackpressureLimitBytes = 4 * 1024 * 1024;
 export const RelayServerDefaultStateSkipBufferedBytes = 16 * 1024;
+export const RelayServerDefaultStateSkipDelayMs = 500;
 // Longer than clients keep trying to reconnect, 30 s by default.
 export const RelayServerDefaultIdentityReservationSeconds = 60;
 
@@ -69,6 +79,13 @@ const abnormalClosureCode = 1006;
 
 const sweepIntervalMs = 250;
 
+// WebSocket pings queue behind everything already sent to a client, including what waits in socket buffers
+// and on the network, so their round trip shows how far behind the client is. Clients answer them on their own.
+const pingIntervalMs = 500;
+const pingPayload = new Uint8Array([0x72, 0x65, 0x6c, 0x61]);
+// 30 s of round trips at one ping every 500 ms.
+const roundTripWindowSize = 60;
+
 // Bun silently drops messages to a client once its own backpressure limit is reached
 // and keeps the connection open. Its limit is kept above ours so that slow clients are
 // disconnected and resynchronize on reconnect instead of receiving a stream with gaps.
@@ -80,6 +97,7 @@ export class RelayServer {
     #idleTimeoutSeconds: number;
     #backpressureLimitBytes: number;
     #stateSkipBufferedBytes: number;
+    #stateSkipDelayMs: number;
     #identityReservationMs: number;
     #server: Bun.Server<RelayWebSocketData> | null = null;
     #sweepTimer: ReturnType<typeof setInterval> | null = null;
@@ -95,6 +113,7 @@ export class RelayServer {
         this.#idleTimeoutSeconds = options.idleTimeoutSeconds ?? RelayServerDefaultIdleTimeoutSeconds;
         this.#backpressureLimitBytes = options.backpressureLimitBytes ?? RelayServerDefaultBackpressureLimitBytes;
         this.#stateSkipBufferedBytes = options.stateSkipBufferedBytes ?? RelayServerDefaultStateSkipBufferedBytes;
+        this.#stateSkipDelayMs = options.stateSkipDelayMs ?? RelayServerDefaultStateSkipDelayMs;
         this.#identityReservationMs =
             (options.identityReservationSeconds ?? RelayServerDefaultIdentityReservationSeconds) * 1000;
     }
@@ -121,7 +140,16 @@ export class RelayServer {
                 : {}),
             fetch: (req, server) => {
                 const connectionId = this.#nextConnectionId;
-                if (server.upgrade(req, { data: { connectionId, channels: new Set<string>() } })) {
+                const data: RelayWebSocketData = {
+                    connectionId,
+                    channels: new Set<string>(),
+                    pingSentAt: 0,
+                    lastPingAt: 0,
+                    lastRoundTripMs: 0,
+                    usualRoundTripMs: 0,
+                    recentRoundTripsMs: [],
+                };
+                if (server.upgrade(req, { data })) {
                     this.#nextConnectionId++;
                     RelayServerLog.debug(
                         `upgrade requested id=${connectionId} remote=${server.requestIP(req)?.address ?? "unknown"}`,
@@ -138,6 +166,9 @@ export class RelayServer {
                 open: (ws) => {
                     this.#connections.add(ws);
                     RelayServerLog.info(`connected id=${ws.data.connectionId} remote=${ws.remoteAddress}`);
+                },
+                pong: (ws, data) => {
+                    this.#handlePong(ws, data);
                 },
                 close: (ws, code, reason) => {
                     this.#connections.delete(ws);
@@ -208,6 +239,7 @@ export class RelayServer {
 
         this.#sweepTimer = setInterval(() => {
             this.#disconnectSlowClients();
+            this.#pingClients();
             this.#expireIdentities();
         }, sweepIntervalMs);
 
@@ -241,6 +273,43 @@ export class RelayServer {
             // terminate() does not wait for a close handshake that a stalled client cannot complete.
             ws.terminate();
         }
+    }
+
+    #pingClients(): void {
+        const now = performance.now();
+        for (const ws of this.#connections) {
+            if (ws.data.pingSentAt > 0 || now - ws.data.lastPingAt < pingIntervalMs) continue;
+
+            ws.data.pingSentAt = now;
+            ws.data.lastPingAt = now;
+            ws.ping(pingPayload);
+        }
+    }
+
+    #handlePong(ws: RelayWebSocket, payload: Buffer): void {
+        // Bun's own keepalive pings carry no payload.
+        if (ws.data.pingSentAt === 0 || !hasBytesAt(payload, 0, pingPayload)) return;
+
+        const roundTripMs = performance.now() - ws.data.pingSentAt;
+        const recentRoundTripsMs = ws.data.recentRoundTripsMs;
+        recentRoundTripsMs.push(roundTripMs);
+        if (recentRoundTripsMs.length > roundTripWindowSize) recentRoundTripsMs.shift();
+
+        ws.data.pingSentAt = 0;
+        ws.data.lastRoundTripMs = roundTripMs;
+        ws.data.usualRoundTripMs = Math.min(...recentRoundTripsMs);
+    }
+
+    /** Whether a client is so far behind that channel state would reach it stale. */
+    #isBehind(ws: RelayWebSocket): boolean {
+        if (ws.getBufferedAmount() > this.#stateSkipBufferedBytes) return true;
+
+        // An unanswered ping counts for as long as it has been waiting.
+        const roundTripMs =
+            ws.data.pingSentAt > 0
+                ? Math.max(ws.data.lastRoundTripMs, performance.now() - ws.data.pingSentAt)
+                : ws.data.lastRoundTripMs;
+        return roundTripMs - ws.data.usualRoundTripMs > this.#stateSkipDelayMs;
     }
 
     #expireIdentities(): void {
@@ -422,7 +491,7 @@ export class RelayServer {
             if (subscriber === ws) continue;
 
             // A receiver this far behind would get stale state, and the next state replaces it anyway.
-            if (isState && subscriber.getBufferedAmount() > this.#stateSkipBufferedBytes) {
+            if (isState && this.#isBehind(subscriber)) {
                 skippedCount++;
                 continue;
             }
