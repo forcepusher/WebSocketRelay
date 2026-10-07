@@ -12,8 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RelayConnectionState` with `Network.ConnectionState` and `RelayClient.State`, plus `RoundTripTimeSeconds`, `IsLinkHealthy`, `PendingSendBytes` and `IsSendBacklogged`.  
 - `NetworkContext.IsConnectionInterrupted`. While the local connection is silent, player timeouts and distance-based authority claims pause, so peers are not dropped and objects are not stolen because of a local outage.  
 - `ISocket.IsClosed`, `ISocket.CloseReason` and `ISocket.PendingSendBytes`. Disconnect reasons are now reported and logged.  
+- The relay binds every connection to the client guid from its hello message and closes connections that send with another guid, so clients cannot speak for each other. The guid of a dropped connection stays reserved for its client for 60 seconds.  
+- `RelayClient.SendState` for state that the next state replaces. The relay skips it for receivers that fell behind, so a client on a slow link catches up on current state instead of working through stale state. Network syncs use it.  
   
 ### Changed  
+- **Breaking:** The relay protocol has new hello and channel state messages, so clients and relay servers only work with others from 3.0.0 on.  
 - **Breaking:** `IRelayListener.OnDisconnectedFromRelay` is replaced by `OnConnectionStateChanged(previousState, state, reason)`.  
 - **Breaking:** `ISocket` has new members that custom implementations need to provide.  
 - **Breaking:** A lost connection no longer clears the session right away. It is cleared only when reconnecting gives up. Set `ReconnectTimeoutSeconds` to 0 for the old behavior.  

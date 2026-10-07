@@ -7,5 +7,7 @@ namespace BananaParty.WebSocketRelay.Transport
         public const byte ChannelMessage = 0x03;
         public const byte Ping = 0x04;
         public const byte Pong = 0x05;
+        public const byte Hello = 0x06;
+        public const byte ChannelState = 0x07;
     }
 }

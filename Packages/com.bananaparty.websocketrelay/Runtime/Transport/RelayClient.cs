@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using Debug = UnityEngine.Debug;
 
 namespace BananaParty.WebSocketRelay.Transport
@@ -22,6 +23,10 @@ namespace BananaParty.WebSocketRelay.Transport
         private readonly RelayConnectionSettings _settings;
         private readonly Func<double> _timeSource;
         private readonly Random _random = new();
+
+        // Proves to the relay that every connection with this client guid comes from this client,
+        // so no other client can take over the guid, even while this one reconnects.
+        private readonly byte[] _secret = CreateSecret();
 
         private ISocket _socket;
         private bool _isDisposed;
@@ -160,15 +165,17 @@ namespace BananaParty.WebSocketRelay.Transport
         /// <returns>False when the message was dropped because the client is not connected.</returns>
         public bool Send(string channel, byte[] data)
         {
-            ThrowIfDisposed();
+            return SendToChannel(channel, data, isState: false);
+        }
 
-            if (!SubscribedChannels.Contains(channel))
-                throw new KeyNotFoundException($"Not subscribed to channel '{channel}'.");
-
-            if (!IsConnected)
-                return false;
-
-            return TrySend(RelayMessageCodec.CreateChannelMessage(ClientGuid, channel, data));
+        /// <summary>
+        /// Sends state that the next state replaces, so the relay skips it for receivers that fell behind
+        /// and they catch up on fresh state instead of working through stale state.
+        /// </summary>
+        /// <returns>False when the message was dropped because the client is not connected.</returns>
+        public bool SendState(string channel, byte[] data)
+        {
+            return SendToChannel(channel, data, isState: true);
         }
 
         /// <summary>
@@ -182,6 +189,29 @@ namespace BananaParty.WebSocketRelay.Transport
             _isDisposed = true;
             DisposeSocket();
             State = RelayConnectionState.Disconnected;
+        }
+
+        private bool SendToChannel(string channel, byte[] data, bool isState)
+        {
+            ThrowIfDisposed();
+
+            if (!SubscribedChannels.Contains(channel))
+                throw new KeyNotFoundException($"Not subscribed to channel '{channel}'.");
+
+            if (!IsConnected)
+                return false;
+
+            return TrySend(isState
+                ? RelayMessageCodec.CreateChannelStateMessage(ClientGuid, channel, data)
+                : RelayMessageCodec.CreateChannelMessage(ClientGuid, channel, data));
+        }
+
+        private static byte[] CreateSecret()
+        {
+            byte[] secret = new byte[RelayMessageCodec.SecretSize];
+            using RandomNumberGenerator random = RandomNumberGenerator.Create();
+            random.GetBytes(secret);
+            return secret;
         }
 
         private static Func<ISocket> CreateSocketFactory(string serverAddress, bool offlineMode)
@@ -310,6 +340,9 @@ namespace BananaParty.WebSocketRelay.Transport
             _hasRoundTripTime = false;
             RoundTripTimeSeconds = 0d;
 
+            // The relay drops connections that subscribe or send before saying who they are.
+            TrySend(RelayMessageCodec.CreateHelloMessage(ClientGuid, _secret));
+
             foreach (string channel in SubscribedChannels)
                 TrySend(RelayMessageCodec.CreateProtocolMessage(RelayMessageType.Subscribe, channel));
 
@@ -374,7 +407,8 @@ namespace BananaParty.WebSocketRelay.Transport
 
         private void DispatchChannelMessage(byte[] payloadBytes)
         {
-            if (payloadBytes.Length == 0 || payloadBytes[0] != RelayMessageType.ChannelMessage)
+            if (payloadBytes.Length == 0
+                || (payloadBytes[0] != RelayMessageType.ChannelMessage && payloadBytes[0] != RelayMessageType.ChannelState))
                 return;
 
             int channelLength = RelayMessageCodec.ReadChannelLength(payloadBytes, RelayMessageCodec.ChannelMessageChannelLengthOffset);

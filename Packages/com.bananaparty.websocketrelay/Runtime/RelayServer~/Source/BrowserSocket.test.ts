@@ -6,6 +6,7 @@ import { RelayServer } from "./RelayServer";
 import {
     RelayMessageType,
     relayWriteChannelMessage,
+    relayWriteHelloMessage,
     relayWritePingMessage,
     relayWriteProtocolMessage,
 } from "./RelayMessageType";
@@ -114,10 +115,13 @@ describe.skipIf(!existsSync(jslibPath))("BrowserSocket.jslib", () => {
     test("relays channel messages between sockets", async () => {
         const sender = await connectOpen();
         const receiver = await connectOpen();
+        const senderGuid = crypto.randomUUID();
+        harness.send(sender, relayWriteHelloMessage(senderGuid, crypto.getRandomValues(new Uint8Array(16))));
+        harness.send(receiver, relayWriteHelloMessage(crypto.randomUUID(), crypto.getRandomValues(new Uint8Array(16))));
         harness.send(receiver, relayWriteProtocolMessage(RelayMessageType.Subscribe, "jslib-relay"));
         await Bun.sleep(20);
 
-        const message = relayWriteChannelMessage(crypto.randomUUID(), "jslib-relay", new Uint8Array([1, 2, 3]));
+        const message = relayWriteChannelMessage(senderGuid, "jslib-relay", new Uint8Array([1, 2, 3]));
         harness.send(sender, message);
         await waitFor(() => harness.exports.GetBrowserSocketHasUnreadPayloadQueue(receiver));
 

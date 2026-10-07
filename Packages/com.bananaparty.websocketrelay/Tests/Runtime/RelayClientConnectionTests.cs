@@ -284,6 +284,44 @@ namespace BananaParty.WebSocketRelay.Tests
         }
 
         [Test]
+        public void EveryConnection_SaysHelloFirstWithTheSameSecret()
+        {
+            CreateClient();
+            FakeSocket firstSocket = ConnectAndOpen();
+            _client.SubscribeToChannel("a");
+
+            firstSocket.Close();
+            RunUntil(() => _factory.Sockets.Count == 2, 1);
+            FakeSocket secondSocket = _factory.Latest;
+            secondSocket.Open();
+            Poll();
+
+            byte[] hello = firstSocket.SentMessages[0];
+            Assert.AreEqual(RelayMessageType.Hello, hello[0]);
+            Assert.AreEqual(RelayMessageCodec.HelloMessageSize, hello.Length);
+            Assert.AreEqual(ClientGuid, RelayMessageCodec.ReadGuid(hello, 1));
+            CollectionAssert.AreEqual(hello, secondSocket.SentMessages[0], "The relay only lets the same secret reclaim the guid.");
+        }
+
+        [Test]
+        public void SendState_IsSentAsChannelStateAndDeliveredLikeAChannelMessage()
+        {
+            CreateClient();
+            FakeSocket socket = ConnectAndOpen();
+            _client.SubscribeToChannel("room");
+            var received = new List<byte[]>();
+            _listener.ChannelMessageReceived += (_, _, data) => received.Add(data);
+
+            Assert.IsTrue(_client.SendState("room", new byte[] { 3 }));
+            byte[] state = socket.SentOfType(RelayMessageType.ChannelState).Single();
+            Assert.AreEqual(ClientGuid, RelayMessageCodec.ReadGuid(state, RelayMessageCodec.ChannelMessageGuidOffset));
+
+            socket.Receive(RelayMessageCodec.CreateChannelStateMessage(PeerGuid, "room", new byte[] { 4 }));
+            Poll();
+            CollectionAssert.AreEqual(new byte[] { 4 }, received.Single());
+        }
+
+        [Test]
         public void ReconnectDelays_GrowExponentiallyWithJitterUpToMaximum()
         {
             RelayConnectionSettings settings = CreateSettings();

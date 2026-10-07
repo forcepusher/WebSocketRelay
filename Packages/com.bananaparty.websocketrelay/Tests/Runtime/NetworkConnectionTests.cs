@@ -150,7 +150,7 @@ namespace BananaParty.WebSocketRelay.Tests
             CollectionAssert.AreEqual(new[] { Channel }, newSocket.SentSubscriptions());
 
             _network.SendSyncIdentities();
-            byte[] syncMessage = newSocket.SentOfType(RelayMessageType.ChannelMessage).Single();
+            byte[] syncMessage = newSocket.SentOfType(RelayMessageType.ChannelState).Single();
             Assert.AreEqual(LocalGuid, RelayMessageCodec.ReadGuid(syncMessage, RelayMessageCodec.ChannelMessageGuidOffset));
         }
 
@@ -273,11 +273,11 @@ namespace BananaParty.WebSocketRelay.Tests
 
             socket.PendingSendBytes = 1001;
             _network.SendSyncIdentities();
-            Assert.AreEqual(0, socket.SentOfType(RelayMessageType.ChannelMessage).Count());
+            Assert.AreEqual(0, socket.SentOfType(RelayMessageType.ChannelState).Count());
 
             socket.PendingSendBytes = 0;
             _network.SendSyncIdentities();
-            Assert.AreEqual(1, socket.SentOfType(RelayMessageType.ChannelMessage).Count());
+            Assert.AreEqual(1, socket.SentOfType(RelayMessageType.ChannelState).Count());
         }
 
         [Test]

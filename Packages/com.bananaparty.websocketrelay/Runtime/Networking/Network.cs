@@ -141,7 +141,7 @@ namespace BananaParty.WebSocketRelay
                 byte[] message = new byte[payload.Length + 1];
                 message[0] = NetworkMessage.SyncIdentities;
                 payload.CopyTo(message, 1);
-                _relayClient.Send(channel, message);
+                _relayClient.SendState(channel, message);
             }
         }
 

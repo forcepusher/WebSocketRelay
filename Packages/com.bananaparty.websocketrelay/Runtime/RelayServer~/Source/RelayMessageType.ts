@@ -4,16 +4,25 @@ export const RelayMessageType = {
     ChannelMessage: 0x03,
     Ping: 0x04,
     Pong: 0x05,
+    Hello: 0x06,
+    ChannelState: 0x07,
 } as const;
 
 export const RelayMessageGuidSize = 16;
+export const RelayMessageSecretSize = 16;
 
 // Ping layout: [type:1][opaque payload]. The server answers with a Pong carrying the same payload.
 export const RelayMessagePingMaxSize = 64;
 
+// Hello layout: [type:1][client guid:16][secret:16]. The first message on every connection, binding it to the
+// client guid. The secret proves that a later connection with the same guid comes from the same client.
+export const RelayMessageHelloSize = 1 + RelayMessageGuidSize + RelayMessageSecretSize;
+
 export const RelayMessageChannelLengthOffset = 1;
 export const RelayMessageChannelOffset = 3;
 
+// Channel message and channel state layout: [type:1][sender guid:16][channel length:2][channel][payload].
+// Channel state is skipped for receivers that fell behind, because the next state replaces it.
 export const RelayMessageChannelMessageGuidOffset = 1;
 export const RelayMessageChannelMessageChannelLengthOffset = RelayMessageChannelMessageGuidOffset + RelayMessageGuidSize;
 export const RelayMessageChannelMessageChannelOffset = RelayMessageChannelMessageChannelLengthOffset + 2;
@@ -24,6 +33,8 @@ const relayMessageTypeNames: Record<number, string> = {
     [RelayMessageType.ChannelMessage]: "ChannelMessage",
     [RelayMessageType.Ping]: "Ping",
     [RelayMessageType.Pong]: "Pong",
+    [RelayMessageType.Hello]: "Hello",
+    [RelayMessageType.ChannelState]: "ChannelState",
 };
 
 export function relayMessageTypeName(type: number): string {
@@ -90,12 +101,25 @@ export function relayWritePingMessage(payload?: Uint8Array): Uint8Array {
     return message;
 }
 
-export function relayWriteChannelMessage(senderGuid: string, channel: string, payload?: Uint8Array): Uint8Array {
+export function relayWriteHelloMessage(clientGuid: string, secret: Uint8Array): Uint8Array {
+    const message = new Uint8Array(RelayMessageHelloSize);
+    message[0] = RelayMessageType.Hello;
+    message.set(relayGuidToBytes(clientGuid), 1);
+    message.set(secret, 1 + RelayMessageGuidSize);
+    return message;
+}
+
+export function relayWriteChannelMessage(
+    senderGuid: string,
+    channel: string,
+    payload?: Uint8Array,
+    type: number = RelayMessageType.ChannelMessage,
+): Uint8Array {
     const channelBytes = new TextEncoder().encode(channel);
     const payloadLength = payload?.byteLength ?? 0;
     const message = new Uint8Array(relayChannelMessagePayloadOffset(channelBytes.byteLength) + payloadLength);
     const view = new DataView(message.buffer);
-    view.setUint8(0, RelayMessageType.ChannelMessage);
+    view.setUint8(0, type);
     message.set(relayGuidToBytes(senderGuid), RelayMessageChannelMessageGuidOffset);
     view.setUint16(RelayMessageChannelMessageChannelLengthOffset, channelBytes.byteLength, true);
     message.set(channelBytes, RelayMessageChannelMessageChannelOffset);
