@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace BananaParty.WebSocketRelay.Tests
 {
@@ -132,9 +134,29 @@ namespace BananaParty.WebSocketRelay.Tests
 
             NetworkContextTestHelpers.Advance(_sender, 1.2f);
             Send(3);
+            LogAssert.Expect(LogType.Warning, new Regex("^Missed 1 reliable RPCs"));
             Deliver(_receiver, SenderGuid, CollectRpcs(_sender));
 
             CollectionAssert.AreEqual(new[] { 1, 3 }, _receivedRpcs.ReceivedValues);
+        }
+
+        [Test]
+        public void ReceiverThatTimedOutOnTheSender_StillGetsWhatArrivedOutOfOrderBeforeTheGap()
+        {
+            NetworkContextTestHelpers.SetPlayerTimeoutSeconds(_sender, 1f);
+            SenderHearsReceiver();
+            Send(1);
+            Send(2);
+            Send(3);
+            List<byte[]> messages = CollectRpcs(_sender);
+            Deliver(_receiver, SenderGuid, new[] { messages[0], messages[2] });
+
+            NetworkContextTestHelpers.Advance(_sender, 1.2f);
+            Send(4);
+            LogAssert.Expect(LogType.Warning, new Regex("^Missed 1 reliable RPCs"));
+            Deliver(_receiver, SenderGuid, CollectRpcs(_sender));
+
+            CollectionAssert.AreEqual(new[] { 1, 3, 4 }, _receivedRpcs.ReceivedValues);
         }
 
         [Test]

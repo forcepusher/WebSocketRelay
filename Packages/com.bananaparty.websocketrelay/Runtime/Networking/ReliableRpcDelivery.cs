@@ -92,13 +92,13 @@ namespace BananaParty.WebSocketRelay
 
             // The sender gave up on what this client misses, e.g. because it dropped this client as timed out meanwhile.
             if (oldestRetainedSequence > stream.NextExpectedSequence)
-                stream.SkipTo(oldestRetainedSequence);
+                SkipTo(senderGuid, channel, stream, oldestRetainedSequence);
+
+            if (stream.Pending.Count >= MaxPendingPerSender)
+                SkipTo(senderGuid, channel, stream, stream.SmallestPendingSequence());
 
             if (sequence < stream.NextExpectedSequence || stream.Pending.ContainsKey(sequence))
                 return;
-
-            if (stream.Pending.Count >= MaxPendingPerSender)
-                stream.SkipTo(stream.SmallestPendingSequence());
 
             stream.Pending.Add(sequence, message);
             DeliverInOrder(senderGuid, stream);
@@ -272,21 +272,52 @@ namespace BananaParty.WebSocketRelay
             return false;
         }
 
+        /// <summary>
+        /// Moves past RPCs that will not come anymore. Those among them that did arrive are still delivered, in order.
+        /// </summary>
+        private void SkipTo(Guid senderGuid, string channel, IncomingStream stream, uint sequence)
+        {
+            List<uint> arrivedSequences = new();
+            foreach (uint pendingSequence in stream.Pending.Keys)
+            {
+                if (pendingSequence < sequence)
+                    arrivedSequences.Add(pendingSequence);
+            }
+
+            arrivedSequences.Sort();
+            uint missedCount = sequence - stream.NextExpectedSequence - (uint)arrivedSequences.Count;
+            Debug.LogWarning($"Missed {missedCount} reliable RPCs from {senderGuid} on channel '{channel}' that the sender gave up on.");
+
+            foreach (uint arrivedSequence in arrivedSequences)
+            {
+                byte[] message = stream.Pending[arrivedSequence];
+                stream.Pending.Remove(arrivedSequence);
+                Deliver(senderGuid, message);
+            }
+
+            stream.NextExpectedSequence = sequence;
+            DeliverInOrder(senderGuid, stream);
+        }
+
         private void DeliverInOrder(Guid senderGuid, IncomingStream stream)
         {
             while (stream.Pending.TryGetValue(stream.NextExpectedSequence, out byte[] message))
             {
                 stream.Pending.Remove(stream.NextExpectedSequence);
                 stream.NextExpectedSequence++;
+                Deliver(senderGuid, message);
+            }
+        }
 
-                try
-                {
-                    _deliver(senderGuid, message, BodyOffset);
-                }
-                catch (Exception exception)
-                {
-                    Debug.LogException(exception);
-                }
+        private void Deliver(Guid senderGuid, byte[] message)
+        {
+            try
+            {
+                _deliver(senderGuid, message, BodyOffset);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
             }
         }
 
@@ -377,24 +408,6 @@ namespace BananaParty.WebSocketRelay
                 HasBaseline = true;
                 NextExpectedSequence = oldestRetainedSequence;
                 Pending.Clear();
-            }
-
-            public void SkipTo(uint sequence)
-            {
-                NextExpectedSequence = sequence;
-
-                List<uint> skippedSequences = null;
-                foreach (uint pendingSequence in Pending.Keys)
-                {
-                    if (pendingSequence < sequence)
-                        (skippedSequences ??= new List<uint>()).Add(pendingSequence);
-                }
-
-                if (skippedSequences == null)
-                    return;
-
-                foreach (uint skippedSequence in skippedSequences)
-                    Pending.Remove(skippedSequence);
             }
 
             public uint SmallestPendingSequence()
