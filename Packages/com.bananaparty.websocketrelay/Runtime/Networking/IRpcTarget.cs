@@ -8,6 +8,9 @@ namespace BananaParty.WebSocketRelay
 
         string RpcSubjectName { get; }
 
-        void ReceiveRpc(IStateInput parametersStateInput);
+        /// <param name="senderGuid">
+        /// The client that sent the RPC, as checked by the relay, or the local client for an RPC invoked locally.
+        /// </param>
+        void ReceiveRpc(Guid senderGuid, IStateInput parametersStateInput);
     }
 }

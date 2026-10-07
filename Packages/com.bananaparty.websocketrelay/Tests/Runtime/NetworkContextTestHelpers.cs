@@ -69,10 +69,9 @@ namespace BananaParty.WebSocketRelay.Tests
             return output;
         }
 
-        public static byte[] CreateClaimAuthorityRpcParameters(Guid requesterGuid, long claimVersion = 1)
+        public static byte[] CreateClaimAuthorityRpcParameters(long claimVersion = 1)
         {
             JsonStateOutput output = new(prettyPrint: false, bracesOnNewLine: false);
-            output.WriteGuid("ClaimAuthorityRequesterGuidKey", requesterGuid);
             output.WriteLong("ClaimAuthorityVersionKey", claimVersion);
             return Encoding.UTF8.GetBytes(output.ToString());
         }
@@ -88,7 +87,6 @@ namespace BananaParty.WebSocketRelay.Tests
 
         public static byte[] CreateSyncIdentitiesMessage(
             INetworkIdentity identity,
-            Guid networkAuthorityOwner,
             int componentValue = 0,
             bool includeComponentState = false,
             long networkAuthorityVersion = 1)
@@ -97,7 +95,6 @@ namespace BananaParty.WebSocketRelay.Tests
             output.BeginObjectElement();
             output.BeginObjectProperty(identity.NetworkIdentifier.ToString());
             output.WriteString(nameof(NetworkIdentity.PrefabName), identity.PrefabName);
-            output.WriteGuid(nameof(NetworkIdentity.NetworkAuthorityOwner), networkAuthorityOwner);
             output.WriteLong(nameof(NetworkIdentity.NetworkAuthorityVersion), networkAuthorityVersion);
             output.BeginArrayProperty("NetworkStates");
             if (includeComponentState)
@@ -224,7 +221,6 @@ namespace BananaParty.WebSocketRelay.Tests
         public void WriteNetworkState(IStateOutput stateOutput)
         {
             stateOutput.WriteString(nameof(PrefabName), PrefabName);
-            stateOutput.WriteGuid(nameof(NetworkAuthorityOwner), NetworkAuthorityOwner);
 
             stateOutput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
@@ -239,7 +235,7 @@ namespace BananaParty.WebSocketRelay.Tests
         public bool ReadNetworkState(IStateInput stateInput, Guid senderGuid)
         {
             stateInput.ReadString(nameof(PrefabName));
-            NetworkAuthorityOwner = stateInput.ReadGuid(nameof(NetworkAuthorityOwner));
+            NetworkAuthorityOwner = senderGuid;
 
             stateInput.BeginArrayProperty("NetworkStates");
             foreach (INetworkState networkState in _networkStates)
@@ -273,9 +269,12 @@ namespace BananaParty.WebSocketRelay.Tests
 
         public int LastReceivedValue { get; private set; }
 
-        public void ReceiveRpc(IStateInput parametersStateInput)
+        public Guid LastSenderGuid { get; private set; }
+
+        public void ReceiveRpc(Guid senderGuid, IStateInput parametersStateInput)
         {
             ReceiveCount++;
+            LastSenderGuid = senderGuid;
             LastReceivedValue = parametersStateInput.ReadInt("value");
         }
     }

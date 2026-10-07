@@ -56,7 +56,7 @@ namespace BananaParty.WebSocketRelay.Samples
             }
         }
 
-        public void ReceiveRpc(IStateInput parametersStateInput)
+        public void ReceiveRpc(System.Guid senderGuid, IStateInput parametersStateInput)
         {
             switch ((RpcType)parametersStateInput.ReadInt(nameof(RpcType)))
             {

@@ -122,7 +122,7 @@ namespace BananaParty.WebSocketRelay.SoakTest
             _networkIdentity.SendRpc(TickRpcName, parameters, invokeLocally: false);
         }
 
-        public void ReceiveRpc(IStateInput parametersStateInput)
+        public void ReceiveRpc(Guid senderGuid, IStateInput parametersStateInput)
         {
             int clientIndex = parametersStateInput.ReadInt("Index");
             int sequence = parametersStateInput.ReadInt("Sequence");

@@ -186,7 +186,7 @@ namespace BananaParty.WebSocketRelay
             switch (data[0])
             {
                 case NetworkMessage.Rpc:
-                    RpcRouter.ProcessIncomingMessage(data);
+                    RpcRouter.ProcessIncomingMessage(senderGuid, data);
                     break;
                 case NetworkMessage.SyncIdentities:
                     ApplyIncomingChannelState(senderGuid, channel, data.AsMemory(1));
@@ -198,7 +198,7 @@ namespace BananaParty.WebSocketRelay
 
         public void SendRpc(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel, bool invokeLocally = true)
         {
-            RpcRouter.Send(networkIdentifier, rpcSubjectName, parametersStateOutput, channel, invokeLocally);
+            RpcRouter.Send(LocalClientIdentity, networkIdentifier, rpcSubjectName, parametersStateOutput, channel, invokeLocally);
         }
 
         public bool TryDequeueOutgoingRpcMessage(out string channel, out byte[] message)
@@ -246,13 +246,13 @@ namespace BananaParty.WebSocketRelay
             }
             else
             {
-                // The prefab name and authority owner are consumed here because the identity
+                // The prefab name and authority version are consumed here because the identity
                 // cannot read its own state before the prefab to spawn is known.
+                // Only the authority owner syncs an identity, so the sender owns it.
                 string prefabName = stateInput.ReadString(nameof(NetworkIdentity.PrefabName));
-                Guid networkAuthorityOwner = stateInput.ReadGuid(nameof(NetworkIdentity.NetworkAuthorityOwner));
                 long networkAuthorityVersion = stateInput.ReadLong(nameof(NetworkIdentity.NetworkAuthorityVersion));
 
-                NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, networkAuthorityOwner);
+                NetworkIdentity spawnedNetworkIdentity = Instantiate(prefabName, channel, networkIdentifier, senderGuid);
                 spawnedNetworkIdentity.NetworkAuthorityVersion = networkAuthorityVersion;
                 spawnedNetworkIdentity.ReadComponentStates(stateInput);
             }

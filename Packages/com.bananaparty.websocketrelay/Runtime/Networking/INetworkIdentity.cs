@@ -24,7 +24,8 @@ namespace BananaParty.WebSocketRelay
 
         void WriteNetworkState(IStateOutput stateOutput);
 
-        /// <returns>False when the state is outdated or was not written by the authority owner, so it was not applied.</returns>
+        /// <param name="senderGuid">The client that sent the state, as checked by the relay. Only owners sync, so it becomes the owner.</param>
+        /// <returns>False when the state is outdated, so it was not applied.</returns>
         bool ReadNetworkState(IStateInput stateInput, Guid senderGuid);
 
         void SendRpc(string rpcSubjectName, IStateOutput parametersStateOutput, bool invokeLocally = true);

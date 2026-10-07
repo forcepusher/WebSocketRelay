@@ -29,13 +29,14 @@ namespace BananaParty.WebSocketRelay
             _rpcTargets.Remove(rpcTarget);
         }
 
-        public void Send(Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel, bool invokeLocally = true)
+        /// <param name="senderGuid">The local client, passed to targets when the RPC is invoked locally.</param>
+        public void Send(Guid senderGuid, Guid networkIdentifier, string rpcSubjectName, IStateOutput parametersStateOutput, string channel, bool invokeLocally = true)
         {
             byte[] parametersPayload = _stateFormat.ToPayload(parametersStateOutput);
             _outgoingMessages.Enqueue((channel, CreateMessage(networkIdentifier, rpcSubjectName, parametersPayload)));
 
             if (invokeLocally)
-                Dispatch(networkIdentifier, rpcSubjectName, parametersPayload);
+                Dispatch(senderGuid, networkIdentifier, rpcSubjectName, parametersPayload);
         }
 
         public bool TryDequeueOutgoingMessage(out string channel, out byte[] message)
@@ -51,7 +52,8 @@ namespace BananaParty.WebSocketRelay
             return true;
         }
 
-        public void ProcessIncomingMessage(byte[] data)
+        /// <param name="senderGuid">The client that sent the message, as checked by the relay.</param>
+        public void ProcessIncomingMessage(Guid senderGuid, byte[] data)
         {
             int subjectNameLength = data[1] | (data[2] << 8);
             string rpcSubjectName = Encoding.UTF8.GetString(data, SubjectNameOffset, subjectNameLength);
@@ -60,7 +62,7 @@ namespace BananaParty.WebSocketRelay
             byte[] parametersPayload = new byte[data.Length - HeaderSize - subjectNameLength];
             Buffer.BlockCopy(data, HeaderSize + subjectNameLength, parametersPayload, 0, parametersPayload.Length);
 
-            Dispatch(networkIdentifier, rpcSubjectName, parametersPayload);
+            Dispatch(senderGuid, networkIdentifier, rpcSubjectName, parametersPayload);
         }
 
         public void ClearOutgoingMessages()
@@ -81,7 +83,7 @@ namespace BananaParty.WebSocketRelay
             return message;
         }
 
-        private void Dispatch(Guid networkIdentifier, string rpcSubjectName, byte[] parametersPayload)
+        private void Dispatch(Guid senderGuid, Guid networkIdentifier, string rpcSubjectName, byte[] parametersPayload)
         {
             // The identifier is matched at dispatch time instead of being indexed at
             // registration time, because a target can register before its identifier
@@ -96,7 +98,7 @@ namespace BananaParty.WebSocketRelay
                 if (rpcTarget.RpcSubjectName != rpcSubjectName)
                     continue;
 
-                rpcTarget.ReceiveRpc(_stateFormat.CreateInput(parametersPayload));
+                rpcTarget.ReceiveRpc(senderGuid, _stateFormat.CreateInput(parametersPayload));
             }
         }
     }

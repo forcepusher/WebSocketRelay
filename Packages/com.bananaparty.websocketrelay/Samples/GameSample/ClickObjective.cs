@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace BananaParty.WebSocketRelay.Samples
@@ -52,7 +53,7 @@ namespace BananaParty.WebSocketRelay.Samples
             _networkIdentity.SendRpc(RpcSubjectName, parametersOutput);
         }
 
-        public void ReceiveRpc(IStateInput parametersStateInput)
+        public void ReceiveRpc(Guid senderGuid, IStateInput parametersStateInput)
         {
             int clicks = parametersStateInput.ReadInt(ClicksParameterName);
 

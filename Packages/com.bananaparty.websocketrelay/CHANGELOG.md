@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
 ### Changed  
 - **Breaking:** The relay protocol has new hello and channel state messages, so clients and relay servers only work with others from 3.0.0 on.  
+- **Breaking:** `IRpcTarget.ReceiveRpc` receives the guid of the sender as checked by the relay, or of the local client for RPCs invoked locally.  
+- **Breaking:** Authority claims and state syncs no longer carry an owner guid. Receivers make the relay-checked sender the owner, so no client can claim or sync an identity for another.  
 - **Breaking:** `IRelayListener.OnDisconnectedFromRelay` is replaced by `OnConnectionStateChanged(previousState, state, reason)`.  
 - **Breaking:** `ISocket` has new members that custom implementations need to provide.  
 - **Breaking:** A lost connection no longer clears the session right away. It is cleared only when reconnecting gives up. Set `ReconnectTimeoutSeconds` to 0 for the old behavior.  
